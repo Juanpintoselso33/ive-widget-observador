@@ -1,0 +1,154 @@
+{
+  "coefficients": {
+    "intercept": 3.100477,
+    "tramo_edad_num": 0.24134,
+    "es_mujer": 0.82603,
+    "nivel_educ_num": 0.103818,
+    "religiosidad_num": -1.292317,
+    "es_montevideo": 0.651057,
+    "tiene_hijos": -0.834267,
+    "voto_fa": 0.978429,
+    "voto_pn": -0.574569,
+    "voto_pc": -0.163287,
+    "voto_ca": 0.525646
+  },
+  "odds_ratios": {
+    "tramo_edad_num": 1.273,
+    "es_mujer": 2.2842,
+    "nivel_educ_num": 1.1094,
+    "religiosidad_num": 0.2746,
+    "es_montevideo": 1.9176,
+    "tiene_hijos": 0.4342,
+    "voto_fa": 2.6603,
+    "voto_pn": 0.5629,
+    "voto_pc": 0.8493,
+    "voto_ca": 1.6916
+  },
+  "model_info": {
+    "pseudo_r2": 0.3201,
+    "n_observations": 2745,
+    "regularization": "Ridge (L2)",
+    "C": 1.0
+  },
+  "variable_ranges": {
+    "tramo_edad_num": {
+      "options": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "labels": [
+        "18-24 años",
+        "25-34 años",
+        "35-44 años",
+        "45-54 años",
+        "55+ años"
+      ],
+      "default": 2
+    },
+    "es_mujer": {
+      "options": [
+        0,
+        1
+      ],
+      "labels": [
+        "Hombre",
+        "Mujer"
+      ],
+      "default": 0
+    },
+    "nivel_educ_num": {
+      "options": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "labels": [
+        "Primaria",
+        "EMS incompleta",
+        "EMS completa",
+        "Terciaria incompleta",
+        "Terciaria completa"
+      ],
+      "default": 3
+    },
+    "religiosidad_num": {
+      "options": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "labels": [
+        "Nada",
+        "Poco",
+        "Bastante",
+        "Mucho"
+      ],
+      "default": 2
+    },
+    "es_montevideo": {
+      "options": [
+        0,
+        1
+      ],
+      "labels": [
+        "Interior",
+        "Montevideo"
+      ],
+      "default": 0
+    },
+    "tiene_hijos": {
+      "options": [
+        0,
+        1
+      ],
+      "labels": [
+        "No",
+        "Sí"
+      ],
+      "default": 0
+    },
+    "voto_2019": {
+      "options": [
+        "otros",
+        "fa",
+        "pn",
+        "pc",
+        "ca"
+      ],
+      "labels": [
+        "Otros/No votó",
+        "Frente Amplio",
+        "Partido Nacional",
+        "Partido Colorado",
+        "Cabildo Abierto"
+      ],
+      "default": "otros"
+    }
+  },
+  "stats_by_group": {
+    "voto_frente_amplio": 93.0,
+    "voto_partido_nacional": 55.0,
+    "voto_partido_colorado": 66.1,
+    "voto_cabildo_abierto": 74.3,
+    "religiosidad_nada": 92.8,
+    "religiosidad_poco": 86.7,
+    "religiosidad_bastante": 65.9,
+    "religiosidad_mucho": 14.6,
+    "educacion_ems_incomp": 73.3,
+    "educacion_ems_comp": 76.7,
+    "educacion_ter_incomp": 84.3,
+    "educacion_ter_comp": 84.8,
+    "edad_18-24": 78.8,
+    "edad_25-34": 77.1,
+    "edad_35-44": 78.2,
+    "edad_45-54": 68.0,
+    "edad_55+": 78.8
+  },
+  "prob_nacional": 78.6
+}
