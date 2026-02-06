@@ -34,3 +34,9 @@ Thumbs.db
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Test cache
+.pytest_cache/
+
+# Outputs (generados por el loop agéntico)
+outputs/

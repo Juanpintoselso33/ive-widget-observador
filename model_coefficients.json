@@ -1,34 +1,59 @@
 {
   "coefficients": {
-    "intercept": 3.100477,
-    "tramo_edad_num": 0.24134,
-    "es_mujer": 0.82603,
-    "nivel_educ_num": 0.103818,
-    "religiosidad_num": -1.292317,
-    "es_montevideo": 0.651057,
-    "tiene_hijos": -0.834267,
-    "voto_fa": 0.978429,
-    "voto_pn": -0.574569,
-    "voto_pc": -0.163287,
-    "voto_ca": 0.525646
+    "intercept": 1.25575,
+    "edad_25_34": -0.401094,
+    "edad_35_44": 0.122925,
+    "edad_45_54": -0.028142,
+    "edad_55_plus": 0.158078,
+    "es_mujer": 0.746715,
+    "educ_ems_incomp": 0.519466,
+    "educ_ems_comp": 0.494613,
+    "educ_ter_incomp": 0.650203,
+    "educ_ter_comp": 0.76806,
+    "relig_poco": -0.056661,
+    "relig_bastante": -1.339214,
+    "relig_mucho": -2.883566,
+    "es_montevideo": 0.699921,
+    "tiene_hijos": -0.365837,
+    "hogar_3_4": -0.22282,
+    "hogar_5_plus": -0.818177,
+    "balotaje_martinez": 1.016112,
+    "balotaje_lacalle": -0.729559,
+    "mujer_x_relig_mucho": -0.655457,
+    "mujer_x_tiene_hijos": 0.208601
   },
   "odds_ratios": {
-    "tramo_edad_num": 1.273,
-    "es_mujer": 2.2842,
-    "nivel_educ_num": 1.1094,
-    "religiosidad_num": 0.2746,
-    "es_montevideo": 1.9176,
-    "tiene_hijos": 0.4342,
-    "voto_fa": 2.6603,
-    "voto_pn": 0.5629,
-    "voto_pc": 0.8493,
-    "voto_ca": 1.6916
+    "edad_25_34": 0.6696,
+    "edad_35_44": 1.1308,
+    "edad_45_54": 0.9722,
+    "edad_55_plus": 1.1713,
+    "es_mujer": 2.1101,
+    "educ_ems_incomp": 1.6811,
+    "educ_ems_comp": 1.6399,
+    "educ_ter_incomp": 1.9159,
+    "educ_ter_comp": 2.1556,
+    "relig_poco": 0.9449,
+    "relig_bastante": 0.2621,
+    "relig_mucho": 0.0559,
+    "es_montevideo": 2.0136,
+    "tiene_hijos": 0.6936,
+    "hogar_3_4": 0.8003,
+    "hogar_5_plus": 0.4412,
+    "balotaje_martinez": 2.7624,
+    "balotaje_lacalle": 0.4821,
+    "mujer_x_relig_mucho": 0.5192,
+    "mujer_x_tiene_hijos": 1.232
   },
   "model_info": {
-    "pseudo_r2": 0.3201,
-    "n_observations": 2745,
+    "pseudo_r2": 0.3685,
+    "n_observations": 2802,
+    "n_predictors": 20,
     "regularization": "Ridge (L2)",
-    "C": 1.0
+    "C": 0.5,
+    "cv_neg_log_loss_mean": -0.3543,
+    "cv_neg_log_loss_std": 0.0237,
+    "weighted_mean_y": 0.7655,
+    "model_version": 2
   },
   "variable_ranges": {
     "tramo_edad_num": {
@@ -113,29 +138,36 @@
       ],
       "default": 0
     },
-    "voto_2019": {
+    "hogar_num": {
       "options": [
-        "otros",
-        "fa",
-        "pn",
-        "pc",
-        "ca"
+        1,
+        2,
+        3
       ],
       "labels": [
-        "Otros/No votó",
-        "Frente Amplio",
-        "Partido Nacional",
-        "Partido Colorado",
-        "Cabildo Abierto"
+        "1-2 personas",
+        "3-4 personas",
+        "5 o mas"
+      ],
+      "default": 2
+    },
+    "balotaje": {
+      "options": [
+        "otros",
+        "martinez",
+        "lacalle"
+      ],
+      "labels": [
+        "No votó/Blanco",
+        "Martínez (FA)",
+        "Lacalle (Coalición)"
       ],
       "default": "otros"
     }
   },
   "stats_by_group": {
-    "voto_frente_amplio": 93.0,
-    "voto_partido_nacional": 55.0,
-    "voto_partido_colorado": 66.1,
-    "voto_cabildo_abierto": 74.3,
+    "balotaje_martinez": 93.5,
+    "balotaje_lacalle": 55.8,
     "religiosidad_nada": 92.8,
     "religiosidad_poco": 86.7,
     "religiosidad_bastante": 65.9,
@@ -144,11 +176,36 @@
     "educacion_ems_comp": 76.7,
     "educacion_ter_incomp": 84.3,
     "educacion_ter_comp": 84.8,
+    "hogar_1_2": 83.7,
+    "hogar_3_4": 75.4,
+    "hogar_5_plus": 54.2,
     "edad_18-24": 78.8,
     "edad_25-34": 77.1,
     "edad_35-44": 78.2,
     "edad_45-54": 68.0,
     "edad_55+": 78.8
   },
-  "prob_nacional": 78.6
+  "predictor_names": [
+    "edad_25_34",
+    "edad_35_44",
+    "edad_45_54",
+    "edad_55_plus",
+    "es_mujer",
+    "educ_ems_incomp",
+    "educ_ems_comp",
+    "educ_ter_incomp",
+    "educ_ter_comp",
+    "relig_poco",
+    "relig_bastante",
+    "relig_mucho",
+    "es_montevideo",
+    "tiene_hijos",
+    "hogar_3_4",
+    "hogar_5_plus",
+    "balotaje_martinez",
+    "balotaje_lacalle",
+    "mujer_x_relig_mucho",
+    "mujer_x_tiene_hijos"
+  ],
+  "prob_nacional": 76.5
 }

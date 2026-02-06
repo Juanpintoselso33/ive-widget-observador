@@ -1,0 +1,19 @@
+# Configuracion de Streamlit - El Observador / IVE Widget
+
+[theme]
+font = "sans serif"
+
+[theme.light]
+primaryColor = "#2E45B8"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F2F2F2"
+textColor = "#121212"
+
+[theme.dark]
+primaryColor = "#475ED1"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1A1C2E"
+textColor = "#E8E8E8"
+
+[browser]
+gatherUsageStats = false
