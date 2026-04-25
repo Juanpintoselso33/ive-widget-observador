@@ -36,11 +36,12 @@ def _z_from_inputs(coef, tramo_edad, es_mujer, nivel_educ, religiosidad,
     edad_45_54 = 1 if tramo_edad == 4 else 0
     edad_55_plus = 1 if tramo_edad == 5 else 0
 
-    educ_cb = 1 if nivel_educ == 2 else 0
-    educ_bach_incomp = 1 if nivel_educ == 3 else 0
-    educ_bach_comp = 1 if nivel_educ == 4 else 0
-    educ_ter_incomp = 1 if nivel_educ == 5 else 0
-    educ_ter_comp = 1 if nivel_educ == 6 else 0
+    educ_cb_incomp = 1 if nivel_educ == 2 else 0
+    educ_cb_comp = 1 if nivel_educ == 3 else 0
+    educ_bach_incomp = 1 if nivel_educ == 4 else 0
+    educ_bach_comp = 1 if nivel_educ == 5 else 0
+    educ_ter_incomp = 1 if nivel_educ == 6 else 0
+    educ_ter_comp = 1 if nivel_educ == 7 else 0
 
     relig_poco = 1 if religiosidad == 2 else 0
     relig_bastante = 1 if religiosidad == 3 else 0
@@ -61,7 +62,8 @@ def _z_from_inputs(coef, tramo_edad, es_mujer, nivel_educ, religiosidad,
     z += coef['edad_45_54'] * edad_45_54
     z += coef['edad_55_plus'] * edad_55_plus
     z += coef['es_mujer'] * es_mujer
-    z += coef['educ_cb'] * educ_cb
+    z += coef['educ_cb_incomp'] * educ_cb_incomp
+    z += coef['educ_cb_comp'] * educ_cb_comp
     z += coef['educ_bach_incomp'] * educ_bach_incomp
     z += coef['educ_bach_comp'] * educ_bach_comp
     z += coef['educ_ter_incomp'] * educ_ter_incomp

@@ -64,13 +64,13 @@ Proporción ponderada de apoyo (entre quienes tienen posición definida): **76.5
 - **Pesos:** `sample_weight=w_norm`
 - **Métricas:** McFadden pseudo-R² = 0.3685, CV neg-log-loss = −0.3543 (±0.0237)
 
-### Predictores (21 variables, referencia entre paréntesis)
+### Predictores (22 variables, referencia entre paréntesis)
 
 | Grupo | Variables | Referencia |
 |-------|-----------|------------|
 | Edad | edad_25_34, edad_35_44, edad_45_54, edad_55_plus | 18–24 |
 | Sexo | es_mujer | Hombre |
-| Educación | educ_cb, educ_bach_incomp, educ_bach_comp, educ_ter_incomp, educ_ter_comp | Primaria o menos |
+| Educación | educ_cb_incomp, educ_cb_comp, educ_bach_incomp, educ_bach_comp, educ_ter_incomp, educ_ter_comp | Primaria o menos |
 | Religiosidad | relig_poco, relig_bastante, relig_mucho | Nada religioso |
 | Región | es_montevideo | Interior |
 | Hijos | tiene_hijos | Sin hijos |
@@ -83,7 +83,7 @@ Proporción ponderada de apoyo (entre quienes tienen posición definida): **76.5
 - **Mayor:** `relig_mucho` OR=0.056 (muy religioso vs nada: 18× menos chances de apoyar)
 - **Gender gap:** `es_mujer` OR=2.110 (las mujeres casi duplican las chances de apoyo)
 - **Voto 2019:** `balotaje_martinez` OR=2.762, `balotaje_lacalle` OR=0.482
-- **Educación:** `educ_ter_comp` (terciaria completa o más vs primaria o menos) — ver `model_coefficients.json` para OR actual tras recodificación a 6 categorías
+- **Educación:** `educ_ter_comp` (terciaria completa o más vs primaria o menos) — ver `model_coefficients.json` para OR actual tras recodificación a 7 categorías
 - **Región:** `es_montevideo` OR=2.014
 
 ## Selección de hiperparámetros
@@ -122,7 +122,7 @@ Sin dependencia de sklearn en runtime.
 ## Modelo secundario: probabilidad de neutralidad
 
 Junto al modelo principal de apoyo se entrena un **logit auxiliar** que predice
-P(NS-NC) sobre los mismos 21 predictores y la misma penalización Ridge (C=0.5,
+P(NS-NC) sobre los mismos 22 predictores y la misma penalización Ridge (C=0.5,
 sample_weight=w_norm). La variable dependiente es:
 
 - `es_neutral = 1` si Likert == 3 ("ni de acuerdo ni en desacuerdo") o falta respuesta
@@ -144,11 +144,11 @@ tasa nacional ponderada ≈ 19%.
 odds) sobre la escala completa Likert 1–5 (sin excluir neutrales) y compara
 sus coeficientes con los del modelo binario de producción.
 
-**Resultado actual:**
-- 19/21 variables con mismo signo entre binario y ordinal
+**Resultado actual (con 22 predictores, post split de Ciclo Básico):**
+- 20/22 variables con mismo signo entre binario y ordinal
 - **Top-4 predictores idénticos en ranking exacto:** relig_mucho, relig_bastante,
   balotaje_martinez, hogar_5_plus
-- Spearman top-5 = 1.0 dentro del subset; Spearman global = 0.50
+- Spearman top-5 = 1.0 dentro del subset; Spearman global = 0.47
 - Discrepancias en variables de baja magnitud (edad, interacciones secundarias)
   y `balotaje_lacalle` (la asociación Lacalle→contra IVE se atenúa al usar
   toda la escala porque muchos votantes Lacalle responden "de acuerdo" pero no
@@ -172,23 +172,24 @@ sugiere que esto no afecta la conclusión cualitativa.
 - Pesos tratados como frecuencias (`sample_weight`); SEs design-aware requieren Taylor lineal o bootstrap de diseño (no implementado)
 - El widget advierte explícitamente: "probabilidades basadas en correlaciones estadísticas, no predicciones individuales"
 
-## Recodificación de educación (v2.1, 2026-04-24)
+## Recodificación de educación (v2.1, 2026-04-24; refinada 2026-04-25 a 7 cat.)
 
-La variable original `nivel_educ` (5 categorías colapsadas) agrupa Ciclo Básico y Bachillerato incompleto bajo "EMS incompleta", lo que oscurece un salto sustantivo de actitudes en el medio del trayecto secundario. Se reemplazó por `nivel_educativo` (escala 1–10 ya presente en `base_limpia.csv`) recodificada en 6 categorías:
+La variable original `nivel_educ` (5 categorías colapsadas) agrupa Ciclo Básico y Bachillerato incompleto bajo "EMS incompleta", lo que oscurece un salto sustantivo de actitudes en el medio del trayecto secundario. Se reemplazó por `nivel_educativo` (escala 1–10 ya presente en `base_limpia.csv`) recodificada en **7 categorías** (Ciclo Básico se separa entre completo e incompleto en una segunda iteración para hacer explícito el corte al usuario y al modelo):
 
-| Cat. UI | Codes `nivel_educativo` | n (sin pesos) |
-|---|---|---|
-| Primaria o menos *(ref)* | 1, 2 | 37 |
-| Ciclo Básico | 3, 4 | 270 |
-| Bachillerato incompleto | 5 | 191 |
-| Bachillerato completo | 6 | 293 |
-| Terciaria incompleta | 7 | 755 |
-| Terciaria completa o más | 8, 9, 10 | 1.779 |
+| Cat. UI | Codes `nivel_educativo` |
+|---|---|
+| Primaria o menos *(ref)* | 1, 2 |
+| Ciclo Básico incompleto | 3 |
+| Ciclo Básico completo | 4 |
+| Bachillerato incompleto | 5 |
+| Bachillerato completo | 6 |
+| Terciaria incompleta | 7 |
+| Terciaria completa o más | 8, 9, 10 |
 
 **Etiquetas inferidas, no documentadas en el dataset.** El proveedor no entregó codebook para `nivel_educativo` (escala 1–10). Las etiquetas se infirieron a partir de:
 1. Escala estándar del INE/Mineduc Uruguay (Sin instrucción / Primaria / CB inc / CB comp / Bach inc / Bach comp / Ter inc / Ter comp / Posg inc / Posg comp).
 2. Cross-tabulación 1:1 con la `nivel_educ` colapsada existente: `{1,2}↔1-PRIMARIA`, `{3,4,5}↔2-EMS INCOMP`, `6↔3-EMS COMP`, `7↔4-TER INCOMP`, `{8,9,10}↔5-TER COMP`.
-3. Monotonía del apoyo al IVE entre las 6 categorías (ponderado): 50% → 72% → 75% → 77% → 84% → 85%.
+3. Monotonía del apoyo al IVE en `model_coefficients.json` (ver `stats_by_group`).
 
 **Riesgo asumido:** si el codebook real definiera otras etiquetas para los códigos 1–10, los nombres mostrados al usuario podrían ser incorrectos, aunque la jerarquía y la lógica de la regresión se mantendrían. Antes de publicación, conviene confirmar con el proveedor.
 

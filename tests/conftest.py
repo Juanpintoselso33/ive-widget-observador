@@ -28,7 +28,8 @@ def synthetic_model():
             # Género
             "es_mujer": 1.0,
             # Educación (ref: primaria o menos)
-            "educ_cb": 0.1,
+            "educ_cb_incomp": 0.05,
+            "educ_cb_comp": 0.1,
             "educ_bach_incomp": 0.15,
             "educ_bach_comp": 0.2,
             "educ_ter_incomp": 0.3,
@@ -54,7 +55,8 @@ def synthetic_model():
         "odds_ratios": {
             "edad_25_34": 1.105, "edad_35_44": 1.221, "edad_45_54": 0.905,
             "edad_55_plus": 1.350, "es_mujer": 2.718,
-            "educ_cb": 1.105, "educ_bach_incomp": 1.162, "educ_bach_comp": 1.221,
+            "educ_cb_incomp": 1.051, "educ_cb_comp": 1.105,
+            "educ_bach_incomp": 1.162, "educ_bach_comp": 1.221,
             "educ_ter_incomp": 1.350, "educ_ter_comp": 1.492,
             "relig_poco": 0.741, "relig_bastante": 0.449, "relig_mucho": 0.223,
             "es_montevideo": 1.649, "tiene_hijos": 0.607,
@@ -66,7 +68,8 @@ def synthetic_model():
             "intercept": -1.5,
             "edad_25_34": 0.0, "edad_35_44": 0.0, "edad_45_54": 0.0, "edad_55_plus": 0.1,
             "es_mujer": -0.2,
-            "educ_cb": 0.1, "educ_bach_incomp": 0.05, "educ_bach_comp": -0.1,
+            "educ_cb_incomp": 0.1, "educ_cb_comp": 0.1,
+            "educ_bach_incomp": 0.05, "educ_bach_comp": -0.1,
             "educ_ter_incomp": -0.3, "educ_ter_comp": -0.5,
             "relig_poco": 0.1, "relig_bastante": 0.2, "relig_mucho": 0.4,
             "es_montevideo": -0.2,
@@ -78,7 +81,8 @@ def synthetic_model():
         "odds_ratios_neutral": {
             "edad_25_34": 1.000, "edad_35_44": 1.000, "edad_45_54": 1.000,
             "edad_55_plus": 1.105, "es_mujer": 0.819,
-            "educ_cb": 1.105, "educ_bach_incomp": 1.051, "educ_bach_comp": 0.905,
+            "educ_cb_incomp": 1.105, "educ_cb_comp": 1.105,
+            "educ_bach_incomp": 1.051, "educ_bach_comp": 0.905,
             "educ_ter_incomp": 0.741, "educ_ter_comp": 0.607,
             "relig_poco": 1.105, "relig_bastante": 1.221, "relig_mucho": 1.492,
             "es_montevideo": 0.819, "tiene_hijos": 1.000,
@@ -89,7 +93,7 @@ def synthetic_model():
         "model_info_neutral": {
             "pseudo_r2": 0.05,
             "n_observations": 120,
-            "n_predictors": 21,
+            "n_predictors": 22,
             "regularization": "Ridge (L2)",
             "C": 1.0,
             "weighted_mean_y": 0.18,
@@ -99,7 +103,7 @@ def synthetic_model():
         "model_info": {
             "pseudo_r2": 0.35,
             "n_observations": 100,
-            "n_predictors": 21,
+            "n_predictors": 22,
             "regularization": "Ridge (L2)",
             "C": 1.0,
             "model_version": 2,
@@ -112,16 +116,17 @@ def synthetic_model():
             },
             "es_mujer": {"options": [0, 1], "labels": ["Hombre", "Mujer"], "default": 0},
             "nivel_educ_num": {
-                "options": [1, 2, 3, 4, 5, 6],
+                "options": [1, 2, 3, 4, 5, 6, 7],
                 "labels": [
                     "Primaria o menos",
-                    "Ciclo Básico",
+                    "Ciclo Básico incompleto",
+                    "Ciclo Básico completo",
                     "Bachillerato incompleto",
                     "Bachillerato completo",
                     "Terciaria incompleta",
                     "Terciaria completa o más",
                 ],
-                "default": 4,
+                "default": 5,
             },
             "religiosidad_num": {
                 "options": [1, 2, 3, 4],
@@ -155,7 +160,8 @@ def synthetic_model():
         "predictor_names": [
             "edad_25_34", "edad_35_44", "edad_45_54", "edad_55_plus",
             "es_mujer",
-            "educ_cb", "educ_bach_incomp", "educ_bach_comp", "educ_ter_incomp", "educ_ter_comp",
+            "educ_cb_incomp", "educ_cb_comp",
+            "educ_bach_incomp", "educ_bach_comp", "educ_ter_incomp", "educ_ter_comp",
             "relig_poco", "relig_bastante", "relig_mucho",
             "es_montevideo", "tiene_hijos",
             "hogar_3_4", "hogar_5_plus",

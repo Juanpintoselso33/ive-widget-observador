@@ -10,12 +10,13 @@ import pytest
 from model import predict_probability, predict_probability_neutral
 from config import get_interpretation, BALOTAJE_UI_TO_CODE
 
-# Claves de coeficientes del modelo v2 (21 predictores + intercept = 22 keys)
+# Claves de coeficientes del modelo v2 (22 predictores + intercept = 23 keys)
 _V2_COEF_KEYS = [
     "intercept",
     "edad_25_34", "edad_35_44", "edad_45_54", "edad_55_plus",
     "es_mujer",
-    "educ_cb", "educ_bach_incomp", "educ_bach_comp", "educ_ter_incomp", "educ_ter_comp",
+    "educ_cb_incomp", "educ_cb_comp",
+    "educ_bach_incomp", "educ_bach_comp", "educ_ter_incomp", "educ_ter_comp",
     "relig_poco", "relig_bastante", "relig_mucho",
     "es_montevideo", "tiene_hijos",
     "hogar_3_4", "hogar_5_plus",
@@ -131,9 +132,9 @@ class TestDummyEncoding:
         assert prob_25_34 > prob_ref
 
     def test_reference_educ_no_effect(self, synthetic_model):
-        """Nivel 1 (primaria o menos) es referencia, nivel 6 activa educ_ter_comp (coef > 0)."""
+        """Nivel 1 (primaria o menos) es referencia, nivel 7 activa educ_ter_comp (coef > 0)."""
         prob_ref = predict_probability(synthetic_model, 1, 0, 1, 1, 0, 0, 1, "otros")
-        prob_ter = predict_probability(synthetic_model, 1, 0, 6, 1, 0, 0, 1, "otros")
+        prob_ter = predict_probability(synthetic_model, 1, 0, 7, 1, 0, 0, 1, "otros")
         assert prob_ter > prob_ref
 
     def test_reference_relig_no_effect(self, synthetic_model):
@@ -323,7 +324,7 @@ class TestNeutralModel:
             synthetic_model, 1, 0, 1, 1, 0, 0, 1, "otros",
         )
         prob_terciaria = predict_probability_neutral(
-            synthetic_model, 1, 0, 6, 1, 0, 0, 1, "otros",
+            synthetic_model, 1, 0, 7, 1, 0, 0, 1, "otros",
         )
         assert prob_terciaria < prob_primaria
 

@@ -64,11 +64,11 @@ df['es_mujer'] = (df['sexo'] == 'F').astype(int)
 
 # ============================================================
 # NIVEL EDUCATIVO (dummies, referencia: primaria o menos)
-# Recodificación a 6 categorías a partir de nivel_educativo (escala 1-10)
-# que separa Ciclo Básico de Bachillerato.
+# Recodificación a 7 categorías a partir de nivel_educativo (escala 1-10).
 # Etiquetas inferidas (escala estándar uruguaya, ver CLAUDE.md):
 #   1 Sin instrucción / 2 Primaria  -> Primaria o menos (REF)
-#   3 CB inc / 4 CB comp           -> Ciclo Básico
+#   3 CB inc                       -> Ciclo Básico incompleto
+#   4 CB comp                      -> Ciclo Básico completo
 #   5 Bach inc                     -> Bachillerato incompleto
 #   6 Bach comp                    -> Bachillerato completo
 #   7 Ter inc                      -> Terciaria incompleta
@@ -78,7 +78,8 @@ def educ_a_cat(n):
     if pd.isna(n): return np.nan
     n = int(n)
     if n in (1, 2): return 'primaria'
-    if n in (3, 4): return 'cb'
+    if n == 3:      return 'cb_incomp'
+    if n == 4:      return 'cb_comp'
     if n == 5:      return 'bach_incomp'
     if n == 6:      return 'bach_comp'
     if n == 7:      return 'ter_incomp'
@@ -88,16 +89,17 @@ def educ_a_cat(n):
 df['nivel_educ_cat'] = df['nivel_educativo'].apply(educ_a_cat)
 
 # Dummies (referencia: primaria o menos)
-df['educ_cb'] = (df['nivel_educ_cat'] == 'cb').astype(int)
+df['educ_cb_incomp'] = (df['nivel_educ_cat'] == 'cb_incomp').astype(int)
+df['educ_cb_comp'] = (df['nivel_educ_cat'] == 'cb_comp').astype(int)
 df['educ_bach_incomp'] = (df['nivel_educ_cat'] == 'bach_incomp').astype(int)
 df['educ_bach_comp'] = (df['nivel_educ_cat'] == 'bach_comp').astype(int)
 df['educ_ter_incomp'] = (df['nivel_educ_cat'] == 'ter_incomp').astype(int)
 df['educ_ter_comp'] = (df['nivel_educ_cat'] == 'ter_comp').astype(int)
 
-# Mantener numérico para variable_ranges (UI): 1..6
+# Mantener numérico para variable_ranges (UI): 1..7
 df['nivel_educ_num'] = df['nivel_educ_cat'].map({
-    'primaria': 1, 'cb': 2, 'bach_incomp': 3,
-    'bach_comp': 4, 'ter_incomp': 5, 'ter_comp': 6,
+    'primaria': 1, 'cb_incomp': 2, 'cb_comp': 3, 'bach_incomp': 4,
+    'bach_comp': 5, 'ter_incomp': 6, 'ter_comp': 7,
 })
 
 # ============================================================
@@ -214,7 +216,8 @@ PREDICTORS = [
     # Género
     'es_mujer',
     # Educación (ref: primaria o menos)
-    'educ_cb', 'educ_bach_incomp', 'educ_bach_comp', 'educ_ter_incomp', 'educ_ter_comp',
+    'educ_cb_incomp', 'educ_cb_comp', 'educ_bach_incomp', 'educ_bach_comp',
+    'educ_ter_incomp', 'educ_ter_comp',
     # Religiosidad (ref: nada)
     'relig_poco', 'relig_bastante', 'relig_mucho',
     # Región
@@ -377,8 +380,8 @@ for cat, label in [('nada', 'nada'), ('poco', 'poco'), ('bastante', 'bastante'),
         prob = np.average(subset['favor_ive'], weights=subset[W])
         stats_by_group[f'religiosidad_{label}'] = round(prob * 100, 1)
 
-# Por nivel educativo (6 categorías)
-for cat in ['primaria', 'cb', 'bach_incomp', 'bach_comp', 'ter_incomp', 'ter_comp']:
+# Por nivel educativo (7 categorías)
+for cat in ['primaria', 'cb_incomp', 'cb_comp', 'bach_incomp', 'bach_comp', 'ter_incomp', 'ter_comp']:
     subset = df[(df['nivel_educ_cat'] == cat) & df['favor_ive'].notna()]
     if len(subset) > 0:
         prob = np.average(subset['favor_ive'], weights=subset[W])
@@ -443,16 +446,17 @@ output = {
         },
         "es_mujer": {"options": [0, 1], "labels": ["Hombre", "Mujer"], "default": 0},
         "nivel_educ_num": {
-            "options": [1, 2, 3, 4, 5, 6],
+            "options": [1, 2, 3, 4, 5, 6, 7],
             "labels": [
                 "Primaria o menos",
-                "Ciclo Básico",
+                "Ciclo Básico incompleto",
+                "Ciclo Básico completo",
                 "Bachillerato incompleto",
                 "Bachillerato completo",
                 "Terciaria incompleta",
                 "Terciaria completa o más",
             ],
-            "default": 4
+            "default": 5
         },
         "religiosidad_num": {
             "options": [1, 2, 3, 4],
