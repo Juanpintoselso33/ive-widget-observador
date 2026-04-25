@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"C:\\\\Users\\\\trico\\\\OneDrive\\\\Observador\\\\ive_widget\\\\.claude\\\\agents\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\trico\\\\OneDrive\\\\Observador\\\\ive_widget\\\\doc\")"
+    ]
+  }
+}

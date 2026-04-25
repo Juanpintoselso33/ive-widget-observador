@@ -191,18 +191,18 @@ def render_comparisons(model, prob, colors=None):
 
     with tab3:
         col1, col2, col3, col4 = st.columns(4)
-        _group_metric(col1, stats, 'educacion_primaria', "Primaria o menos", prob, colors, show_delta=False)
-        _group_metric(col2, stats, 'educacion_secundaria', "Secundaria", prob, colors, show_delta=False)
-        _group_metric(col3, stats, 'educacion_ter_incomp', "Terciaria incompleta", prob, colors, show_delta=False)
-        _group_metric(col4, stats, 'educacion_ter_comp', "Terciaria completa+", prob, colors, show_delta=False)
+        _group_metric(col1, stats, 'educacion_primaria', "Primaria o menos", prob, colors)
+        _group_metric(col2, stats, 'educacion_secundaria', "Secundaria", prob, colors)
+        _group_metric(col3, stats, 'educacion_ter_incomp', "Terciaria incompleta", prob, colors)
+        _group_metric(col4, stats, 'educacion_ter_comp', "Terciaria completa+", prob, colors)
 
     with tab4:
         col1, col2, col3, col4, col5 = st.columns(5)
-        _group_metric(col1, stats, 'edad_18-24', "18-24", prob, colors, show_delta=False)
-        _group_metric(col2, stats, 'edad_25-34', "25-34", prob, colors, show_delta=False)
-        _group_metric(col3, stats, 'edad_35-44', "35-44", prob, colors, show_delta=False)
-        _group_metric(col4, stats, 'edad_45-54', "45-54", prob, colors, show_delta=False)
-        _group_metric(col5, stats, 'edad_55+', "55+", prob, colors, show_delta=False)
+        _group_metric(col1, stats, 'edad_18-24', "18-24", prob, colors)
+        _group_metric(col2, stats, 'edad_25-34', "25-34", prob, colors)
+        _group_metric(col3, stats, 'edad_35-44', "35-44", prob, colors)
+        _group_metric(col4, stats, 'edad_45-54', "45-54", prob, colors)
+        _group_metric(col5, stats, 'edad_55+', "55+", prob, colors)
 
 
 def _group_metric(col, stats, key, label, prob, colors=None, show_delta=True):
@@ -259,7 +259,7 @@ def render_footer(model):
     """Renderiza el pie de p\u00e1gina."""
     st.markdown("""
     <div class="footer-text">
-        <strong>El Observador</strong> | Encuesta realizada en Uruguay 2025<br>
+        <strong>El Observador</strong> | Encuesta realizada en Uruguay 2025/2026<br>
         Basado en {} respuestas ponderadas | Modelo de regresi\u00f3n log\u00edstica<br>
         <em>Las probabilidades son estimaciones estad\u00edsticas basadas en grupos,
         no predicciones individuales</em>

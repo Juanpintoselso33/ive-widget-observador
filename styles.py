@@ -92,7 +92,7 @@ def get_custom_css(mode="light"):
     .prob-endpoints {{
         display: flex;
         justify-content: space-between;
-        margin-bottom: 0.5rem;
+        margin-bottom: 2.25rem;
     }}
 
     .prob-endpoint {{
@@ -274,11 +274,34 @@ def get_custom_css(mode="light"):
     /* ============================================================
        EXPANDER (METODOLOGIA)
        ============================================================ */
+    [data-testid="stExpander"] {{
+        margin-top: 1.5rem;
+    }}
+
     .streamlit-expanderHeader {{
         font-family: 'IBM Plex Sans', sans-serif;
         font-size: 0.9rem;
         font-weight: 600;
         color: {c['text']};
+    }}
+
+    /* ============================================================
+       MOBILE: forzar apilado de columnas
+       ============================================================ */
+    @media (max-width: 640px) {{
+        [data-testid="stHorizontalBlock"] {{
+            flex-direction: column !important;
+        }}
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
+            width: 100% !important;
+            flex: 1 1 100% !important;
+        }}
+        .main-title {{
+            font-size: 1.6rem;
+        }}
+        .result-number {{
+            font-size: 2.75rem;
+        }}
     }}
 
     /* ============================================================

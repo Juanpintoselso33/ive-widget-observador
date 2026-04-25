@@ -1,0 +1,273 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage[protrusion=true,expansion=false]{microtype}
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=black
+}
+
+\title{Nota metodológica: estimación de actitudes hacia la IVE mediante regresión logística ponderada}
+\author{Equipo de Datos --- El Observador}
+\date{2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent Esta nota documenta la metodología estadística detrás del widget interactivo \emph{Construí tu votante}, desarrollado por El Observador (Uruguay) con inspiración en el \emph{Build a Voter} de \textit{The Economist}. El widget estima la probabilidad de que una persona apoye la interrupción voluntaria del embarazo (IVE) en Uruguay a partir de sus características sociodemográficas y políticas. Se describe la fuente de datos, la construcción de la variable dependiente, la especificación del modelo (regresión logística binaria ponderada con penalización L2), la selección del hiperparámetro por validación cruzada, las medidas de ajuste y las principales interpretaciones sustantivas, así como las limitaciones de la estimación.
+\end{abstract}
+
+\section{Introducción}
+
+El widget \emph{Construí tu votante} es una herramienta interactiva publicada por El Observador que permite al lector ingresar sus propias características sociodemográficas y políticas y observar la probabilidad estimada de que una persona con ese perfil apoye la interrupción voluntaria del embarazo (IVE) en Uruguay. La propuesta se inspira en el \emph{Build a Voter} elaborado por \textit{The Economist}, adaptado aquí al contexto uruguayo y a una pregunta de opinión específica.
+
+Detrás del widget hay un modelo estadístico entrenado sobre una encuesta propia de El Observador. Esta nota tiene como objetivo documentar de manera transparente la construcción de ese modelo, de modo que los resultados puedan ser auditados, reproducidos y contextualizados por lectores con formación universitaria general.
+
+\section{Datos y muestra}
+
+Los datos provienen de una encuesta propia de El Observador, levantada en Uruguay entre 2025 y 2026. La muestra total cuenta con aproximadamente 3.300 observaciones de personas adultas residentes en el país. Cada observación dispone de una ponderación de post-estratificación, denominada \texttt{w\_norm}, normalizada a media unitaria, que corrige desbalances respecto de los totales poblacionales conocidos (edad, sexo, región y nivel educativo).
+
+Tras eliminar por \emph{listwise deletion} los casos con datos faltantes en las variables del modelo y excluir aquellos con respuesta neutral en el ítem de interés (véase sección siguiente), la muestra efectiva utilizada para la estimación asciende a $n = 2.802$ observaciones. La ponderación de cada caso se utiliza en todas las etapas de la estimación como \texttt{sample\_weight}, siguiendo el enfoque de pseudo-máxima verosimilitud \cite{Pfeffermann1993,Binder1983}. Esto implica que las estimaciones apuntan a la población adulta nacional y no sólo a la composición concreta de la muestra.
+
+\section{Construcción de la variable dependiente}
+
+La variable de interés se deriva del ítem \textbf{P174} del cuestionario, formulado en una escala Likert de 5 puntos:
+\begin{quote}
+\textit{``Las mujeres tienen derecho a decidir sobre su embarazo''}
+\end{quote}
+donde 1 indica ``muy en desacuerdo'' y 5 ``muy de acuerdo''.
+
+Definimos la variable binaria $\texttt{favor\_ive}$ como:
+\begin{equation}
+\texttt{favor\_ive}_i =
+\begin{cases}
+1, & \text{si Likert}_i \geq 4 \quad \text{(de acuerdo o muy de acuerdo)} \\
+0, & \text{si Likert}_i \leq 2 \quad \text{(en desacuerdo o muy en desacuerdo)} \\
+\text{excluido}, & \text{si Likert}_i = 3 \quad \text{(ni de acuerdo ni en desacuerdo)}
+\end{cases}
+\end{equation}
+
+La categoría neutral (Likert $= 3$) se excluye explícitamente del modelo. La categoría central de una escala Likert agrupa respondentes genuinamente ambivalentes, sin opinión formada y potenciales evasores de una respuesta socialmente costosa; forzarla al 0 o al 1 introduce error de clasificación no diferencial que atenúa los coeficientes estimados hacia cero \cite{Jacoby1994}. Aproximadamente el 22\% de los respondentes se ubica en esa categoría. En consecuencia, todas las probabilidades estimadas deben interpretarse como \textbf{condicionales a tener una posición definida} respecto del ítem.
+
+Entre quienes sí manifiestan una posición, la proporción ponderada de apoyo a la IVE es del 76,55\%. Esta cifra opera como punto de partida poblacional: el modelo ajusta esa probabilidad media hacia arriba o hacia abajo según el perfil sociodemográfico de cada persona.
+
+\section{Especificación del modelo}
+
+Se estima una regresión logística binaria ponderada con penalización L2 (\emph{ridge}). La probabilidad de apoyar la IVE, condicional a las covariables $\mathbf{x}$, se modela como:
+\begin{align}
+P(\texttt{favor\_ive}_i = 1 \mid \mathbf{x}_i) &= \sigma(z_i) = \frac{1}{1 + \exp(-z_i)}, \\
+z_i &= \beta_0 + \sum_{k=1}^{K} \beta_k \, x_{ik}.
+\end{align}
+
+Los coeficientes se obtienen minimizando la siguiente función objetivo penalizada:
+\begin{equation}
+\hat{\boldsymbol{\beta}} = \arg\min_{\boldsymbol{\beta}} \;\; \tfrac{1}{2} \lVert \boldsymbol{\beta} \rVert^{2} \;+\; C \sum_{i=1}^{n} w_i \, \ell\bigl(y_i, \sigma(\mathbf{x}_i^{\top} \boldsymbol{\beta})\bigr),
+\end{equation}
+donde $\ell$ es la log-verosimilitud negativa logística, $w_i$ es el peso muestral normalizado, y $C = 1/\lambda$ controla la fuerza de la regularización (valores más pequeños de $C$ implican regularización más fuerte). La minimización se realiza con el algoritmo L-BFGS, con un máximo de 2.000 iteraciones. La penalización L2 estabiliza los coeficientes en presencia de predictores correlacionados y mitiga el sobreajuste, al costo de introducir un sesgo que encoge los coeficientes hacia cero \cite{LeCessie1992}.
+
+El vector $\mathbf{x}$ contiene 20 predictores descritos con detalle en la sección~\ref{sec:interpretacion}.
+
+\section{Selección del hiperparámetro de regularización}
+
+El hiperparámetro $C$ se selecciona mediante validación cruzada estratificada de 5 pliegues (\texttt{StratifiedKFold}). La estratificación garantiza que cada pliegue de evaluación refleje la distribución de la variable dependiente en la muestra completa (${\approx}77\%$ de apoyo); sin ella, la varianza entre pliegues del estimador de error se inflaría artificialmente. La grilla explorada es
+\[
+C \in \{0{,}01,\; 0{,}1,\; 0{,}5,\; 1{,}0,\; 5{,}0,\; 10{,}0\}.
+\]
+El criterio de selección es la log-verosimilitud negativa ponderada (\emph{weighted negative log-loss}) promedio a través de los pliegues: esta métrica penaliza la calibración de probabilidades y no únicamente la clasificación binaria, lo que la convierte en el criterio más adecuado cuando el objetivo del modelo es estimar una probabilidad continua \cite{Kohavi1995}. El valor óptimo resulta ser $C = 0{,}5$ (equivalente a $\lambda = 2$), que corresponde a una regularización moderada. El desempeño medio en validación cruzada es
+\[
+\overline{\text{neg-log-loss}} = -0{,}3543 \; (\pm 0{,}0237).
+\]
+
+\section{Ajuste del modelo}
+
+Como medida global de ajuste reportamos el pseudo-$R^2$ de McFadden:
+\begin{equation}
+R^{2}_{\text{McFadden}} = 1 - \frac{\ln L_{\text{modelo}}}{\ln L_{\text{nulo}}}.
+\end{equation}
+El modelo nulo se define utilizando la \textbf{media ponderada} de la variable dependiente, coherentemente con el uso de pesos en el modelo completo. El valor obtenido es
+\[
+R^{2}_{\text{McFadden}} = 0{,}3685.
+\]
+Según los lineamientos originales de McFadden \cite{McFadden1974}, valores entre 0{,}2 y 0{,}4 indican un ``excelente ajuste'' en el contexto de modelos de elección discreta. Cabe recordar que los pseudo-$R^2$ tienden a ser sistemáticamente más bajos que el $R^2$ de MCO para ajustes equivalentes, por lo que no deben compararse directamente con los valores típicos de una regresión lineal.
+
+\section{Interpretación de los coeficientes}
+\label{sec:interpretacion}
+
+El modelo incluye 20 predictores, con las categorías de referencia indicadas entre paréntesis:
+\begin{itemize}
+\setlength{\itemsep}{2pt}
+\item \textbf{Edad}: dummies para 25--34, 35--44, 45--54 y 55+ (referencia: 18--24).
+\item \textbf{Sexo}: mujer (referencia: hombre).
+\item \textbf{Educación}: EMS incompleta, EMS completa, terciaria incompleta, terciaria completa (referencia: primaria).
+\item \textbf{Religiosidad}: poco, bastante, mucho religioso (referencia: nada religioso).
+\item \textbf{Región}: Montevideo (referencia: interior del país).
+\item \textbf{Hijos}: tiene hijos (referencia: sin hijos).
+\item \textbf{Tamaño del hogar}: 3--4 personas, 5+ personas (referencia: 1--2 personas).
+\item \textbf{Voto en el balotaje 2019}: Martínez (FA), Lacalle (coalición) (referencia: blanco/no votó/no recuerda).
+\item \textbf{Interacciones}: mujer$\times$mucho religioso, mujer$\times$tiene hijos.
+\end{itemize}
+
+El Cuadro~\ref{tab:or} presenta los \textit{odds ratios} completos del modelo (OR $= \exp(\beta_k)$), agrupados por bloque temático \cite{Hosmer2013}. Un OR mayor que 1 indica mayores chances de apoyar la IVE respecto de la categoría de referencia; un OR menor que 1 indica menores chances; todo ello manteniendo constantes el resto de los predictores.
+
+\begin{table}[htbp]
+\centering
+\caption{Odds ratios completos, regresión logística ponderada ($C = 0{,}5$, $n = 2.802$).}
+\label{tab:or}
+\begin{tabular}{lc}
+\toprule
+\textbf{Predictor (vs. referencia)} & \textbf{OR} \\
+\midrule
+\multicolumn{2}{l}{\textit{Edad (ref.: 18--24 años)}} \\
+\quad 25--34 años & 0{,}670 \\
+\quad 35--44 años & 1{,}131 \\
+\quad 45--54 años & 0{,}972 \\
+\quad 55 años o más & 1{,}171 \\
+\midrule
+\multicolumn{2}{l}{\textit{Sexo (ref.: hombre)}} \\
+\quad Mujer & 2{,}110 \\
+\midrule
+\multicolumn{2}{l}{\textit{Educación (ref.: primaria)}} \\
+\quad EMS incompleta & 1{,}681 \\
+\quad EMS completa & 1{,}640 \\
+\quad Terciaria incompleta & 1{,}916 \\
+\quad Terciaria completa & 2{,}156 \\
+\midrule
+\multicolumn{2}{l}{\textit{Religiosidad (ref.: nada religioso)}} \\
+\quad Poco religioso & 0{,}945 \\
+\quad Bastante religioso & 0{,}262 \\
+\quad Muy religioso & 0{,}056 \\
+\midrule
+\multicolumn{2}{l}{\textit{Región (ref.: interior)}} \\
+\quad Montevideo & 2{,}014 \\
+\midrule
+\multicolumn{2}{l}{\textit{Hijos (ref.: sin hijos)}} \\
+\quad Tiene hijos & 0{,}694 \\
+\midrule
+\multicolumn{2}{l}{\textit{Tamaño del hogar (ref.: 1--2 personas)}} \\
+\quad 3--4 personas & 0{,}800 \\
+\quad 5 o más personas & 0{,}441 \\
+\midrule
+\multicolumn{2}{l}{\textit{Voto balotaje 2019 (ref.: blanco/no votó/no recuerda)}} \\
+\quad Martínez (FA) & 2{,}762 \\
+\quad Lacalle (coalición multicolor) & 0{,}482 \\
+\midrule
+\multicolumn{2}{l}{\textit{Interacciones}} \\
+\quad Mujer $\times$ muy religioso & 0{,}519 \\
+\quad Mujer $\times$ tiene hijos & 1{,}232 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Edad.} El efecto de la edad sobre el apoyo a la IVE es no monótono: las personas de 25--34 años presentan menores chances que el grupo de referencia (18--24), mientras que los tramos de 35--44 y 55 o más muestran odds ligeramente superiores. La ausencia de un gradiente claro justifica el uso de variables indicadoras en lugar de una escala numérica continua.
+
+\paragraph{Sexo.} Las mujeres tienen, controlando el resto de los predictores del modelo, aproximadamente 2,1 veces las \textit{chances} de apoyar la IVE que los hombres con igual perfil. Este es el efecto principal, antes de aplicar los términos de interacción.
+
+\paragraph{Religiosidad.} Es el predictor con el efecto más fuerte. Respecto de las personas no religiosas, quienes se declaran muy religiosos tienen un OR de 0,056, es decir, \emph{unas 18 veces menos chances} de apoyar la IVE; los bastante religiosos, aproximadamente cuatro veces menos.
+
+\paragraph{Educación y región.} El apoyo a la IVE crece de forma aproximadamente monótona con el nivel educativo: desde EMS incompleta (OR~=~1,68) hasta terciaria completa (OR~=~2,16), siempre respecto de quienes alcanzaron solo primaria. Residir en Montevideo casi duplica las chances de apoyo frente al interior del país (OR~=~2,01).
+
+\paragraph{Hijos y tamaño del hogar.} Tener hijos se asocia a menores chances de apoyo (OR~=~0,69), efecto que se atenúa para las madres por el término de interacción (véase más abajo). El tamaño del hogar muestra un gradiente negativo: los hogares de 5 o más personas tienen menos de la mitad de las chances de los hogares unipersonales o de pareja (OR~=~0,44), posiblemente reflejo de la correlación entre composición familiar numerosa, religiosidad y residencia en el interior.
+
+\paragraph{Voto en el balotaje 2019.} Haber votado por Martínez (Frente Amplio) se asocia a un OR de 2,76, mientras que haber votado por Lacalle Pou (coalición multicolor) se asocia a un OR de 0,48 respecto de la categoría de referencia.
+
+\paragraph{Interacciones.} Las dos interacciones incluidas capturan que el efecto del sexo no es homogéneo:
+\begin{itemize}
+\item \textit{Mujer $\times$ muy religioso.} El diferencial de género a favor de la IVE se reduce marcadamente entre quienes son muy religiosos. El efecto neto para una mujer muy religiosa es
+\[
+\beta_{\text{mujer}} + \beta_{\text{mujer}\times\text{relig.\,mucho}} = 0{,}7467 + (-0{,}6555) = +0{,}0912,
+\]
+prácticamente nulo; mientras que para una mujer no religiosa el efecto de ser mujer sigue siendo $+0{,}7467$.
+
+\item \textit{Mujer $\times$ tiene hijos.} Tener hijos reduce el apoyo (efecto ``parental''), pero ese castigo se atenúa para las madres. El efecto neto para mujeres con hijos es $-0{,}3658 + 0{,}2086 = -0{,}157$, frente a $-0{,}3658$ para padres varones.
+\end{itemize}
+
+\paragraph{Estadísticas descriptivas ponderadas.} Para contextualizar las estimaciones, el Cuadro~\ref{tab:desc} reporta el porcentaje ponderado de apoyo a la IVE en grupos seleccionados (sobre quienes tienen posición definida).
+
+\begin{table}[htbp]
+\centering
+\caption{Apoyo ponderado a la IVE por grupo (porcentaje).}
+\label{tab:desc}
+\begin{tabular}{lr}
+\toprule
+\textbf{Grupo} & \textbf{\% apoyo} \\
+\midrule
+\multicolumn{2}{l}{\textit{Religiosidad}} \\
+\quad Nada religioso & 92{,}8 \\
+\quad Poco religioso & 86{,}7 \\
+\quad Bastante religioso & 65{,}9 \\
+\quad Muy religioso & 14{,}6 \\
+\midrule
+\multicolumn{2}{l}{\textit{Voto balotaje 2019}} \\
+\quad Martínez & 93{,}5 \\
+\quad Lacalle & 55{,}8 \\
+\midrule
+\multicolumn{2}{l}{\textit{Educación}} \\
+\quad Terciaria completa & 84{,}8 \\
+\midrule
+\multicolumn{2}{l}{\textit{Tamaño del hogar}} \\
+\quad 1--2 personas & 83{,}7 \\
+\quad 3--4 personas & 75{,}4 \\
+\quad 5+ personas & 54{,}2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Limitaciones}
+
+Las estimaciones presentadas deben interpretarse teniendo en cuenta las siguientes limitaciones:
+\begin{enumerate}
+\setlength{\itemsep}{2pt}
+\item \textbf{Exclusión de respuestas neutrales.} Al retirar del modelo a quienes contestan ``ni de acuerdo ni en desacuerdo'' (Likert $= 3$), las probabilidades estimadas son condicionales a tener una posición definida. No deben leerse como probabilidades marginales poblacionales.
+
+\item \textbf{Estimación ridge y ausencia de errores estándar analíticos.} La estimación con penalización \emph{ridge} no produce errores estándar analíticos directamente interpretables; por ello no se reportan valores-$p$ ni intervalos de confianza. La cuantificación de la incertidumbre requeriría métodos de remuestreo (\emph{bootstrap}) que no han sido implementados en esta versión del modelo.
+
+\item \textbf{Ausencia de conjunto de prueba externo.} El desempeño se evalúa exclusivamente mediante validación cruzada; no hay conjunto \emph{hold-out} independiente.
+
+\item \textbf{Pesos tratados como pesos de frecuencia.} Los pesos $w_i$ se utilizan como \texttt{sample\_weight} en la librería \texttt{scikit-learn}, lo que es apropiado para estimación puntual bajo pseudo-máxima verosimilitud, pero no incorpora el diseño muestral a los errores estándar. Una inferencia basada en el diseño requeriría linealización de Taylor o pesos replicados \cite{Binder1983}.
+
+\item \textbf{Asociaciones, no efectos causales.} El widget reporta asociaciones correlacionales. Los coeficientes no deben interpretarse como efectos causales de las variables sobre las actitudes hacia la IVE.
+
+\item \textbf{Recuerdo de voto.} La variable de voto en el balotaje de 2019 se construye a partir del autorreporte, sujeto a sesgos de memoria y de deseabilidad social (\emph{recall bias}).
+\end{enumerate}
+
+\begin{thebibliography}{9}
+
+\bibitem{Pfeffermann1993}
+Pfeffermann, D.\ (1993). ``The Role of Sampling Weights When Modeling Survey Data''. \textit{International Statistical Review}, 61(2), 317--337.
+
+\bibitem{Binder1983}
+Binder, D.\ A.\ (1983). ``On the Variances of Asymptotically Normal Estimators from Complex Surveys''. \textit{International Statistical Review}, 51(3), 279--292.
+
+\bibitem{McFadden1974}
+McFadden, D.\ (1974). ``Conditional Logit Analysis of Qualitative Choice Behavior''. En P.\ Zarembka (ed.), \textit{Frontiers in Econometrics}. New York: Academic Press, pp.\ 105--142.
+
+\bibitem{Hosmer2013}
+Hosmer, D.\ W., Lemeshow, S., y Sturdivant, R.\ X.\ (2013). \textit{Applied Logistic Regression} (3.ª ed.). Hoboken, NJ: Wiley.
+
+\bibitem{Kohavi1995}
+Kohavi, R.\ (1995). ``A Study of Cross-Validation and Bootstrap for Accuracy Estimation and Model Selection''. En \textit{Proceedings of the 14th International Joint Conference on Artificial Intelligence (IJCAI)}, vol.\ 2, pp.\ 1137--1143.
+
+\bibitem{LeCessie1992}
+Le~Cessie, S., y van~Houwelingen, J.\ C.\ (1992). ``Ridge Estimators in Logistic Regression''. \textit{Applied Statistics}, 41(1), 191--201.
+
+\bibitem{Jacoby1994}
+Jacoby, W.\ G.\ (1994). ``The Structure of Ideological Thinking in the American Electorate''. \textit{American Journal of Political Science}, 39(2), 314--335. Véase también: Narayan, S., y Krosnick, J.\ A.\ (1996). ``Education and Question Order Effects on Political Attitude Reporting''. \textit{Public Opinion Quarterly}, 60(2), 214--251.
+
+\bibitem{Economist}
+\textit{The Economist} (2024). ``Build a Voter: use our model to find out how demographic groups vote''. The Economist Interactive. Recuperado de \url{https://www.economist.com/interactive/us-2024-election/build-a-voter}.
+
+\end{thebibliography}
+
+\end{document}
