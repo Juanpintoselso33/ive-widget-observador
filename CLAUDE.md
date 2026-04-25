@@ -62,15 +62,15 @@ Proporción ponderada de apoyo (entre quienes tienen posición definida): **76.5
 - **Solver:** L-BFGS, `max_iter=2000`, `random_state=42`
 - **Regularización:** `C=0.5` (seleccionado por CV)
 - **Pesos:** `sample_weight=w_norm`
-- **Métricas:** McFadden pseudo-R² = 0.3685, CV neg-log-loss = −0.3543 (±0.0237)
+- **Métricas:** McFadden pseudo-R² = 0.3687, CV neg-log-loss = −0.3539 (±0.0240)
 
-### Predictores (20 variables, referencia entre paréntesis)
+### Predictores (19 variables, referencia entre paréntesis)
 
 | Grupo | Variables | Referencia |
 |-------|-----------|------------|
 | Edad | edad_25_34, edad_35_44, edad_45_54, edad_55_plus | 18–24 |
 | Sexo | es_mujer | Hombre |
-| Educación | educ_bach_incomp, educ_bach_comp, educ_ter_incomp, educ_ter_comp | Primaria o menos |
+| Educación | educ_secundaria, educ_ter_incomp, educ_ter_comp | Primaria o menos |
 | Religiosidad | relig_poco, relig_bastante, relig_mucho | Nada religioso |
 | Región | es_montevideo | Interior |
 | Hijos | tiene_hijos | Sin hijos |
@@ -83,7 +83,7 @@ Proporción ponderada de apoyo (entre quienes tienen posición definida): **76.5
 - **Mayor:** `relig_mucho` OR=0.056 (muy religioso vs nada: 18× menos chances de apoyar)
 - **Gender gap:** `es_mujer` OR=2.110 (las mujeres casi duplican las chances de apoyo)
 - **Voto 2019:** `balotaje_martinez` OR=2.762, `balotaje_lacalle` OR=0.482
-- **Educación:** `educ_ter_comp` (terciaria completa o más vs primaria o menos) — ver `model_coefficients.json` para OR actual tras recodificación a 5 categorías
+- **Educación:** `educ_ter_comp` OR≈2.21 (terciaria completa o más vs primaria o menos); `educ_secundaria` OR≈1.73; `educ_ter_incomp` OR≈1.98
 - **Región:** `es_montevideo` OR=2.014
 
 ## Selección de hiperparámetros
@@ -100,7 +100,7 @@ Proporción ponderada de apoyo (entre quienes tienen posición definida): **76.5
 
 ## Inferencia (app)
 
-`model.py` lee `model_coefficients.json` vía `@st.cache_data`, construye el vector de 20 dummies/interacciones a partir de los 8 inputs del usuario, y evalúa:
+`model.py` lee `model_coefficients.json` vía `@st.cache_data`, construye el vector de 19 dummies/interacciones a partir de los 8 inputs del usuario, y evalúa:
 
 ```python
 z = intercept + sum(coef[k] * x[k] for k in predictors)
@@ -122,7 +122,7 @@ Sin dependencia de sklearn en runtime.
 ## Modelo secundario: probabilidad de neutralidad
 
 Junto al modelo principal de apoyo se entrena un **logit auxiliar** que predice
-P(NS-NC) sobre los mismos 20 predictores y la misma penalización Ridge (C=0.5,
+P(NS-NC) sobre los mismos 19 predictores y la misma penalización Ridge (C=0.5,
 sample_weight=w_norm). La variable dependiente es:
 
 - `es_neutral = 1` si Likert == 3 ("ni de acuerdo ni en desacuerdo") o falta respuesta
@@ -144,11 +144,11 @@ tasa nacional ponderada ≈ 19%.
 odds) sobre la escala completa Likert 1–5 (sin excluir neutrales) y compara
 sus coeficientes con los del modelo binario de producción.
 
-**Resultado actual (con 20 predictores, post colapso CB → Bach incompleto):**
-- 18/20 variables con mismo signo entre binario y ordinal
+**Resultado actual (19 predictores, post colapso Bach inc + Bach comp → Secundaria):**
+- 17/19 variables con mismo signo entre binario y ordinal
 - **Top-5 predictores idénticos en ranking exacto:** relig_mucho, relig_bastante,
   balotaje_martinez, hogar_5_plus, educ_ter_comp
-- Spearman top-5 = 1.0; Spearman global = 0.50
+- Spearman top-5 = 1.0; Spearman global ≈ 0.52
 - Discrepancias en variables de baja magnitud (edad_35_44, edad_55_plus) y
   atenuación esperable en `balotaje_lacalle` (la asociación Lacalle→contra IVE
   se diluye al usar toda la escala porque muchos votantes Lacalle responden
@@ -172,30 +172,30 @@ sugiere que esto no afecta la conclusión cualitativa.
 - Pesos tratados como frecuencias (`sample_weight`); SEs design-aware requieren Taylor lineal o bootstrap de diseño (no implementado)
 - El widget advierte explícitamente: "probabilidades basadas en correlaciones estadísticas, no predicciones individuales"
 
-## Recodificación de educación (v2.1, 2026-04-24; iterada 2026-04-25 a 7 cat. y revertida a 5 cat.)
+## Recodificación de educación (iterada 2026-04-24 → 2026-04-25, final 4 cat.)
 
-Se exploró pasar de la `nivel_educ` original (5 cats colapsadas por el proveedor) a una versión más fina sobre `nivel_educativo` (escala 1–10), abriendo Ciclo Básico (CB) y Bachillerato incompleto. Diagnóstico (`scripts/diagnostico_educ.py`, `scripts/test_sin_ridge.py`):
+Se exploró abrir la `nivel_educ` original del proveedor (5 cats colapsadas) sobre la escala fina `nivel_educativo` (1–10). Tras varias iteraciones (7 cats, 5 cats) se llegó a 4 categorías. Diagnósticos: `scripts/diagnostico_educ.py`, `scripts/diagnostico_bach.py`, `scripts/test_sin_ridge.py`.
 
-- Tasas crudas ponderadas de apoyo IVE eran monotónicas pero CB-Bach formaban una **meseta** (~72–75%, gap < 3pp).
-- Coeficientes ajustados (controlando religiosidad, balotaje, edad) **invierten** levemente la jerarquía (CB > Bach inc, ~0.03–0.04 logit) tanto con Ridge como con MLE puro: la inversión es señal real, no artefacto, pero <1pp en probabilidad.
-- Confounder principal: CB tiene mayor proporción de muy religiosos (12.7%) que Bach inc (9.5%); al controlar por religiosidad, CB se infla.
+**Iteración 1 (7→5 cat):** colapsar CB inc + CB comp + Bach inc en "Bachillerato incompleto". CB-Bach formaban una meseta (~72–75%) y los coeficientes ajustados invertían CB > Bach inc por confounder de religiosidad.
 
-**Decisión final (5 categorías):** se vuelve a colapsar CB inc + CB comp + Bach inc en una única **"Bachillerato incompleto"**. La distinción ofrecía mejora marginal, ruido en la presentación y una inversión contraintuitiva que costaba más explicar que el valor que aportaba.
+**Iteración 2 (5→4 cat, final):** colapsar Bach inc + Bach comp en una sola **"Secundaria"**. Las tasas crudas eran monotónicas (73.3% vs 76.7%) pero el efecto neto controlando por sexo, religión, balotaje y región era ~0 con leve inversión (gap ≈ 0.024 logit, <0.5pp probabilidad). Confounder principal: bach_comp tiene mayor proporción de mujeres (62.9% vs 48.3% en bach_inc), urbanos (48.3% vs 42.3%) y nada religiosos (31.8% vs 26.4%); su "ventaja cruda" es composición, no efecto educativo neto. Sin controles la jerarquía es la esperada (bach_comp > bach_inc, gap ≈ 0.18 logit en MLE puro), confirmando que el flip es mediación de confounders.
 
 | Cat. UI | Codes `nivel_educativo` |
 |---|---|
 | Primaria o menos *(ref)* | 1, 2 |
-| Bachillerato incompleto | 3, 4, 5 |
-| Bachillerato completo | 6 |
+| Secundaria | 3, 4, 5, 6 |
 | Terciaria incompleta | 7 |
 | Terciaria completa o más | 8, 9, 10 |
 
-**Etiquetas inferidas, no documentadas en el dataset.** El proveedor no entregó codebook para `nivel_educativo` (escala 1–10). Las etiquetas se infirieron a partir de:
-1. Escala estándar del INE/Mineduc Uruguay (Sin instrucción / Primaria / CB inc / CB comp / Bach inc / Bach comp / Ter inc / Ter comp / Posg inc / Posg comp).
-2. Cross-tabulación 1:1 con la `nivel_educ` colapsada del proveedor: `{1,2}↔1-PRIMARIA`, `{3,4,5}↔2-EMS INCOMP`, `6↔3-EMS COMP`, `7↔4-TER INCOMP`, `{8,9,10}↔5-TER COMP`.
-3. Monotonía del apoyo al IVE en `model_coefficients.json` (ver `stats_by_group`).
+Coeficientes resultantes monotónicos: `educ_secundaria` 0.545 → `educ_ter_incomp` 0.681 → `educ_ter_comp` 0.795.
 
-**Riesgo asumido:** si el codebook real definiera otras etiquetas para los códigos 1–10, los nombres mostrados al usuario podrían ser incorrectos, aunque la jerarquía y la lógica de la regresión se mantendrían. Antes de publicación, conviene confirmar con el proveedor.
+**Etiquetas inferidas, no documentadas en el dataset.** El proveedor no entregó codebook para `nivel_educativo` (escala 1–10). El mapeo se infirió de la escala estándar INE/Mineduc Uruguay y de la cross-tabulación 1:1 con la `nivel_educ` colapsada del proveedor.
+
+**Riesgo asumido:** si el codebook real definiera otras etiquetas para los códigos 1–10, los nombres podrían ser incorrectos, aunque la jerarquía y la lógica de la regresión se mantendrían. Antes de publicación, conviene confirmar con el proveedor.
+
+## Limpieza de outliers en edad
+
+`train_model.py` setea a NaN los valores de `edad < 18` o `edad > 110` antes de cualquier feature. La encuesta tenía 2 casos con valores tipo año-de-nacimiento o fecha codificada como número (e.g. 1966, 26091962). No afectaba al modelo principal (los tramos de edad son categóricos y caían en `55+` o NaN), pero sí contaminaba `stats_by_group` y promedios crudos.
 
 ## Convenciones de código
 

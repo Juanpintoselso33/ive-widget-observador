@@ -190,13 +190,11 @@ def render_comparisons(model, prob, colors=None):
         _group_metric(col2, stats, 'balotaje_lacalle', "Lacalle (Coalici\u00f3n)", prob, colors)
 
     with tab3:
-        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        col1, col2, col3, col4 = st.columns(4)
         _group_metric(col1, stats, 'educacion_primaria', "Primaria o menos", prob, colors, show_delta=False)
-        _group_metric(col2, stats, 'educacion_cb', "Ciclo Básico", prob, colors, show_delta=False)
-        _group_metric(col3, stats, 'educacion_bach_incomp', "Bach. incompleto", prob, colors, show_delta=False)
-        _group_metric(col4, stats, 'educacion_bach_comp', "Bach. completo", prob, colors, show_delta=False)
-        _group_metric(col5, stats, 'educacion_ter_incomp', "Terciaria incompleta", prob, colors, show_delta=False)
-        _group_metric(col6, stats, 'educacion_ter_comp', "Terciaria completa+", prob, colors, show_delta=False)
+        _group_metric(col2, stats, 'educacion_secundaria', "Secundaria", prob, colors, show_delta=False)
+        _group_metric(col3, stats, 'educacion_ter_incomp', "Terciaria incompleta", prob, colors, show_delta=False)
+        _group_metric(col4, stats, 'educacion_ter_comp', "Terciaria completa+", prob, colors, show_delta=False)
 
     with tab4:
         col1, col2, col3, col4, col5 = st.columns(5)

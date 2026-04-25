@@ -31,6 +31,16 @@ print("Cargando datos...")
 df = pd.read_csv(DATA_FILE)
 print(f"Base cargada: {len(df)} casos")
 
+# Limpieza de outliers en edad: hay ~2 casos con valores fuera de rango
+# (e.g. años de nacimiento o fechas codificadas como número en vez de edad).
+# Los pasamos a NaN para que sean excluidos por dropna() y no contaminen
+# tabulaciones cruzadas. No afectan al modelo principal directamente porque
+# usamos tramos categóricos, pero sí a `stats_by_group`.
+n_outliers_edad = ((df['edad'] < 18) | (df['edad'] > 110)).sum()
+if n_outliers_edad:
+    print(f"Limpiando {n_outliers_edad} outliers en edad (<18 o >110)")
+    df.loc[(df['edad'] < 18) | (df['edad'] > 110), 'edad'] = np.nan
+
 print("\nCreando variables...")
 
 # ============================================================
@@ -64,23 +74,23 @@ df['es_mujer'] = (df['sexo'] == 'F').astype(int)
 
 # ============================================================
 # NIVEL EDUCATIVO (dummies, referencia: primaria o menos)
-# Recodificación a 5 categorías a partir de nivel_educativo (escala 1-10).
-# Ciclo Básico (codes 3, 4) se colapsa con Bachillerato incompleto (5):
-# diagnóstico mostró que CB-Bach inc forman una meseta (apoyo ~72-75%),
-# y los coeficientes ajustados por confounders (religiosidad, balotaje,
-# edad) los vuelven prácticamente intercambiables (gap < 0.05 logit).
-#   1 Sin instrucción / 2 Primaria         -> Primaria o menos (REF)
-#   3 CB inc / 4 CB comp / 5 Bach inc      -> Bachillerato incompleto
-#   6 Bach comp                            -> Bachillerato completo
-#   7 Ter inc                              -> Terciaria incompleta
-#   8 Ter comp / 9 Posg inc / 10 Posg comp -> Terciaria completa+
+# Recodificación a 4 categorías a partir de nivel_educativo (escala 1-10).
+# Bachillerato incompleto + Bachillerato completo se colapsan en "Secundaria":
+# las tasas crudas son monotónicas (73.3% vs 76.7%) pero el efecto neto
+# controlando por confounders (sexo, religión, balotaje, región) es
+# indistinguible (gap ~0.024 logit, signo invertido y dentro del ruido).
+# La mayor proporción de mujeres y urbanos en bach_comp explica la
+# diferencia cruda; no es un efecto educativo neto.
+#   1 Sin instrucción / 2 Primaria              -> Primaria o menos (REF)
+#   3 CB inc / 4 CB comp / 5 Bach inc / 6 Bach comp -> Secundaria
+#   7 Ter inc                                   -> Terciaria incompleta
+#   8 Ter comp / 9 Posg inc / 10 Posg comp      -> Terciaria completa+
 # ============================================================
 def educ_a_cat(n):
     if pd.isna(n): return np.nan
     n = int(n)
     if n in (1, 2): return 'primaria'
-    if n in (3, 4, 5): return 'bach_incomp'
-    if n == 6:      return 'bach_comp'
+    if n in (3, 4, 5, 6): return 'secundaria'
     if n == 7:      return 'ter_incomp'
     if n in (8, 9, 10): return 'ter_comp'
     return np.nan
@@ -88,14 +98,13 @@ def educ_a_cat(n):
 df['nivel_educ_cat'] = df['nivel_educativo'].apply(educ_a_cat)
 
 # Dummies (referencia: primaria o menos)
-df['educ_bach_incomp'] = (df['nivel_educ_cat'] == 'bach_incomp').astype(int)
-df['educ_bach_comp'] = (df['nivel_educ_cat'] == 'bach_comp').astype(int)
+df['educ_secundaria'] = (df['nivel_educ_cat'] == 'secundaria').astype(int)
 df['educ_ter_incomp'] = (df['nivel_educ_cat'] == 'ter_incomp').astype(int)
 df['educ_ter_comp'] = (df['nivel_educ_cat'] == 'ter_comp').astype(int)
 
-# Mantener numérico para variable_ranges (UI): 1..5
+# Mantener numérico para variable_ranges (UI): 1..4
 df['nivel_educ_num'] = df['nivel_educ_cat'].map({
-    'primaria': 1, 'bach_incomp': 2, 'bach_comp': 3, 'ter_incomp': 4, 'ter_comp': 5,
+    'primaria': 1, 'secundaria': 2, 'ter_incomp': 3, 'ter_comp': 4,
 })
 
 # ============================================================
@@ -212,7 +221,7 @@ PREDICTORS = [
     # Género
     'es_mujer',
     # Educación (ref: primaria o menos)
-    'educ_bach_incomp', 'educ_bach_comp', 'educ_ter_incomp', 'educ_ter_comp',
+    'educ_secundaria', 'educ_ter_incomp', 'educ_ter_comp',
     # Religiosidad (ref: nada)
     'relig_poco', 'relig_bastante', 'relig_mucho',
     # Región
@@ -375,8 +384,8 @@ for cat, label in [('nada', 'nada'), ('poco', 'poco'), ('bastante', 'bastante'),
         prob = np.average(subset['favor_ive'], weights=subset[W])
         stats_by_group[f'religiosidad_{label}'] = round(prob * 100, 1)
 
-# Por nivel educativo (5 categorías)
-for cat in ['primaria', 'bach_incomp', 'bach_comp', 'ter_incomp', 'ter_comp']:
+# Por nivel educativo (4 categorías)
+for cat in ['primaria', 'secundaria', 'ter_incomp', 'ter_comp']:
     subset = df[(df['nivel_educ_cat'] == cat) & df['favor_ive'].notna()]
     if len(subset) > 0:
         prob = np.average(subset['favor_ive'], weights=subset[W])
@@ -441,15 +450,14 @@ output = {
         },
         "es_mujer": {"options": [0, 1], "labels": ["Hombre", "Mujer"], "default": 0},
         "nivel_educ_num": {
-            "options": [1, 2, 3, 4, 5],
+            "options": [1, 2, 3, 4],
             "labels": [
                 "Primaria o menos",
-                "Bachillerato incompleto",
-                "Bachillerato completo",
+                "Secundaria",
                 "Terciaria incompleta",
                 "Terciaria completa o más",
             ],
-            "default": 3
+            "default": 2
         },
         "religiosidad_num": {
             "options": [1, 2, 3, 4],
