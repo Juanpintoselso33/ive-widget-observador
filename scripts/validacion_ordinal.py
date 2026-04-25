@@ -35,7 +35,6 @@ COEF_FILE = BASE_DIR / 'model_coefficients.json'
 PREDICTORS = [
     'edad_25_34', 'edad_35_44', 'edad_45_54', 'edad_55_plus',
     'es_mujer',
-    'educ_cb_incomp', 'educ_cb_comp',
     'educ_bach_incomp', 'educ_bach_comp', 'educ_ter_incomp', 'educ_ter_comp',
     'relig_poco', 'relig_bastante', 'relig_mucho',
     'es_montevideo',
@@ -61,9 +60,7 @@ def educ_a_cat(n):
         return np.nan
     n = int(n)
     if n in (1, 2): return 'primaria'
-    if n == 3:      return 'cb_incomp'
-    if n == 4:      return 'cb_comp'
-    if n == 5:      return 'bach_incomp'
+    if n in (3, 4, 5): return 'bach_incomp'
     if n == 6:      return 'bach_comp'
     if n == 7:      return 'ter_incomp'
     if n in (8, 9, 10): return 'ter_comp'
@@ -89,8 +86,6 @@ def construir_features(df):
     df['es_mujer'] = (df['sexo'] == 'F').astype(int)
 
     df['nivel_educ_cat'] = df['nivel_educativo'].apply(educ_a_cat)
-    df['educ_cb_incomp'] = (df['nivel_educ_cat'] == 'cb_incomp').astype(int)
-    df['educ_cb_comp'] = (df['nivel_educ_cat'] == 'cb_comp').astype(int)
     df['educ_bach_incomp'] = (df['nivel_educ_cat'] == 'bach_incomp').astype(int)
     df['educ_bach_comp'] = (df['nivel_educ_cat'] == 'bach_comp').astype(int)
     df['educ_ter_incomp'] = (df['nivel_educ_cat'] == 'ter_incomp').astype(int)
