@@ -7,15 +7,15 @@ import math
 
 import pytest
 
-from model import predict_probability
+from model import predict_probability, predict_probability_neutral
 from config import get_interpretation, BALOTAJE_UI_TO_CODE
 
-# Claves de coeficientes del modelo v2 (20 predictores + intercept = 21 keys)
+# Claves de coeficientes del modelo v2 (21 predictores + intercept = 22 keys)
 _V2_COEF_KEYS = [
     "intercept",
     "edad_25_34", "edad_35_44", "edad_45_54", "edad_55_plus",
     "es_mujer",
-    "educ_ems_incomp", "educ_ems_comp", "educ_ter_incomp", "educ_ter_comp",
+    "educ_cb", "educ_bach_incomp", "educ_bach_comp", "educ_ter_incomp", "educ_ter_comp",
     "relig_poco", "relig_bastante", "relig_mucho",
     "es_montevideo", "tiene_hijos",
     "hogar_3_4", "hogar_5_plus",
@@ -43,7 +43,7 @@ class TestSigmoid:
     def test_large_positive_z_near_100(self, synthetic_model):
         """Un z muy positivo debe dar probabilidad cercana a 100%."""
         result = predict_probability(
-            synthetic_model, tramo_edad=5, es_mujer=1, nivel_educ=5,
+            synthetic_model, tramo_edad=5, es_mujer=1, nivel_educ=6,
             religiosidad=1, es_montevideo=1, tiene_hijos=0, hogar=1, balotaje="martinez",
         )
         # z = 0.3 + 1.0 + 0.4 + 0.5 + 1.0 = 3.2 -> sigmoid(3.2) ≈ 96.1%
@@ -131,9 +131,9 @@ class TestDummyEncoding:
         assert prob_25_34 > prob_ref
 
     def test_reference_educ_no_effect(self, synthetic_model):
-        """Nivel 1 (primaria) es referencia, nivel 5 activa educ_ter_comp (coef > 0)."""
+        """Nivel 1 (primaria o menos) es referencia, nivel 6 activa educ_ter_comp (coef > 0)."""
         prob_ref = predict_probability(synthetic_model, 1, 0, 1, 1, 0, 0, 1, "otros")
-        prob_ter = predict_probability(synthetic_model, 1, 0, 5, 1, 0, 0, 1, "otros")
+        prob_ter = predict_probability(synthetic_model, 1, 0, 6, 1, 0, 0, 1, "otros")
         assert prob_ter > prob_ref
 
     def test_reference_relig_no_effect(self, synthetic_model):
@@ -295,3 +295,51 @@ class TestDeterminism:
             synthetic_model, 3, 1, 3, 2, 1, 0, 1, "martinez",
         )
         assert isinstance(result, float)
+
+
+class TestNeutralModel:
+    """Tests para predict_probability_neutral (modelo secundario de NS-NC)."""
+
+    def test_returns_percentage(self, synthetic_model):
+        """El resultado del modelo neutral debe estar en rango 0-100."""
+        result = predict_probability_neutral(
+            synthetic_model, 1, 0, 1, 1, 0, 0, 1, "otros",
+        )
+        assert 0 <= result <= 100
+
+    def test_uses_neutral_coefficients(self, synthetic_model):
+        """El modelo neutral usa coefficients_neutral, no coefficients."""
+        prob_main = predict_probability(
+            synthetic_model, 1, 0, 1, 1, 0, 0, 1, "otros",
+        )
+        prob_neu = predict_probability_neutral(
+            synthetic_model, 1, 0, 1, 1, 0, 0, 1, "otros",
+        )
+        assert prob_main != pytest.approx(prob_neu, abs=0.5)
+
+    def test_neutral_decreases_with_higher_education(self, synthetic_model):
+        """Mayor educación reduce la prob de no fijar postura (coef negativo en fixture)."""
+        prob_primaria = predict_probability_neutral(
+            synthetic_model, 1, 0, 1, 1, 0, 0, 1, "otros",
+        )
+        prob_terciaria = predict_probability_neutral(
+            synthetic_model, 1, 0, 6, 1, 0, 0, 1, "otros",
+        )
+        assert prob_terciaria < prob_primaria
+
+    def test_neutral_increases_with_religiosity(self, synthetic_model):
+        """Mayor religiosidad aumenta la prob de neutralidad (coef positivo en fixture)."""
+        prob_nada = predict_probability_neutral(
+            synthetic_model, 1, 0, 1, 1, 0, 0, 1, "otros",
+        )
+        prob_mucho = predict_probability_neutral(
+            synthetic_model, 1, 0, 1, 4, 0, 0, 1, "otros",
+        )
+        assert prob_mucho > prob_nada
+
+    def test_neutral_deterministic(self, synthetic_model):
+        """Mismos inputs dan mismo resultado en el modelo neutral."""
+        args = (synthetic_model, 3, 1, 3, 2, 1, 0, 1, "martinez")
+        r1 = predict_probability_neutral(*args)
+        r2 = predict_probability_neutral(*args)
+        assert r1 == r2

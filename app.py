@@ -11,7 +11,7 @@ Autor: El Observador / Equipo de Datos
 import streamlit as st
 from styles import get_custom_css
 from config import get_colors
-from model import load_model as _load_model, predict_probability
+from model import load_model as _load_model, predict_probability, predict_probability_neutral
 from components import (
     render_header,
     render_inputs,
@@ -65,8 +65,12 @@ inputs = render_inputs(MODEL)
 prob = predict_probability(MODEL, *inputs)
 prob_nacional = MODEL.get('prob_nacional', 78.6)
 
+prob_neutral = None
+if 'coefficients_neutral' in MODEL:
+    prob_neutral = predict_probability_neutral(MODEL, *inputs)
+
 render_probability_bar(prob, colors)
-render_result_card(prob, prob_nacional, colors, theme_mode)
+render_result_card(prob, prob_nacional, colors, theme_mode, prob_neutral=prob_neutral)
 render_comparisons(MODEL, prob, colors)
 render_methodology(MODEL)
 render_footer(MODEL)

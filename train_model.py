@@ -63,27 +63,41 @@ df['tramo_edad_num'] = df['tramo_edad'].map({
 df['es_mujer'] = (df['sexo'] == 'F').astype(int)
 
 # ============================================================
-# NIVEL EDUCATIVO (dummies, referencia: primaria)
+# NIVEL EDUCATIVO (dummies, referencia: primaria o menos)
+# Recodificación a 6 categorías a partir de nivel_educativo (escala 1-10)
+# que separa Ciclo Básico de Bachillerato.
+# Etiquetas inferidas (escala estándar uruguaya, ver CLAUDE.md):
+#   1 Sin instrucción / 2 Primaria  -> Primaria o menos (REF)
+#   3 CB inc / 4 CB comp           -> Ciclo Básico
+#   5 Bach inc                     -> Bachillerato incompleto
+#   6 Bach comp                    -> Bachillerato completo
+#   7 Ter inc                      -> Terciaria incompleta
+#   8 Ter comp / 9 Posg inc / 10 Posg comp -> Terciaria completa+
 # ============================================================
-educ_map = {
-    '1-PRIMARIA': 'primaria',
-    '2-EMS INCOMP': 'ems_incomp',
-    '3-EMS COMP': 'ems_comp',
-    '4-TER INCOMP': 'ter_incomp',
-    '5-TER COMP': 'ter_comp'
-}
-df['nivel_educ_cat'] = df['nivel_educ'].map(educ_map)
+def educ_a_cat(n):
+    if pd.isna(n): return np.nan
+    n = int(n)
+    if n in (1, 2): return 'primaria'
+    if n in (3, 4): return 'cb'
+    if n == 5:      return 'bach_incomp'
+    if n == 6:      return 'bach_comp'
+    if n == 7:      return 'ter_incomp'
+    if n in (8, 9, 10): return 'ter_comp'
+    return np.nan
 
-# Dummies (referencia: primaria)
-df['educ_ems_incomp'] = (df['nivel_educ_cat'] == 'ems_incomp').astype(int)
-df['educ_ems_comp'] = (df['nivel_educ_cat'] == 'ems_comp').astype(int)
+df['nivel_educ_cat'] = df['nivel_educativo'].apply(educ_a_cat)
+
+# Dummies (referencia: primaria o menos)
+df['educ_cb'] = (df['nivel_educ_cat'] == 'cb').astype(int)
+df['educ_bach_incomp'] = (df['nivel_educ_cat'] == 'bach_incomp').astype(int)
+df['educ_bach_comp'] = (df['nivel_educ_cat'] == 'bach_comp').astype(int)
 df['educ_ter_incomp'] = (df['nivel_educ_cat'] == 'ter_incomp').astype(int)
 df['educ_ter_comp'] = (df['nivel_educ_cat'] == 'ter_comp').astype(int)
 
-# Mantener numérico para variable_ranges (UI)
-df['nivel_educ_num'] = df['nivel_educ'].map({
-    '1-PRIMARIA': 1, '2-EMS INCOMP': 2, '3-EMS COMP': 3,
-    '4-TER INCOMP': 4, '5-TER COMP': 5
+# Mantener numérico para variable_ranges (UI): 1..6
+df['nivel_educ_num'] = df['nivel_educ_cat'].map({
+    'primaria': 1, 'cb': 2, 'bach_incomp': 3,
+    'bach_comp': 4, 'ter_incomp': 5, 'ter_comp': 6,
 })
 
 # ============================================================
@@ -173,10 +187,23 @@ df['favor_ive'] = np.where(
     np.where(df['decidir_embarazo'] <= 2, 0, np.nan)
 )
 
+# Variable secundaria: indicador de neutralidad / NS-NC.
+# 1 si Likert == 3 ("ni de acuerdo ni en desacuerdo") o falta respuesta.
+# Se usa para entrenar un modelo logit auxiliar que predice la probabilidad
+# de no fijar postura, reportada en la UI como dato secundario.
+df['es_neutral'] = np.where(
+    df['decidir_embarazo'] == 3, 1,
+    np.where(df['decidir_embarazo'].isin([1, 2, 4, 5]), 0, 1)
+).astype(int)
+
 print(f"\nDistribución favor_ive:")
 print(f"  A favor (1):    {(df['favor_ive']==1).sum()}")
 print(f"  En contra (0):  {(df['favor_ive']==0).sum()}")
 print(f"  Indecisos (NA): {df['favor_ive'].isna().sum()} (excluidos)")
+
+print(f"\nDistribución es_neutral:")
+print(f"  Neutral/NSNC (1): {(df['es_neutral']==1).sum()}")
+print(f"  Con postura (0):  {(df['es_neutral']==0).sum()}")
 
 # ============================================================
 # PREDICTORES (dummies + interacciones)
@@ -186,8 +213,8 @@ PREDICTORS = [
     'edad_25_34', 'edad_35_44', 'edad_45_54', 'edad_55_plus',
     # Género
     'es_mujer',
-    # Educación (ref: primaria)
-    'educ_ems_incomp', 'educ_ems_comp', 'educ_ter_incomp', 'educ_ter_comp',
+    # Educación (ref: primaria o menos)
+    'educ_cb', 'educ_bach_incomp', 'educ_bach_comp', 'educ_ter_incomp', 'educ_ter_comp',
     # Religiosidad (ref: nada)
     'relig_poco', 'relig_bastante', 'relig_mucho',
     # Región
@@ -297,6 +324,41 @@ coeficientes = coeficientes.sort_values('|Coef|', ascending=False)
 print(coeficientes.to_string(index=False))
 
 # ============================================================
+# MODELO SECUNDARIO: P(neutral / NS-NC)
+# Mismos 21 predictores, misma penalización Ridge, mismos pesos.
+# C fijo en best_C (no se vuelve a hacer CV; es un modelo descriptivo
+# auxiliar, no un producto principal).
+# ============================================================
+print("\n" + "="*60)
+print(f"ENTRENANDO MODELO DE NEUTRALIDAD (C={best_C})")
+print("="*60)
+
+datos_neu = df[['es_neutral', W] + PREDICTORS].dropna()
+X_neu = datos_neu[PREDICTORS].values
+y_neu = datos_neu['es_neutral'].values
+w_neu = datos_neu[W].values
+
+modelo_neu = LogisticRegression(
+    C=best_C, solver='lbfgs', max_iter=2000, random_state=42
+)
+modelo_neu.fit(X_neu, y_neu, sample_weight=w_neu)
+
+y_neu_pred = modelo_neu.predict_proba(X_neu)[:, 1]
+ll_neu_model = -log_loss(y_neu, y_neu_pred, sample_weight=w_neu, normalize=False)
+y_neu_mean = np.average(y_neu, weights=w_neu)
+ll_neu_null = -log_loss(
+    y_neu, np.full(len(y_neu), y_neu_mean),
+    sample_weight=w_neu, normalize=False
+)
+pseudo_r2_neu = 1 - (ll_neu_model / ll_neu_null)
+
+print(f"N modelo neutral: {len(datos_neu)}")
+print(f"Tasa neutral ponderada: {y_neu_mean:.4f}")
+print(f"Pseudo R² (McFadden) neutral: {pseudo_r2_neu:.4f}")
+
+prob_neutral_nacional = float(np.average(y_neu_pred, weights=w_neu)) * 100
+
+# ============================================================
 # ESTADÍSTICAS POR GRUPO
 # ============================================================
 stats_by_group = {}
@@ -315,13 +377,12 @@ for cat, label in [('nada', 'nada'), ('poco', 'poco'), ('bastante', 'bastante'),
         prob = np.average(subset['favor_ive'], weights=subset[W])
         stats_by_group[f'religiosidad_{label}'] = round(prob * 100, 1)
 
-# Por nivel educativo
-for cat, label in [('primaria', 'primaria'), ('ems_incomp', 'ems_incomp'),
-                   ('ems_comp', 'ems_comp'), ('ter_incomp', 'ter_incomp'), ('ter_comp', 'ter_comp')]:
+# Por nivel educativo (6 categorías)
+for cat in ['primaria', 'cb', 'bach_incomp', 'bach_comp', 'ter_incomp', 'ter_comp']:
     subset = df[(df['nivel_educ_cat'] == cat) & df['favor_ive'].notna()]
     if len(subset) > 0:
         prob = np.average(subset['favor_ive'], weights=subset[W])
-        stats_by_group[f'educacion_{label}'] = round(prob * 100, 1)
+        stats_by_group[f'educacion_{cat}'] = round(prob * 100, 1)
 
 # Por personas en hogar
 for cat, label in [('1-2', '1_2'), ('3-4', '3_4'), ('5+', '5_plus')]:
@@ -349,6 +410,20 @@ output = {
         "intercept": round(modelo.intercept_[0], 6)
     },
     "odds_ratios": {},
+    "coefficients_neutral": {
+        "intercept": round(modelo_neu.intercept_[0], 6)
+    },
+    "odds_ratios_neutral": {},
+    "model_info_neutral": {
+        "pseudo_r2": round(pseudo_r2_neu, 4),
+        "n_observations": int(len(datos_neu)),
+        "n_predictors": len(PREDICTORS),
+        "regularization": "Ridge (L2)",
+        "C": best_C,
+        "weighted_mean_y": round(float(y_neu_mean), 4),
+        "model_version": 2,
+    },
+    "prob_neutral_nacional": round(prob_neutral_nacional, 1),
     "model_info": {
         "pseudo_r2": round(pseudo_r2, 4),
         "n_observations": int(len(datos)),
@@ -368,9 +443,16 @@ output = {
         },
         "es_mujer": {"options": [0, 1], "labels": ["Hombre", "Mujer"], "default": 0},
         "nivel_educ_num": {
-            "options": [1, 2, 3, 4, 5],
-            "labels": ["Primaria", "EMS incompleta", "EMS completa", "Terciaria incompleta", "Terciaria completa"],
-            "default": 3
+            "options": [1, 2, 3, 4, 5, 6],
+            "labels": [
+                "Primaria o menos",
+                "Ciclo Básico",
+                "Bachillerato incompleto",
+                "Bachillerato completo",
+                "Terciaria incompleta",
+                "Terciaria completa o más",
+            ],
+            "default": 4
         },
         "religiosidad_num": {
             "options": [1, 2, 3, 4],
@@ -398,6 +480,8 @@ output = {
 for i, param in enumerate(PREDICTORS):
     output["coefficients"][param] = round(modelo.coef_[0][i], 6)
     output["odds_ratios"][param] = round(np.exp(modelo.coef_[0][i]), 4)
+    output["coefficients_neutral"][param] = round(modelo_neu.coef_[0][i], 6)
+    output["odds_ratios_neutral"][param] = round(np.exp(modelo_neu.coef_[0][i]), 4)
 
 # Probabilidad promedio nacional
 prob_promedio = np.average(y_pred_proba, weights=weights)

@@ -16,8 +16,9 @@ def render_header():
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<p class="subtitle">Basado en la encuesta de El Observador a uruguayos. '
-        'Selecciona tus caracter\u00edsticas:</p>',
+        '<p class="subtitle">Basado en la encuesta de El Observador a uruguayos '
+        '<em>con opini\u00f3n formada</em> sobre el tema. '
+        'Seleccion\u00e1 tus caracter\u00edsticas:</p>',
         unsafe_allow_html=True,
     )
 
@@ -50,8 +51,9 @@ def render_inputs(model):
         es_mujer = 1 if sexo == "Mujer" else 0
 
         educ_options = ranges['nivel_educ_num']['labels']
+        educ_default = ranges['nivel_educ_num'].get('default', 4) - 1
         educacion = st.selectbox(
-            "Nivel educativo", options=educ_options, index=2,
+            "Nivel educativo", options=educ_options, index=educ_default,
             help="Selecciona tu nivel educativo m\u00e1s alto",
         )
         nivel_educ = educ_options.index(educacion) + 1
@@ -117,8 +119,8 @@ def render_probability_bar(prob, colors=None):
     st.markdown(bar_html, unsafe_allow_html=True)
 
 
-def render_result_card(prob, prob_nacional, colors=None, mode="light"):
-    """Renderiza la tarjeta de resultado con promedio nacional inline."""
+def render_result_card(prob, prob_nacional, colors=None, mode="light", prob_neutral=None):
+    """Renderiza la tarjeta de resultado con promedio nacional y % de neutrales."""
     if colors is None:
         colors = get_colors(mode)
 
@@ -128,11 +130,22 @@ def render_result_card(prob, prob_nacional, colors=None, mode="light"):
     arrow = "\u2191" if diff > 0 else "\u2193" if diff < 0 else "="
     diff_color = colors["success"] if diff > 0 else colors["danger"] if diff < 0 else colors["text_muted"]
 
+    neutral_html = ""
+    if prob_neutral is not None:
+        neutral_html = (
+            f'<div class="result-neutral" '
+            f'style="margin-top:8px;font-size:0.85em;color:{colors["text_muted"]};">'
+            f'Adem\u00e1s, <strong>{prob_neutral:.0f}%</strong> de personas con tu perfil '
+            f'no toma posici\u00f3n clara sobre el tema.'
+            f'</div>'
+        )
+
     st.markdown(f"""
     <div class="result-card">
         <div class="result-number" style="color: {color};">{prob:.0f}%</div>
         <div class="result-text">
-            Probabilidad de apoyar el derecho a decidir sobre el embarazo.<br>
+            Probabilidad de apoyar el derecho a decidir sobre el embarazo
+            <em>entre quienes tienen postura definida</em>.<br>
             <strong style="color: {color};">Es {texto}</strong> al IVE seg\u00fan tus caracter\u00edsticas.
         </div>
         <div class="result-nacional">
@@ -142,6 +155,7 @@ def render_result_card(prob, prob_nacional, colors=None, mode="light"):
                 {arrow} {abs(diff):.0f}pp vs. tu
             </span>
         </div>
+        {neutral_html}
     </div>
     """, unsafe_allow_html=True)
 
@@ -176,10 +190,13 @@ def render_comparisons(model, prob, colors=None):
         _group_metric(col2, stats, 'balotaje_lacalle', "Lacalle (Coalici\u00f3n)", prob, colors)
 
     with tab3:
-        col1, col2, col3 = st.columns(3)
-        _group_metric(col1, stats, 'educacion_primaria', "Primaria", prob, colors, show_delta=False)
-        _group_metric(col2, stats, 'educacion_ems_comp', "Secundaria", prob, colors, show_delta=False)
-        _group_metric(col3, stats, 'educacion_ter_comp', "Universitaria", prob, colors, show_delta=False)
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        _group_metric(col1, stats, 'educacion_primaria', "Primaria o menos", prob, colors, show_delta=False)
+        _group_metric(col2, stats, 'educacion_cb', "Ciclo Básico", prob, colors, show_delta=False)
+        _group_metric(col3, stats, 'educacion_bach_incomp', "Bach. incompleto", prob, colors, show_delta=False)
+        _group_metric(col4, stats, 'educacion_bach_comp', "Bach. completo", prob, colors, show_delta=False)
+        _group_metric(col5, stats, 'educacion_ter_incomp', "Terciaria incompleta", prob, colors, show_delta=False)
+        _group_metric(col6, stats, 'educacion_ter_comp', "Terciaria completa+", prob, colors, show_delta=False)
 
     with tab4:
         col1, col2, col3, col4, col5 = st.columns(5)
