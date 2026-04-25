@@ -86,13 +86,13 @@ def get_custom_css(mode="light"):
        BARRA DE PROBABILIDAD (GRADIENTE EDITORIAL)
        ============================================================ */
     .prob-bar-wrapper {{
-        margin: 2rem 0 1.5rem 0;
+        margin: 1.5rem 0 3.5rem 0;
     }}
 
     .prob-endpoints {{
         display: flex;
         justify-content: space-between;
-        margin-bottom: 2.25rem;
+        margin-bottom: 0.5rem;
     }}
 
     .prob-endpoint {{
@@ -121,17 +121,17 @@ def get_custom_css(mode="light"):
 
     .prob-indicator {{
         position: absolute;
-        top: -8px;
+        top: -6px;
         transform: translateX(-50%);
         width: 3px;
-        height: 60px;
+        height: 56px;
         background: {c['text']};
         border-radius: 2px;
     }}
 
     .prob-label {{
         position: absolute;
-        top: -38px;
+        top: 58px;
         transform: translateX(-50%);
         background: {c['text']};
         color: {c['background']};
