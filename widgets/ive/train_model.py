@@ -12,7 +12,9 @@ Mejoras v2 (2026-02-06):
 
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+_ROOT = Path(__file__).parent.parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 from widgets.ive.config import DATA_FILE, MODEL_COEFFICIENTS_PATH
 
 import pandas as pd
@@ -407,6 +409,8 @@ for tramo in ['18-24', '25-34', '35-44', '45-54', '55+']:
 # ============================================================
 # EXPORTAR COEFICIENTES
 # ============================================================
+# Outputs to widgets/ive/model_coefficients.json (package-local copy).
+# Root model_coefficients.json is a legacy copy to be removed in platform cleanup.
 print("\n" + "="*60)
 print("EXPORTANDO COEFICIENTES")
 print("="*60)
