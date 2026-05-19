@@ -66,8 +66,8 @@ def render_inputs(model):
 
         balotaje_options = ranges['balotaje']['labels']
         balotaje_sel = st.selectbox(
-            "Balotaje 2019", options=balotaje_options, index=0,
-            help="¿A quién votaste en el balotaje de 2019?",
+            "Balotaje 2024", options=balotaje_options, index=0,
+            help="¿A quién votaste en el balotaje de 2024?",
         )
         balotaje = BALOTAJE_UI_TO_CODE[balotaje_sel]
 
@@ -180,7 +180,7 @@ def render_comparisons(model, prob, colors=None):
     stats = model['stats_by_group']
 
     tab1, tab2, tab3, tab4 = st.tabs(
-        ["Por religiosidad", "Por balotaje 2019", "Por educación", "Por edad"]
+        ["Por religiosidad", "Por balotaje 2024", "Por educación", "Por edad"]
     )
 
     with tab1:
@@ -192,8 +192,8 @@ def render_comparisons(model, prob, colors=None):
 
     with tab2:
         col1, col2 = st.columns(2)
-        _group_metric(col1, stats, 'balotaje_martinez', "Martínez (FA)", prob, colors)
-        _group_metric(col2, stats, 'balotaje_lacalle', "Lacalle (Coalición)", prob, colors)
+        _group_metric(col1, stats, 'balotaje_martinez', "Orsi (FA)", prob, colors)
+        _group_metric(col2, stats, 'balotaje_lacalle', "Delgado (Coalición)", prob, colors)
 
     with tab3:
         col1, col2, col3, col4 = st.columns(4)
@@ -245,8 +245,8 @@ def render_methodology(model):
         1. **Religiosidad**: Es el factor más importante. Las personas más religiosas tienen
            significativamente menor probabilidad de apoyar el IVE.
 
-        2. **Voto político**: Votantes de Martínez en el balotaje tienen mayor probabilidad de apoyo
-           que votantes de Lacalle.
+        2. **Voto político**: Votantes de Orsi (FA) en el balotaje 2024 tienen mayor probabilidad de apoyo
+           que votantes de Delgado (Coalición).
 
         3. **Sexo**: Las mujeres tienden a apoyar más el IVE que los hombres.
 

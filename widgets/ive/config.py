@@ -30,6 +30,6 @@ DATA_FILE = _ROOT.parent / "base_limpia.csv"
 # ============================================================
 BALOTAJE_UI_TO_CODE = {
     "No votó/Blanco": "otros",
-    "Martínez (FA)": "martinez",
-    "Lacalle (Coalición)": "lacalle",
+    "Orsi (FA)": "martinez",
+    "Delgado (Coalición)": "lacalle",
 }

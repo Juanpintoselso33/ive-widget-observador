@@ -252,14 +252,14 @@ class TestBalotajeMapping:
 
     def test_all_options_mapped(self):
         """Todas las opciones de balotaje deben tener mapeo."""
-        assert "Martínez (FA)" in BALOTAJE_UI_TO_CODE
-        assert "Lacalle (Coalición)" in BALOTAJE_UI_TO_CODE
+        assert "Orsi (FA)" in BALOTAJE_UI_TO_CODE
+        assert "Delgado (Coalición)" in BALOTAJE_UI_TO_CODE
         assert "No votó/Blanco" in BALOTAJE_UI_TO_CODE
 
     def test_correct_codes(self):
         """Los códigos de balotaje deben ser los esperados."""
-        assert BALOTAJE_UI_TO_CODE["Martínez (FA)"] == "martinez"
-        assert BALOTAJE_UI_TO_CODE["Lacalle (Coalición)"] == "lacalle"
+        assert BALOTAJE_UI_TO_CODE["Orsi (FA)"] == "martinez"
+        assert BALOTAJE_UI_TO_CODE["Delgado (Coalición)"] == "lacalle"
         assert BALOTAJE_UI_TO_CODE["No votó/Blanco"] == "otros"
 
 

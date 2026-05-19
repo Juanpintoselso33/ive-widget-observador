@@ -7,7 +7,7 @@ Mejoras v2 (2026-02-06):
 - Términos de interacción (mujer*religiosidad, mujer*hijos)
 - Cross-validation para selección de C
 - Pseudo R² corregido (modelo nulo con media ponderada)
-- Balotaje 2019 en vez de voto por partido (mejor R² con menos dummies)
+- Balotaje 2024 (Orsi/FA vs Delgado/Coalición) en vez de voto por partido (mejor R² con menos dummies)
 """
 
 import sys
@@ -160,16 +160,17 @@ df['hogar_5_plus'] = (df['hogar_cat'] == '5+').astype(int)
 df['hogar_num'] = df['hogar_cat'].map({'1-2': 1, '3-4': 2, '5+': 3})
 
 # ============================================================
-# BALOTAJE 2019 (dummies, referencia: blanco/no votó/no recuerda)
-# IdBalotaje: 1=Martínez, 2=Lacalle, 3=Blanco, 4=No votó, 5=No recuerda
+# BALOTAJE 2024 (dummies, referencia: blanco/no votó/no recuerda)
+# IdBalotaje: 1=Orsi (FA), 2=Delgado (Coalición), 3=Blanco, 4=No votó, 5=No recuerda
+# Coeficientes internos nombrados como martinez/lacalle por compatibilidad histórica
 # ============================================================
 df['balotaje_martinez'] = (df['IdBalotaje'] == 1).astype(int)
 df['balotaje_lacalle'] = (df['IdBalotaje'] == 2).astype(int)
 
-balotaje_labels = {1: 'Martínez', 2: 'Lacalle', 3: 'Blanco', 4: 'No votó', 5: 'No recuerda'}
+balotaje_labels = {1: 'Orsi (FA)', 2: 'Delgado (Coalición)', 3: 'Blanco', 4: 'No votó', 5: 'No recuerda'}
 df['balotaje_label'] = df['IdBalotaje'].map(balotaje_labels)
 
-print(f"\nDistribución balotaje 2019:")
+print(f"\nDistribución balotaje 2024:")
 print(df['balotaje_label'].value_counts())
 
 # ============================================================
@@ -476,7 +477,7 @@ output = {
         },
         "balotaje": {
             "options": ["otros", "martinez", "lacalle"],
-            "labels": ["No votó/Blanco", "Martínez (FA)", "Lacalle (Coalición)"],
+            "labels": ["No votó/Blanco", "Orsi (FA)", "Delgado (Coalición)"],
             "default": "otros"
         }
     },
