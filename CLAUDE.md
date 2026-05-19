@@ -17,26 +17,46 @@ El widget estima la **probabilidad de que una persona apoye el derecho de la muj
 ## Estructura del proyecto
 
 ```
-ive_widget/
-├── app.py                    # Punto de entrada Streamlit
-├── model.py                  # Lógica de predicción (sin sklearn, solo JSON + numpy)
-├── train_model.py            # Pipeline de entrenamiento v2 (modelo actual)
-├── model_coefficients.json   # Coeficientes serializados + metadatos
-├── components.py             # Renderizado UI (barra gradiente, cards, tabs)
-├── config.py                 # Paleta, rutas, umbrales de interpretación
-├── styles.py                 # CSS customizado (estética El Observador / The Economist)
-├── scripts/
-│   ├── screening_variables.py   # Screening univariado e incremental de variables
-│   ├── validacion_ordinal.py    # Validación logit ordinal (Likert 1-5) vs binario
-│   ├── train_model_backup.py    # Versión v1 (legacy, solo referencia)
-│   ├── validar_mapeo.py         # Validación del mapeo de voto 2019
-│   ├── verificar_voto.py        # Verificación cruzada con datos históricos Factum
-│   └── buscar_elecciones.py     # Exploración datos electorales
-└── tests/
-    ├── conftest.py              # Fixtures con coeficientes sintéticos
-    ├── test_model.py            # Tests de predicción
-    └── test_config.py           # Tests de configuración
+ive_widget/                         # Raíz del repo (plataforma multi-widget)
+├── shared/                         # Código editorial compartido
+│   ├── styles.py                   # CSS (IBM Plex, Economist-style)
+│   └── config.py                   # Paleta de colores + umbrales
+├── widgets/
+│   ├── ive/                        # Widget IVE — el original
+│   │   ├── app.py                  # Entry standalone: streamlit run widgets/ive/app.py
+│   │   ├── model.py                # Predicción (Python puro + JSON)
+│   │   ├── components.py           # UI Streamlit
+│   │   ├── config.py               # Config IVE (rutas, balotaje)
+│   │   ├── train_model.py          # Pipeline de entrenamiento
+│   │   ├── model_coefficients.json # Coeficientes serializados
+│   │   └── tests/                  # Tests con coeficientes sintéticos
+│   └── _template/                  # Scaffold para nuevos widgets
+│       ├── app.py / model.py / components.py / config.py
+│       └── WIDGET_README.md        # Guía para crear widget nuevo
+├── app.py                          # Entry del deploy actual (→ IVE via shared/ + widgets/ive/)
+├── scripts/                        # Scripts de análisis (sin cambios)
+├── docs/
+│   ├── widget-catalog.md           # Registro de widgets
+│   └── bmad-output/                # Artefactos BMAD
+└── requirements.txt
 ```
+
+## Workflow para crear un widget nuevo
+
+1. `cp -r widgets/_template widgets/<nombre>`
+2. Adaptar `config.py`, `model.py`, `components.py`, `app.py`
+3. Crear `widgets/<nombre>/train_model.py` y entrenarlo
+4. Testear: `streamlit run widgets/<nombre>/app.py`
+5. Registrar en `docs/widget-catalog.md`
+
+### Entry points
+
+| Quiero... | Comando |
+|-----------|---------|
+| Correr el IVE widget (actual deploy) | `streamlit run app.py` |
+| Correr el IVE widget standalone | `streamlit run widgets/ive/app.py` |
+| Correr widget nuevo | `streamlit run widgets/<nombre>/app.py` |
+| Correr tests IVE | `pytest widgets/ive/tests/ -v` |
 
 ## Modelo estadístico
 
