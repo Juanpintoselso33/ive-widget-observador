@@ -8,11 +8,18 @@ Adaptado para medir apoyo a la interrupci\u00f3n voluntaria del embarazo
 Autor: El Observador / Equipo de Datos
 """
 
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import streamlit as st
-from styles import get_custom_css
-from config import get_colors
-from model import load_model as _load_model, predict_probability, predict_probability_neutral
-from components import (
+from shared.styles import get_custom_css
+from shared.config import get_colors
+from widgets.ive.model import load_model as _load_model, predict_probability, predict_probability_neutral
+from widgets.ive.components import (
     render_header,
     render_inputs,
     render_probability_bar,
