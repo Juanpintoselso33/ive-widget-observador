@@ -42,7 +42,7 @@ def synthetic_model():
             # Personas en hogar (ref: 1-2)
             "hogar_3_4": -0.4,
             "hogar_5_plus": -0.8,
-            # Balotaje 2019 (ref: otros/no votó/blanco)
+            # Balotaje 2024 (ref: otros/no votó/blanco)
             "balotaje_martinez": 1.0,
             "balotaje_lacalle": -0.7,
             # Interacciones
@@ -133,7 +133,7 @@ def synthetic_model():
             },
             "balotaje": {
                 "options": ["otros", "martinez", "lacalle"],
-                "labels": ["No votó/Blanco", "Martínez (FA)", "Lacalle (Coalición)"],
+                "labels": ["No votó/Blanco", "Orsi (FA)", "Delgado (Coalición)"],
                 "default": "otros",
             },
         },

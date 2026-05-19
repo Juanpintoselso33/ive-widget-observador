@@ -232,7 +232,7 @@ PREDICTORS = [
     'tiene_hijos',
     # Personas en hogar (ref: 1-2)
     'hogar_3_4', 'hogar_5_plus',
-    # Balotaje 2019 (ref: blanco/no votó/no recuerda)
+    # Balotaje 2024 (ref: blanco/no votó/no recuerda)
     'balotaje_martinez', 'balotaje_lacalle',
     # Interacciones
     'mujer_x_relig_mucho', 'mujer_x_tiene_hijos',

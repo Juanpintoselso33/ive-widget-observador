@@ -90,7 +90,7 @@ async def main():
         await page.evaluate("window.scrollTo(0, 0)")
         await page.wait_for_timeout(500)
 
-        # Cambiar a perfil "muy religioso + Lacalle"
+        # Cambiar a perfil "muy religioso + Delgado"
         selects = page.locator('div[data-baseweb="select"]')
         scount = await selects.count()
         print(f"Selects: {scount}")
@@ -104,7 +104,7 @@ async def main():
             # Balotaje (índice 3 en col1)
             await selects.nth(3).click()
             await page.wait_for_timeout(400)
-            await page.get_by_role("option", name="Lacalle (Coalición)").click()
+            await page.get_by_role("option", name="Delgado (Coalición)").click()
             await wait_streamlit_ready(page, 30_000)
 
             await page.wait_for_timeout(800)
