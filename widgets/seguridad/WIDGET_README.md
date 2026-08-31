@@ -137,8 +137,17 @@ posibles de la UI**; la peor discrepancia es 0,000000 pp.
 - **Pseudo-R² de McFadden ≈ 0,17**, bastante menor que el 0,37 del IVE. Es
   esperable: allá la religiosidad era un predictor potentísimo y acá no hay nada
   equivalente. Conviene decirlo, no maquillarlo.
-- **Sin errores estándar ni p-valores**: Ridge no los provee analíticamente, y
-  los pesos se tratan como frecuencias.
+- **Los intervalos son amplios: rondan los 25 puntos.** Salen de un bootstrap
+  estratificado (400 réplicas, remuestreo dentro de cada uno de los 28 estratos
+  de la encuesta). Cuando el intervalo cruza el 50%, el widget deja de afirmar
+  de qué lado está la mayoría — con 43% y un intervalo de 31 a 58 no se puede
+  decir que la mayoría esté en contra.
+- **No es un bootstrap de diseño completo**: no hay información de
+  conglomerados en la base, así que captura la variabilidad entre estratos pero
+  no el efecto de conglomeración. Es mejor que el bootstrap simple, no
+  equivalente a uno con el diseño entero.
+- **Sin p-valores**: Ridge no provee errores estándar analíticos; los
+  intervalos vienen del bootstrap, no de la teoría del estimador.
 - **Muchos perfiles no existen en la muestra.** De las 1.296 combinaciones que
   el lector puede elegir, sólo **566** aparecen en la encuesta y apenas **4**
   tienen 30 casos o más. El resto se estima por extrapolación aditiva. Está

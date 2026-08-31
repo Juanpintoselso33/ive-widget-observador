@@ -44,6 +44,7 @@ def base_minima():
         filas.append({
             "edad": edad, "sexo": sexo, "nivel_educativo": educ,
             "dpto_ech": dpto, "IdBalotaje": idbal, "w_norm": 1.0,
+            "estrato": f"dpto-{dpto}",
             "var_241 | Victima de delito ultimos 12 meses": vic,
             "var_242 | Autoubicacion izquierda-derecha (0-10)": ideol,
             config.PREGUNTA["columna"]: "De acuerdo",

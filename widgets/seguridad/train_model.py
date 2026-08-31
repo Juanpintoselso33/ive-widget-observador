@@ -62,7 +62,7 @@ EDUC_COLAPSO = ESPEC_CRUDA["educ_colapso"]
 
 # Columnas que la base tiene que traer sí o sí para poder entrenar.
 COLUMNAS_REQUERIDAS = [
-    "edad", "sexo", "nivel_educativo", "dpto_ech", "IdBalotaje", PONDERADOR,
+    "edad", "sexo", "nivel_educativo", "dpto_ech", "IdBalotaje", "estrato", PONDERADOR,
     "var_241 | Victima de delito ultimos 12 meses",
     "var_242 | Autoubicacion izquierda-derecha (0-10)",
 ]
@@ -306,6 +306,42 @@ def _ajustar(X, y, w, etiqueta):
     return modelo, mejor_c, mejor_score
 
 
+def bootstrap_coeficientes(d, X, y, w, c, n_replicas=400):
+    """
+    Coeficientes de B réplicas bootstrap, para poder mostrar intervalos.
+
+    El remuestreo es ESTRATIFICADO: se remuestrea con reemplazo dentro de cada
+    estrato, conservando su tamaño. La encuesta trae la variable `estrato` (28
+    estratos: los departamentos del interior y tramos de ranking en Montevideo),
+    así que ignorar el diseño y remuestrear la muestra entera subestimaría el
+    error. No es un bootstrap de diseño completo —no hay información de
+    conglomerados— pero es bastante mejor que el simple.
+
+    Se guardan los coeficientes y no los intervalos por perfil: así la app puede
+    calcular el intervalo de cualquier combinación sin arrastrar 1.296 pares de
+    números, y `model.py` sigue sin depender de sklearn.
+    """
+    estratos = d["estrato"].values
+    indices_por_estrato = [np.where(estratos == e)[0] for e in np.unique(estratos)]
+    rng = np.random.default_rng(RANDOM_STATE)
+    coeficientes = []
+
+    for _ in range(n_replicas):
+        idx = np.concatenate([
+            rng.choice(indices, size=len(indices), replace=True)
+            for indices in indices_por_estrato
+        ])
+        # Una réplica puede quedar sin variación en la dependiente dentro de un
+        # estrato chico; si pasa en toda la muestra, se descarta esa réplica.
+        if len(np.unique(y[idx])) < 2:
+            continue
+        m = LogisticRegression(C=c, max_iter=2000, random_state=RANDOM_STATE)
+        m.fit(X[idx], y[idx], sample_weight=w[idx])
+        coeficientes.append([float(m.intercept_[0])] + [float(v) for v in m.coef_[0]])
+
+    return coeficientes
+
+
 def _mcfadden(modelo, X, y, w):
     """Pseudo-R² con log-likelihood nulo calculado sobre la media ponderada."""
     p = modelo.predict_proba(X)[:, 1]
@@ -345,6 +381,10 @@ def main():
     modelo, c_ppal, cv_ppal = _ajustar(X, y, w, "principal")
     r2 = _mcfadden(modelo, X, y, w)
     print(f"  [principal] McFadden pseudo-R² = {r2:.4f}")
+
+    print("\nBootstrap estratificado para los intervalos...")
+    boot = bootstrap_coeficientes(d, X, y, w, c_ppal)
+    print(f"  {len(boot)} réplicas útiles sobre 400")
 
     coeficientes = {"intercept": float(modelo.intercept_[0])}
     for nombre, valor in zip(PREDICTORES, modelo.coef_[0]):
@@ -440,6 +480,12 @@ def main():
         "coefficients": coeficientes,
         "odds_ratios": odds,
         "coefficients_neutral": coef_neutral,
+        # Réplicas bootstrap: [intercept, *coeficientes en el orden de
+        # PREDICTORES]. La app calcula el intervalo percentil con esto.
+        "bootstrap": {
+            "orden": ["intercept"] + list(PREDICTORES),
+            "replicas": [[round(v, 5) for v in fila] for fila in boot],
+        },
         "prob_favor_nacional": round(prop_pond, 2),
         "prob_neutral_nacional": round(prop_neutral, 2),
         "stats_by_group": stats,

@@ -37,8 +37,20 @@ INTENSIDAD = [
 ]
 
 
-def interpretar(prob, colors):
-    """Devuelve (color, texto) sin cargar valoración moral en el color."""
+def interpretar(prob, colors, intervalo=None):
+    """
+    Devuelve (color, texto) sin cargar valoración moral en el color.
+
+    Si el intervalo de confianza cruza el 50%, no se afirma de qué lado está la
+    mayoría: con estos intervalos —que rondan los 25 puntos— una estimación de
+    43% puede corresponder tanto a una mayoría en contra como a favor, y decir
+    "la mayoría está en contra" sería afirmar más de lo que el dato aguanta.
+    """
+    if intervalo and intervalo[0] < 50 < intervalo[1]:
+        return colors["primary"], (
+            "El margen de error no permite afirmar de qué lado está la mayoría "
+            "en este perfil"
+        )
     for umbral, texto in INTENSIDAD:
         if prob >= umbral:
             return colors["primary"], texto
@@ -143,8 +155,8 @@ def render_probability_bar(prob):
     """, unsafe_allow_html=True)
 
 
-def render_result_card(model, prob, colors):
-    color, texto = interpretar(prob, colors)
+def render_result_card(model, prob, colors, intervalo=None):
+    color, texto = interpretar(prob, colors, intervalo)
 
     # La diferencia se calcula sobre los valores YA redondeados que ve el
     # lector: si en pantalla dicen 53% y 37%, la brecha tiene que decir 16pp.
@@ -168,6 +180,18 @@ def render_result_card(model, prob, colors):
             f'posición clara sobre el tema y quedan fuera de este cálculo.</div>'
         )
 
+    # El intervalo va junto al número, no escondido en la metodología: con 571
+    # casos efectivos y perfiles que muchas veces no existen en la muestra, la
+    # amplitud es parte del dato.
+    intervalo_html = ""
+    if intervalo:
+        bajo, alto = intervalo
+        intervalo_html = (
+            f'<div style="margin-top:-6px;margin-bottom:10px;font-size:0.9em;'
+            f'color:{colors["text_muted"]};">Intervalo de confianza del 95%: '
+            f'entre <strong>{bajo:.0f}%</strong> y <strong>{alto:.0f}%</strong></div>'
+        )
+
     posicion = "por encima" if diff > 0 else "por debajo" if diff < 0 else "igual"
     brecha = (
         f"{arrow} este perfil está {abs(diff)}pp {posicion}"
@@ -177,6 +201,7 @@ def render_result_card(model, prob, colors):
     st.markdown(f"""
     <div class="result-card">
         <div class="result-number" style="color: {color};">{prob_r}%</div>
+        {intervalo_html}
         <div class="result-text">
             El modelo estima que, entre quienes tienen estas características y
             <em>postura definida</em>, ese es el porcentaje que declara

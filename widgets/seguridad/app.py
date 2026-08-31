@@ -13,7 +13,9 @@ import streamlit as st
 
 from shared.styles import get_custom_css
 from shared.config import get_colors
-from widgets.seguridad.model import load_model as _load_model, predict_probability
+from widgets.seguridad.model import (
+    load_model as _load_model, predict_probability, intervalo_probabilidad,
+)
 from widgets.seguridad.components import (
     render_header, render_inputs, render_probability_bar,
     render_result_card, render_comparisons, render_methodology, render_footer,
@@ -100,9 +102,10 @@ inputs = render_inputs()
 # ese modelo casi no discrimina (pseudo-R² 0,03). Calcularla igual sólo abriría
 # la posibilidad de que un JSON neutral defectuoso rompa la página.
 prob = predict_probability(MODEL, *inputs)
+intervalo = intervalo_probabilidad(MODEL, *inputs)
 
 render_probability_bar(prob)
-render_result_card(MODEL, prob, colors)
+render_result_card(MODEL, prob, colors, intervalo)
 render_comparisons(MODEL, prob, colors)
 render_methodology(MODEL)
 render_footer(MODEL)

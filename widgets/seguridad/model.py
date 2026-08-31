@@ -94,3 +94,37 @@ def predict_probability_neutral(model, tramo_edad, es_mujer, nivel_educ, ideolog
     features = build_features(tramo_edad, es_mujer, nivel_educ, ideologia,
                               victima, es_montevideo, balotaje)
     return _sigmoid_pct(_z(model["coefficients_neutral"], features))
+
+
+def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
+                           victima, es_montevideo, balotaje, nivel=95):
+    """
+    Intervalo de confianza percentil para la probabilidad estimada.
+
+    Se calcula sobre las réplicas bootstrap guardadas en el JSON: para cada una
+    se evalúa la logística con el mismo vector de features y se toman los
+    percentiles. Sin sklearn ni numpy — es aritmética sobre una lista.
+
+    Devuelve (bajo, alto) en 0-100, o None si el modelo no trae bootstrap.
+    """
+    boot = model.get("bootstrap")
+    if not boot or not boot.get("replicas"):
+        return None
+
+    features = build_features(tramo_edad, es_mujer, nivel_educ, ideologia,
+                              victima, es_montevideo, balotaje)
+    orden = boot["orden"]
+
+    probabilidades = []
+    for fila in boot["replicas"]:
+        z = fila[0]  # intercept
+        for nombre, coef in zip(orden[1:], fila[1:]):
+            z += coef * features[nombre]
+        probabilidades.append(_sigmoid_pct(z))
+
+    probabilidades.sort()
+    cola = (100 - nivel) / 2 / 100
+    n = len(probabilidades)
+    bajo = probabilidades[max(0, int(cola * n))]
+    alto = probabilidades[min(n - 1, int((1 - cola) * n))]
+    return bajo, alto
