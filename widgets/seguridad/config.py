@@ -132,20 +132,43 @@ EDUC_UI_TO_CODE = {
     "Terciaria completa o más": 3,
 }
 
-# Autoubicación 0-10 agrupada. El centro es la referencia porque es la
-# categoría modal (32% de la muestra se ubica en el 5 exacto).
+# Autoubicación en la escala de 0 a 10, en los seis tramos que pidió Tomer
+# (WhatsApp, 31/8/2026).
+#
+# DOS COSAS QUE NO CIERRAN CON LO QUE ÉL ESCRIBIÓ, y quedan asentadas acá
+# porque cambian lo que significa cada etiqueta:
+#
+# 1. Él propuso los tramos sobre una escala de 1 a 10. La del cuestionario va
+#    de 0 a 10 y el 0 está usado: 33 personas de la muestra de modelado se
+#    ubicaron ahí. Como su tramo más a la izquierda es "1 a 2", el 0 quedaba
+#    sin categoría. Se lo mete en "Izquierda extrema", que es la única lectura
+#    razonable del extremo de la escala.
+#
+# 2. En una escala de 1 a 10 el punto medio es 5,5 y llamar "centroizquierda"
+#    al 5 tiene sentido. En una de 0 a 10 el punto medio es el 5 EXACTO, y es
+#    la respuesta modal: 842 de 2.672 casos, el 32% de la muestra. La etiqueta
+#    "Centroizquierda" reclasifica como inclinado a la izquierda a un tercio
+#    de los encuestados que se pusieron justo en el centro. Se implementa como
+#    él lo pidió; si prefiere llamarlo "Centro", es cambiar el texto de esta
+#    tabla y re-entrenar.
+#
+# La referencia es el tramo del 5 por ser el modal: una referencia chica hace
+# que todos los coeficientes se estimen contra pocos casos, que es el problema
+# que ya hubo con "Primaria o menos" y sus 28 casos.
 #
 # "No se ubica" NO se ofrece en la UI. En el entrenamiento esa dummy agrupa a
 # los 80 encuestados que no contestaron la escala, y no contestar una encuesta
 # no es lo mismo que no ubicarse políticamente: ofrecérsela al lector le
 # aplicaría el coeficiente de un grupo definido por otra cosa. Sigue existiendo
-# como predictor —para que esos casos no contaminen el centro, que es la
-# referencia— pero queda siempre en cero desde la interfaz, igual que
-# victima_sin_dato.
+# como predictor —para que esos casos no contaminen la referencia— pero queda
+# siempre en cero desde la interfaz, igual que victima_sin_dato.
 IDEOLOGIA_UI_TO_CODE = {
-    "Izquierda (0-3)": 1,
-    "Centro (4-6)": 2,        # referencia
-    "Derecha (7-10)": 3,
+    "Izquierda extrema (0-2)": 1,
+    "Izquierda (3-4)": 2,
+    "Centroizquierda (5)": 3,      # referencia
+    "Centroderecha (6)": 4,
+    "Derecha (7-8)": 5,
+    "Derecha extrema (9-10)": 6,
 }
 
 VICTIMA_UI_TO_CODE = {
@@ -159,39 +182,25 @@ REGION_UI_TO_CODE = {
     "Interior": 0,
 }
 
-# Voto en el balotaje 2024. Es el control que el widget IVE ya tenía y a éste
-# le faltaba: mejora la discriminación (AUC 0,748 -> 0,752) y sobre todo evita
-# atribuirle a la ideología declarada un efecto que en parte es del voto.
-#
-# La referencia es "blanco, anulado o no votó" (códigos 3 y 4), y no es una
-# categoría de descarte: es justamente el grupo MÁS punitivo de la muestra.
-# Tanto los votantes de Orsi como los de Delgado apoyan menos la pena de muerte
-# que quienes no eligieron ninguno.
-#
-# Los 153 que NO RECUERDAN a quién votaron (código 5) llevan dummy propia y no
-# entran en esa referencia: no acordarse no es lo mismo que haber votado en
-# blanco, y meterlos juntos hacía que la etiqueta publicada dijera una cosa y
-# el grupo fuera otra. Como ideol_no_ubica y victima_sin_dato, la UI no la
-# ofrece y queda siempre en cero.
-BALOTAJE_UI_TO_CODE = {
-    "Orsi": 1,
-    "Delgado": 2,
-    "Blanco, anulado o no votó": 0,   # referencia
-}
-
 # ============================================================
 # PREDICTORES DEL MODELO
 # ============================================================
 # El orden importa sólo para la legibilidad de los reportes; el vector se
 # arma por nombre, no por posición.
+# Sin voto de balotaje: Tomer pidió expresamente "poner identificación
+# ideológica y sacar partidos políticos" (31/8/2026). Es una decisión
+# editorial suya, no un problema del modelo — el balotaje discriminaba bien.
+# Consecuencia estadística a tener presente: parte de lo que antes explicaba
+# el voto ahora lo absorbe la ideología declarada, así que los coeficientes
+# ideológicos de este modelo NO son comparables con los de la versión anterior.
 PREDICTORES = [
     "edad_30_44", "edad_45_59", "edad_60_plus",
     "es_mujer",
     "educ_ter_incomp", "educ_ter_comp",
-    "ideol_izquierda", "ideol_derecha", "ideol_no_ubica",
+    "ideol_izq_extrema", "ideol_izquierda", "ideol_centroderecha",
+    "ideol_derecha", "ideol_der_extrema", "ideol_no_ubica",
     "victima_sin_violencia", "victima_con_violencia", "victima_sin_dato",
     "es_montevideo",
-    "bal_orsi", "bal_delgado", "bal_no_recuerda",
 ]
 
 # `victima_sin_dato` existe para que los 53 casos sin respuesta no se mezclen
@@ -209,13 +218,22 @@ ESPEC_CRUDA = {
     "educ_colapso": {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 2, 8: 3, 9: 3, 10: 3},
     # Cortes de edad (bordes de pd.cut) y sus códigos.
     "edad_cortes": [17, 29, 44, 59, 120],
-    # Corte de la autoubicación 0-10 en izquierda / centro / derecha.
-    "ideol_izquierda_hasta": 3,
-    "ideol_derecha_desde": 7,
+    # Tramos de la autoubicación 0-10. Cada uno es [desde, hasta] inclusive y
+    # el nombre es el sufijo de la dummy. El tramo marcado como referencia no
+    # genera dummy. Van explícitos y no como dos umbrales sueltos porque ahora
+    # son seis cortes y un umbral no alcanza para describirlos.
+    "ideol_tramos": [
+        ["izq_extrema", 0, 2],
+        ["izquierda", 3, 4],
+        ["centroizq", 5, 5],
+        ["centroderecha", 6, 6],
+        ["derecha", 7, 8],
+        ["der_extrema", 9, 10],
+    ],
+    "ideol_referencia": "centroizq",
     # Códigos crudos de las demás variables.
     "sexo_valores": {"mujer": "Mujer", "hombre": "Hombre"},
     "dpto_montevideo": 1,
-    "balotaje_codigos": {"orsi": 1, "delgado": 2, "referencia": [3, 4], "no_recuerda": 5},
     # Etiquetas crudas de victimización. Viven acá y no en train_model.py para
     # que entren en la huella: son parte de la definición de las dummies.
     "victima_etiquetas": {
@@ -239,7 +257,7 @@ def huella_contrato():
 
     Incluye TODO lo que define el significado de una dummy: los mapeos de la UI,
     las referencias, la escala Likert y la especificación de transformación
-    cruda (cortes de edad, colapso educativo, códigos de balotaje). Una versión
+    cruda (cortes de edad, colapso educativo, tramos ideológicos). Una versión
     anterior de esta función decía en su docstring que cubría las referencias y
     no las cubría, y sobre todo dejaba afuera `EDUC_COLAPSO` — con lo cual
     cambiar el colapso educativo dejaba exactamente la misma huella, que es
@@ -262,7 +280,6 @@ def huella_contrato():
         "ideologia": sorted(IDEOLOGIA_UI_TO_CODE.items()),
         "victima": sorted(VICTIMA_UI_TO_CODE.items()),
         "region": sorted(REGION_UI_TO_CODE.items()),
-        "balotaje": sorted(BALOTAJE_UI_TO_CODE.items()),
         "referencias": sorted(REFERENCIAS.items()),
         "likert": sorted(LIKERT_MAP.items()),
         "favor": sorted(LIKERT_FAVOR),
@@ -278,8 +295,7 @@ REFERENCIAS = {
     "edad": "18-29 años",
     "sexo": "Hombre",
     "educacion": "Secundaria o menos",
-    "ideologia": "Centro (4-6)",
+    "ideologia": "Centroizquierda (5)",
     "victima": "No fue víctima",
     "region": "Interior",
-    "balotaje": "Blanco, anulado o no votó",
 }

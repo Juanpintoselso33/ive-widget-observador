@@ -33,6 +33,8 @@ from widgets.seguridad.config import (
     DATA_FILE, MODEL_COEFFICIENTS_PATH, PREGUNTA, PREGUNTA_ACTIVA,
     LIKERT_MAP, LIKERT_FAVOR, LIKERT_CONTRA, LIKERT_NEUTRAL,
     PONDERADOR, PREDICTORES, REFERENCIAS, huella_contrato, ESPEC_CRUDA,
+    EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE, VICTIMA_UI_TO_CODE,
+    REGION_UI_TO_CODE,
 )
 
 RANDOM_STATE = 42
@@ -62,7 +64,7 @@ EDUC_COLAPSO = ESPEC_CRUDA["educ_colapso"]
 
 # Columnas que la base tiene que traer sí o sí para poder entrenar.
 COLUMNAS_REQUERIDAS = [
-    "edad", "sexo", "nivel_educativo", "dpto_ech", "IdBalotaje", "estrato", PONDERADOR,
+    "edad", "sexo", "nivel_educativo", "dpto_ech", "estrato", PONDERADOR,
     "var_241 | Victima de delito ultimos 12 meses",
     "var_242 | Autoubicacion izquierda-derecha (0-10)",
 ]
@@ -127,15 +129,6 @@ def preparar(df):
     if dptos:
         problemas.append(f"códigos de 'dpto_ech' fuera de 1-19: {sorted(dptos)}")
     revisar_nulos("dpto_ech", "dpto_ech")
-
-    # IdBalotaje sólo se exigía como columna: un código nuevo caía en la
-    # referencia sin avisar.
-    _bc = ESPEC_CRUDA["balotaje_codigos"]
-    _bal_validos = {_bc["orsi"], _bc["delgado"], _bc["no_recuerda"], *_bc["referencia"]}
-    bal = set(df["IdBalotaje"].dropna().unique()) - _bal_validos
-    if bal:
-        problemas.append(f"códigos de 'IdBalotaje' fuera de {sorted(_bal_validos)}: {sorted(bal)}")
-    revisar_nulos("IdBalotaje", "IdBalotaje")
 
     # La escala es discreta 0-10: un 3,5 pasaba como válido y caía en "Centro".
     ideol = df["var_242 | Autoubicacion izquierda-derecha (0-10)"].dropna()
@@ -225,10 +218,29 @@ def preparar(df):
     df["educ_ter_incomp"] = (educ == 2).astype(int)
     df["educ_ter_comp"] = (educ == 3).astype(int)
 
-    # --- Ideología: 0-10 agrupada, centro como referencia.
+    # --- Ideología: los seis tramos de ESPEC_CRUDA["ideol_tramos"], con el
+    # marcado como referencia sin dummy. Los tramos se leen de la
+    # especificación y no se escriben a mano acá: si se escribieran a mano, la
+    # huella del contrato cambiaría al editar la espec pero las dummies no,
+    # que es exactamente el agujero que Codex encontró con los códigos de
+    # balotaje.
     ideol = df["var_242 | Autoubicacion izquierda-derecha (0-10)"]
-    df["ideol_izquierda"] = (ideol <= ESPEC_CRUDA["ideol_izquierda_hasta"]).astype(int)
-    df["ideol_derecha"] = (ideol >= ESPEC_CRUDA["ideol_derecha_desde"]).astype(int)
+    referencia = ESPEC_CRUDA["ideol_referencia"]
+    cubierto = ideol.isna()
+    for nombre, desde, hasta in ESPEC_CRUDA["ideol_tramos"]:
+        en_tramo = ideol.between(desde, hasta)
+        cubierto |= en_tramo
+        if nombre != referencia:
+            df[f"ideol_{nombre}"] = en_tramo.astype(int)
+    # Un valor de la escala que no cae en ningún tramo quedaría con TODAS las
+    # dummies en cero, o sea silenciosamente dentro de la referencia. Con la
+    # base actual no pasa, pero el widget está pensado para re-entrenarse.
+    if (~cubierto).any():
+        sueltos = sorted(ideol[~cubierto].dropna().unique())
+        raise SystemExit(
+            f"estos valores de autoubicación no caen en ningún tramo de "
+            f"ideol_tramos y caerían en la referencia: {sueltos}"
+        )
     df["ideol_no_ubica"] = ideol.isna().astype(int)
 
     # --- Víctima de delito en los últimos 12 meses. La base distingue con y
@@ -254,14 +266,6 @@ def preparar(df):
               f"— con dummy propia, no mezclados con los 'No'")
 
     df["es_montevideo"] = (df["dpto_ech"] == ESPEC_CRUDA["dpto_montevideo"]).astype(int)
-
-    # --- Balotaje 2024. IdBalotaje: 1=Orsi, 2=Delgado, 3=blanco, 4=no votó,
-    # 5=no recuerda. La referencia son SÓLO 3 y 4: quienes no recuerdan llevan
-    # dummy propia porque no acordarse no es lo mismo que haber votado en blanco.
-    _bc = ESPEC_CRUDA["balotaje_codigos"]
-    df["bal_orsi"] = (df["IdBalotaje"] == _bc["orsi"]).astype(int)
-    df["bal_delgado"] = (df["IdBalotaje"] == _bc["delgado"]).astype(int)
-    df["bal_no_recuerda"] = (df["IdBalotaje"] == _bc["no_recuerda"]).astype(int)
 
     return df
 
@@ -476,26 +480,33 @@ def main():
     # en la muestra. El modelo es aditivo y puede estimar las que faltan, pero
     # conviene decir cuántas salen de una extrapolación y no de casos reales.
     # Sólo cuentan los casos que corresponden a un perfil REALMENTE elegible en
-    # la UI. Los que tienen alguna de las tres dummies ocultas activas quedan
-    # fuera: si no, un encuestado que "no recuerda" a quién votó se contaba
-    # dentro de "blanco, anulado o no votó", y la UI terminaba afirmando que un
-    # perfil aparece en la encuesta cuando en realidad no hay ningún caso
-    # exacto. Con la mezcla daban 597 observados y 5 con 30+; los reales son
-    # 566 y 4.
-    elegibles = d[(d["victima_sin_dato"] == 0)
-                  & (d["ideol_no_ubica"] == 0)
-                  & (d["bal_no_recuerda"] == 0)]
+    # la UI. Los que tienen alguna de las dummies ocultas activas quedan fuera:
+    # si no, la UI terminaría afirmando que un perfil aparece en la encuesta
+    # cuando en realidad no hay ningún caso exacto.
+    #
+    # El número de perfiles posibles se DERIVA de los mapeos de la UI en vez de
+    # escribirse a mano. Antes era la constante 4*2*3*3*3*2*3; al sacar el
+    # balotaje y abrir la ideología a seis tramos habría quedado publicando
+    # 1.296 combinaciones sobre un espacio de 864, sin que nada lo detectara.
+    elegibles = d[(d["victima_sin_dato"] == 0) & (d["ideol_no_ubica"] == 0)]
+    ideol_codigo = sum(
+        elegibles[f"ideol_{nombre}"] * i
+        for i, (nombre, _, _) in enumerate(ESPEC_CRUDA["ideol_tramos"], start=1)
+        if nombre != ESPEC_CRUDA["ideol_referencia"]
+    )
     perfiles = list(zip(
         elegibles["tramo_edad"], elegibles["es_mujer"],
         elegibles["educ_ter_incomp"] * 1 + elegibles["educ_ter_comp"] * 2,
-        elegibles["ideol_izquierda"] * 1 + elegibles["ideol_derecha"] * 2,
+        ideol_codigo,
         elegibles["victima_sin_violencia"] * 1 + elegibles["victima_con_violencia"] * 2,
         elegibles["es_montevideo"],
-        elegibles["bal_orsi"] * 1 + elegibles["bal_delgado"] * 2,
     ))
     conteo = pd.Series(perfiles).value_counts()
+    posibles = (len(EDAD_UI_TO_CODE) * 2 * len(EDUC_UI_TO_CODE)
+                * len(IDEOLOGIA_UI_TO_CODE) * len(VICTIMA_UI_TO_CODE)
+                * len(REGION_UI_TO_CODE))
     cobertura = {
-        "posibles": 4 * 2 * 3 * 3 * 3 * 2 * 3,
+        "posibles": int(posibles),
         "observados": int(len(conteo)),
         "con_30_o_mas": int((conteo >= 30).sum()),
     }
@@ -507,8 +518,17 @@ def main():
         "mujeres": df["es_mujer"] == 1,
         "montevideo": df["es_montevideo"] == 1,
         "interior": df["es_montevideo"] == 0,
-        "izquierda": df["ideol_izquierda"] == 1,
-        "derecha": df["ideol_derecha"] == 1,
+        # Un grupo por tramo ideológico, incluida la referencia (que no tiene
+        # dummy y se define por tener todas las demás en cero y haberse ubicado).
+        **{
+            f"ideol_{nombre}": (
+                df[f"ideol_{nombre}"] == 1 if nombre != ESPEC_CRUDA["ideol_referencia"]
+                else (df["ideol_no_ubica"] == 0) & (sum(
+                    df[f"ideol_{n}"] for n, _, _ in ESPEC_CRUDA["ideol_tramos"]
+                    if n != ESPEC_CRUDA["ideol_referencia"]) == 0)
+            )
+            for nombre, _, _ in ESPEC_CRUDA["ideol_tramos"]
+        },
         "victima": (df["victima_sin_violencia"] == 1) | (df["victima_con_violencia"] == 1),
         # Sólo quienes contestaron "No": si se define por las dummies en cero
         # se cuelan los sin dato y la tasa publicada sale corrida.
@@ -521,11 +541,6 @@ def main():
         "educ_secundaria": (df["educ_ter_incomp"] == 0) & (df["educ_ter_comp"] == 0),
         "educ_ter_incompleta": df["educ_ter_incomp"] == 1,
         "educ_ter_completa": df["educ_ter_comp"] == 1,
-        "voto_orsi": df["bal_orsi"] == 1,
-        "voto_delgado": df["bal_delgado"] == 1,
-        # Sólo blanco/anulado/no votó: si se define por las dummies en cero se
-        # cuelan los 153 que no recuerdan y la etiqueta publicada miente.
-        "voto_blanco_no_voto": df["IdBalotaje"].isin(ESPEC_CRUDA["balotaje_codigos"]["referencia"]),
     }
     for nombre, mascara in grupos.items():
         sub = df[mascara & df["a_favor"].notna()]

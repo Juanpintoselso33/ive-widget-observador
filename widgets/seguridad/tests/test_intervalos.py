@@ -94,7 +94,7 @@ class TestReglaDelCincuenta:
 
 class TestIntervaloProbabilidad:
     PERFIL = dict(tramo_edad=2, es_mujer=0, nivel_educ=1, ideologia=2,
-                  victima=1, es_montevideo=0, balotaje=0)
+                  victima=1, es_montevideo=0)
 
     def test_devuelve_none_sin_bootstrap(self):
         assert intervalo_probabilidad({"coefficients": {}}, **self.PERFIL) is None
@@ -124,15 +124,17 @@ class TestBandaDeDecision:
     """
 
     PERFIL = dict(tramo_edad=2, es_mujer=0, nivel_educ=1, ideologia=2,
-                  victima=1, es_montevideo=0, balotaje=0)
+                  victima=1, es_montevideo=0)
 
-    # 18-29, mujer, terciaria incompleta, izquierda, víctima sin violencia,
-    # interior, blanco/no votó. Codex lo encontró remuestreando las réplicas
-    # guardadas: se mostraba como 15%-49% y el widget afirmaba "la amplia
-    # mayoría está en contra", pero en 456 de 1.000 corridas simuladas ese
-    # extremo llegaba a 50.
+    # 18-29, mujer, terciaria incompleta, izquierda extrema, víctima sin
+    # violencia, interior. Codex encontró la versión previa de este perfil
+    # remuestreando las réplicas: se mostraba como 15%-49% y el widget afirmaba
+    # "la amplia mayoría está en contra", pero en 456 de 1.000 corridas
+    # simuladas ese extremo llegaba a 50. El modelo cambió (seis tramos
+    # ideológicos, sin balotaje), así que los números concretos son otros; lo
+    # que el test fija es la REGLA, no aquel intervalo.
     TESTIGO = dict(tramo_edad=1, es_mujer=1, nivel_educ=2, ideologia=1,
-                   victima=2, es_montevideo=0, balotaje=0)
+                   victima=2, es_montevideo=0)
 
     COLORES = {"primary": "#000", "text_muted": "#888"}
 
@@ -154,23 +156,51 @@ class TestBandaDeDecision:
 
     @pytest.mark.skipif(not config.MODEL_COEFFICIENTS_PATH.exists(),
                         reason="El modelo todavía no fue entrenado")
-    def test_el_caso_testigo_ya_no_afirma_mayoria(self):
+    def test_ningun_perfil_afirma_mayoria_si_la_banda_cruza_el_50(self):
         """
-        El test que fija el arreglo. Si alguien vuelve a decidir con el
-        intervalo mostrado, este caso vuelve a afirmar y el test se pone rojo.
+        El test que fija el arreglo, escrito como INVARIANTE y no como un caso
+        puntual: la versión anterior clavaba el perfil que había encontrado
+        Codex con sus números exactos, y al cambiar el modelo (seis tramos
+        ideológicos, sin balotaje) el test se puso rojo sin que hubiera ninguna
+        regresión — el perfil seguía bien, los números eran otros.
+
+        Recorre TODOS los perfiles elegibles y comprueba dos cosas:
+          1. si la banda cruza el 50, el texto es el prudente;
+          2. existe al menos un perfil donde el intervalo mostrado NO cruza el
+             50 pero la banda SÍ. Sin esa segunda parte el test pasaría
+             igual con banda_decision() devolviendo el intervalo tal cual, o
+             sea sin el arreglo.
         """
+        import itertools
         with open(config.MODEL_COEFFICIENTS_PATH, encoding="utf-8") as f:
             modelo = json.load(f)
-        prob = predict_probability(modelo, **self.TESTIGO)
-        iv = intervalo_probabilidad(modelo, **self.TESTIGO)
-        bd = banda_decision(modelo, **self.TESTIGO)
 
-        # La premisa del caso: el intervalo mostrado NO cruza el 50 y la banda SÍ.
-        assert round(iv[1]) < 50, f"cambió la base: el intervalo ahora es {iv}"
-        assert round(bd[1]) >= 50, f"cambió la base: la banda ahora es {bd}"
+        n_ideol = len(config.IDEOLOGIA_UI_TO_CODE)
+        distinguen = 0
+        for te, mu, ed, id_, vi, mv in itertools.product(
+                range(1, 5), (0, 1), (1, 2, 3), range(1, n_ideol + 1),
+                (1, 2, 3), (0, 1)):
+            perfil = dict(tramo_edad=te, es_mujer=mu, nivel_educ=ed,
+                          ideologia=id_, victima=vi, es_montevideo=mv)
+            prob = predict_probability(modelo, **perfil)
+            iv = intervalo_probabilidad(modelo, **perfil)
+            bd = banda_decision(modelo, **perfil)
 
-        _, texto = interpretar(prob, self.COLORES, iv, bd)
-        assert "no permite afirmar" in texto
+            cruza_banda = round(bd[0]) <= 50 <= round(bd[1])
+            cruza_iv = round(iv[0]) <= 50 <= round(iv[1])
+            _, texto = interpretar(prob, self.COLORES, iv, bd)
+
+            if cruza_banda:
+                assert "no permite afirmar" in texto, (
+                    f"la banda {bd} cruza el 50 y el widget igual afirmó: {perfil}"
+                )
+            if cruza_banda and not cruza_iv:
+                distinguen += 1
+
+        assert distinguen > 0, (
+            "en ningún perfil la banda decide distinto del intervalo mostrado: "
+            "o banda_decision() dejó de ensanchar, o el test quedó vacío"
+        )
 
     def test_la_banda_manda_sobre_el_intervalo(self):
         """Sin tocar el modelo: si la banda cruza el 50, no se afirma."""

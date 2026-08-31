@@ -20,7 +20,9 @@ if str(_ROOT) not in sys.path:
 import json
 import math
 
-from widgets.seguridad.config import MODEL_COEFFICIENTS_PATH, PREDICTORES
+from widgets.seguridad.config import (
+    MODEL_COEFFICIENTS_PATH, PREDICTORES, ESPEC_CRUDA, IDEOLOGIA_UI_TO_CODE,
+)
 
 
 def load_model():
@@ -30,24 +32,26 @@ def load_model():
 
 
 def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima,
-                   es_montevideo, balotaje):
+                   es_montevideo):
     """
     Traduce los inputs de la UI (códigos de config.py) al vector de dummies.
 
     Cada bloque omite su categoría de referencia: 18-29 en edad, hombre en
-    sexo, secundaria o menos en educación, centro en ideología, no víctima, e
-    interior en región, y blanco/no votó en balotaje.
+    sexo, secundaria o menos en educación, centroizquierda (el 5 de la escala)
+    en ideología, no víctima e interior en región.
+
+    Las dummies ideológicas se arman recorriendo IDEOLOGIA_UI_TO_CODE y no
+    escribiendo `ideologia == 1` a mano para cada tramo: con seis tramos, un
+    índice mal escrito daría un vector válido con la categoría equivocada, que
+    es el error que produce un número plausible y falso.
     """
-    return {
+    features = {
         "edad_30_44": int(tramo_edad == 2),
         "edad_45_59": int(tramo_edad == 3),
         "edad_60_plus": int(tramo_edad == 4),
         "es_mujer": int(es_mujer),
         "educ_ter_incomp": int(nivel_educ == 2),
         "educ_ter_comp": int(nivel_educ == 3),
-        "ideol_izquierda": int(ideologia == 1),
-        "ideol_derecha": int(ideologia == 3),
-        "ideol_no_ubica": int(ideologia == 4),
         "victima_sin_violencia": int(victima == 2),
         "victima_con_violencia": int(victima == 3),
         # Siempre 0: la UI obliga a elegir una de las tres opciones reales.
@@ -55,11 +59,18 @@ def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima,
         # contaminen la categoría de referencia (ver config.PREDICTORES).
         "victima_sin_dato": 0,
         "es_montevideo": int(es_montevideo),
-        "bal_orsi": int(balotaje == 1),
-        "bal_delgado": int(balotaje == 2),
-        # Siempre 0 desde la UI, igual que las otras dummies de "sin dato".
-        "bal_no_recuerda": 0,
+        # Siempre 0 desde la UI, igual que victima_sin_dato: "no se ubica"
+        # agrupa a quienes no contestaron la escala, que no es una posición
+        # política que el lector pueda elegir.
+        "ideol_no_ubica": 0,
     }
+    referencia = ESPEC_CRUDA["ideol_referencia"]
+    nombres = [n for n, _, _ in ESPEC_CRUDA["ideol_tramos"]]
+    for codigo, etiqueta in enumerate(IDEOLOGIA_UI_TO_CODE, start=1):
+        nombre = nombres[codigo - 1]
+        if nombre != referencia:
+            features[f"ideol_{nombre}"] = int(ideologia == codigo)
+    return features
 
 
 def _z(coef, features):
@@ -75,29 +86,29 @@ def _sigmoid_pct(z):
 
 
 def predict_probability(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                        victima, es_montevideo, balotaje):
+                        victima, es_montevideo):
     """
     Probabilidad de estar a favor, condicional a tener postura definida.
     Returns: float en 0-100.
     """
     features = build_features(tramo_edad, es_mujer, nivel_educ, ideologia,
-                              victima, es_montevideo, balotaje)
+                              victima, es_montevideo)
     return _sigmoid_pct(_z(model["coefficients"], features))
 
 
 def predict_probability_neutral(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                                victima, es_montevideo, balotaje):
+                                victima, es_montevideo):
     """
     Probabilidad de no fijar postura (Likert=3 o sin respuesta) según el perfil.
     Returns: float en 0-100.
     """
     features = build_features(tramo_edad, es_mujer, nivel_educ, ideologia,
-                              victima, es_montevideo, balotaje)
+                              victima, es_montevideo)
     return _sigmoid_pct(_z(model["coefficients_neutral"], features))
 
 
 def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                              victima, es_montevideo, balotaje):
+                              victima, es_montevideo):
     """
     Las B probabilidades del perfil, una por réplica bootstrap, ordenadas.
 
@@ -108,7 +119,7 @@ def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia
         return None
 
     features = build_features(tramo_edad, es_mujer, nivel_educ, ideologia,
-                              victima, es_montevideo, balotaje)
+                              victima, es_montevideo)
     orden = boot["orden"]
 
     probabilidades = []
@@ -123,7 +134,7 @@ def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia
 
 
 def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                           victima, es_montevideo, balotaje, nivel=95):
+                           victima, es_montevideo, nivel=95):
     """
     Intervalo de confianza percentil para la probabilidad estimada. ES EL QUE SE
     MUESTRA: la decisión editorial sobre el 50% no se toma con éste, sino con
@@ -137,7 +148,7 @@ def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
     """
     probabilidades = _probabilidades_bootstrap(
         model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
-        es_montevideo, balotaje)
+        es_montevideo)
     if probabilidades is None:
         return None
     cola = (100 - nivel) / 2 / 100
@@ -149,7 +160,7 @@ _Z_MC = 1.959964
 
 
 def banda_decision(model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
-                   es_montevideo, balotaje, nivel=95):
+                   es_montevideo, nivel=95):
     """
     Extremos CONSERVADORES del intervalo, para decidir si se afirma de qué lado
     está la mayoría. No se muestran: sólo gobiernan esa decisión.
@@ -185,7 +196,7 @@ def banda_decision(model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
     """
     probabilidades = _probabilidades_bootstrap(
         model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
-        es_montevideo, balotaje)
+        es_montevideo)
     if probabilidades is None:
         return None
 

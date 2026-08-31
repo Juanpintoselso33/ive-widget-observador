@@ -43,7 +43,7 @@ def base_minima():
     ]:
         filas.append({
             "edad": edad, "sexo": sexo, "nivel_educativo": educ,
-            "dpto_ech": dpto, "IdBalotaje": idbal, "w_norm": 1.0,
+            "dpto_ech": dpto, "w_norm": 1.0,
             "estrato": f"dpto-{dpto}",
             "var_241 | Victima de delito ultimos 12 meses": vic,
             "var_242 | Autoubicacion izquierda-derecha (0-10)": ideol,
@@ -52,28 +52,49 @@ def base_minima():
     return pd.DataFrame(filas)
 
 
-def test_los_codigos_de_balotaje_salen_de_la_especificacion(base_minima, monkeypatch):
+def test_los_tramos_ideologicos_salen_de_la_especificacion(base_minima, monkeypatch):
     """
-    El caso que encontró Codex: invertir Orsi y Delgado en la especificación
-    tiene que invertir las dummies. Si no, la espec no es fuente de verdad y el
-    hash cambia sin que cambie nada real.
+    El caso que encontró Codex, trasladado a la variable que ahora manda. Antes
+    era con los códigos de balotaje: invertir Orsi y Delgado en la
+    especificación cambiaba el hash y NO cambiaba las dummies, porque
+    train_model usaba códigos escritos a mano. Balotaje ya no está en el
+    modelo, pero el agujero se puede reabrir en cualquier variable, así que el
+    test se mantiene sobre los tramos ideológicos.
     """
     normal = tm.preparar(base_minima)
-    assert normal.loc[0, "bal_orsi"] == 1 and normal.loc[0, "bal_delgado"] == 0
-    assert normal.loc[1, "bal_delgado"] == 1 and normal.loc[1, "bal_orsi"] == 0
+    # ideologia 0 -> izquierda extrema (0-2); 5 -> centroizquierda (referencia)
+    assert normal.loc[0, "ideol_izq_extrema"] == 1
+    assert normal.loc[1, "ideol_izq_extrema"] == 0
 
     espec = {**config.ESPEC_CRUDA,
-             "balotaje_codigos": {"orsi": 2, "delgado": 1,
-                                  "referencia": [3, 4], "no_recuerda": 5}}
+             "ideol_tramos": [["izq_extrema", 9, 10], ["izquierda", 3, 4],
+                              ["centroizq", 5, 5], ["centroderecha", 6, 6],
+                              ["derecha", 7, 8], ["der_extrema", 0, 2]]}
     monkeypatch.setattr(config, "ESPEC_CRUDA", espec)
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
 
     invertido = tm.preparar(base_minima)
-    assert invertido.loc[0, "bal_delgado"] == 1, (
-        "invertir los códigos en ESPEC_CRUDA no invirtió las dummies: "
+    assert invertido.loc[0, "ideol_der_extrema"] == 1, (
+        "invertir los extremos en ESPEC_CRUDA no invirtió las dummies: "
         "la especificación no se está consumiendo de verdad"
     )
-    assert invertido.loc[1, "bal_orsi"] == 1
+    assert invertido.loc[0, "ideol_izq_extrema"] == 0
+
+
+def test_un_valor_de_la_escala_sin_tramo_aborta(base_minima, monkeypatch):
+    """
+    Un valor que no cae en ningún tramo quedaría con todas las dummies en cero,
+    o sea silenciosamente dentro de la referencia. Tiene que abortar.
+    """
+    espec = {**config.ESPEC_CRUDA,
+             "ideol_tramos": [["izq_extrema", 0, 2], ["izquierda", 3, 4],
+                              ["centroizq", 5, 5], ["centroderecha", 6, 6],
+                              ["derecha", 7, 7], ["der_extrema", 9, 10]]}
+    monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
+    df = base_minima.copy()
+    df.loc[0, "var_242 | Autoubicacion izquierda-derecha (0-10)"] = 8
+    with pytest.raises(SystemExit, match="no caen en ningún tramo"):
+        tm.preparar(df)
 
 
 def test_los_cortes_de_edad_salen_de_la_especificacion(base_minima, monkeypatch):
@@ -98,16 +119,6 @@ def test_el_colapso_educativo_sale_de_la_especificacion(base_minima, monkeypatch
     assert colapsado.loc[1, "educ_ter_comp"] == 0, (
         "colapsar todo a una categoría no cambió las dummies educativas"
     )
-
-
-def test_los_cortes_ideologicos_salen_de_la_especificacion(base_minima, monkeypatch):
-    normal = tm.preparar(base_minima)
-    assert normal.loc[1, "ideol_izquierda"] == 0   # 5 es centro
-
-    espec = {**config.ESPEC_CRUDA, "ideol_izquierda_hasta": 5}
-    monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
-    movido = tm.preparar(base_minima)
-    assert movido.loc[1, "ideol_izquierda"] == 1
 
 
 def test_las_etiquetas_de_victima_son_de_dominio_cerrado(base_minima):
@@ -151,9 +162,9 @@ def test_la_cobertura_no_cuenta_perfiles_no_elegibles():
     # (597 observados, 5 con 30+) también pasaban las dos comprobaciones de
     # arriba. Si la base cambia hay que actualizar estos números a propósito,
     # que es justamente la idea.
-    assert cob["posibles"] == 1296
-    assert cob["observados"] == 566, (
+    assert cob["posibles"] == 864
+    assert cob["observados"] == 531, (
         "la cobertura cambió: si es por un cambio de base, actualizar el "
         "número; si no, revisar que no se estén contando perfiles no elegibles"
     )
-    assert cob["con_30_o_mas"] == 4
+    assert cob["con_30_o_mas"] == 9

@@ -18,7 +18,7 @@ import streamlit as st
 
 from widgets.seguridad.config import (
     PREGUNTA, EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE,
-    VICTIMA_UI_TO_CODE, REGION_UI_TO_CODE, BALOTAJE_UI_TO_CODE,
+    VICTIMA_UI_TO_CODE, REGION_UI_TO_CODE, ESPEC_CRUDA,
 )
 
 # Escala neutra: la intensidad del color acompaña la magnitud, sin valorarla.
@@ -99,11 +99,11 @@ def render_inputs():
 
     Returns:
         tuple: (tramo_edad, es_mujer, nivel_educ, ideologia, victima,
-                es_montevideo, balotaje)
+                es_montevideo)
     """
-    # Cuatro a la izquierda y tres a la derecha, agrupadas por tipo: quién sos
-    # de un lado, qué pensás y qué te pasó del otro. Repartirlas 3/4 dejaba un
-    # hueco visible al pie de la primera columna.
+    # Tres y tres, agrupadas por tipo: quién sos de un lado, qué pensás y qué
+    # te pasó del otro. Al sacar el selector de balotaje quedaron seis, así que
+    # las columnas cierran parejas.
     col1, col2 = st.columns(2)
 
     with col1:
@@ -120,23 +120,22 @@ def render_inputs():
             "Nivel educativo", options=list(EDUC_UI_TO_CODE), index=1,
             help="El máximo nivel que alcanzaste",
         )
-        region_sel = st.selectbox(
-            "Región", options=list(REGION_UI_TO_CODE), index=1,
-        )
 
     with col2:
+        # index=2 es "Centroizquierda (5)", la categoría modal y la referencia
+        # del modelo: el widget abre en el perfil más común, no en un extremo.
         ideol_sel = st.selectbox(
-            "Ideología", options=list(IDEOLOGIA_UI_TO_CODE), index=1,
-            help="En política se habla normalmente de izquierda y derecha. "
-                 "En una escala de 0 a 10, ¿dónde te ubicarías?",
-        )
-        balotaje_sel = st.selectbox(
-            "¿A quién votaste en el balotaje de 2024?",
-            options=list(BALOTAJE_UI_TO_CODE), index=2,
+            "Identificación ideológica", options=list(IDEOLOGIA_UI_TO_CODE), index=2,
+            help="En política se habla normalmente de izquierda y derecha. En "
+                 "una escala de 0 a 10, ¿dónde te ubicarías? Los tramos entre "
+                 "paréntesis son los valores de esa escala.",
         )
         victima_sel = st.selectbox(
             "¿Fuiste víctima de un delito en los últimos 12 meses?",
             options=list(VICTIMA_UI_TO_CODE), index=0,
+        )
+        region_sel = st.selectbox(
+            "Región", options=list(REGION_UI_TO_CODE), index=1,
         )
 
     return (
@@ -146,7 +145,6 @@ def render_inputs():
         IDEOLOGIA_UI_TO_CODE[ideol_sel],
         VICTIMA_UI_TO_CODE[victima_sel],
         REGION_UI_TO_CODE[region_sel],
-        BALOTAJE_UI_TO_CODE[balotaje_sel],
     )
 
 
@@ -233,8 +231,12 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
 
 # Etiqueta legible para cada grupo del bloque comparativo.
 GRUPOS_LABEL = {
-    "izquierda": "Se ubica a la izquierda",
-    "derecha": "Se ubica a la derecha",
+    # Las seis etiquetas ideológicas salen de IDEOLOGIA_UI_TO_CODE, que es la
+    # misma tabla que ve el lector en el selector: si se renombra un tramo, se
+    # renombra en los dos lados o en ninguno.
+    **{f"ideol_{nombre}": etiqueta
+       for (nombre, _, _), etiqueta in zip(ESPEC_CRUDA["ideol_tramos"],
+                                           IDEOLOGIA_UI_TO_CODE)},
     "victima": "Fue víctima de un delito",
     "no_victima": "No fue víctima",
     "hombres": "Hombres",
@@ -246,19 +248,18 @@ GRUPOS_LABEL = {
     "educ_secundaria": "Secundaria o menos",
     "educ_ter_incompleta": "Terciaria incompleta",
     "educ_ter_completa": "Terciaria completa",
-    "voto_orsi": "Votó a Orsi",
-    "voto_delgado": "Votó a Delgado",
-    "voto_blanco_no_voto": "Blanco, anulado o no votó",
 }
 
 
 # Las dimensiones, y dentro de cada una el orden que tiene sentido leer
 # (izquierda a derecha, educación y edad de menor a mayor), no el orden por
-# valor: ordenar los dieciséis por magnitud daba un ranking sin estructura, en
-# el que "mujeres" quedaba pegado a "interior" por casualidad aritmética.
+# valor: ordenar todos por magnitud daba un ranking sin estructura, en el que
+# "mujeres" quedaba pegado a "interior" por casualidad aritmética. Con los seis
+# tramos ideológicos importa todavía más: puestos en orden se lee de un vistazo
+# si el apoyo crece de izquierda a derecha o no.
 GRUPOS_ORDEN = [
-    ("Ideología", ["izquierda", "derecha"]),
-    ("Voto en el balotaje de 2024", ["voto_orsi", "voto_delgado", "voto_blanco_no_voto"]),
+    ("Identificación ideológica",
+     [f"ideol_{nombre}" for nombre, _, _ in ESPEC_CRUDA["ideol_tramos"]]),
     ("Victimización", ["victima", "no_victima"]),
     ("Nivel educativo", ["educ_secundaria", "educ_ter_incompleta", "educ_ter_completa"]),
     ("Edad", ["edad_18_29", "edad_60_plus"]),
@@ -365,15 +366,29 @@ haber caído en 51% con otra simulación, así que para afirmar que la mayoría 
 de un lado se exige un margen un poco más ancho que el que se muestra. Cuando el
 extremo queda pegado al 50%, el widget prefiere no afirmar.
 
-**Qué sostiene y qué no.** Los factores que más pesan —nivel educativo, edad y
-autoubicación ideológica— se mantienen estables cuando se estima el modelo de
-otra forma. En cambio **el efecto del sexo, el de la región y el contraste entre 30-44 y
-18-29 años son chicos y no son robustos**: cambian de signo según la
-especificación, así que este widget no permite afirmar que las mujeres apoyen
-más que los varones, ni Montevideo más que el interior, ni que los de 30 a 44
-apoyen más que los más jóvenes. Lo que sí se sostiene en edad es el contraste
-de los mayores de 60, que apoyan claramente menos. Las tasas por grupo que se muestran abajo son descriptivas
-de la muestra, no efectos ajustados.
+**Sobre la escala ideológica.** Va de 0 a 10, así que **el 5 es el punto medio
+exacto** y es la respuesta más elegida: un tercio de los encuestados se ubica
+ahí. Las etiquetas de los seis tramos son una convención editorial, no una
+medición: quien se pone en el 5 está diciendo "en el medio", no "un poco a la
+izquierda".
+
+**Qué sostiene y qué no.** Estimado de otra manera —sobre la escala completa de
+acuerdo, sin excluir a los neutrales— el modelo mantiene los efectos grandes:
+**quienes se ubican en el extremo derecho de la escala apoyan mucho más**, y
+apoyan claramente menos quienes se ubican a la izquierda, quienes tienen
+estudios terciarios y los mayores de 60. Haber sido víctima de un delito con
+violencia también aguanta.
+
+En cambio **no son robustos el efecto del sexo, el de la región, el contraste
+entre 30-44 y 18-29 años, ni los dos tramos del medio de la escala
+(centroderecha y derecha)**: cambian de signo según cómo se estime. O sea que
+este widget no permite afirmar que las mujeres apoyen más que los varones, ni
+Montevideo más que el interior, ni ordenar con confianza el centro de la escala
+ideológica. Lo que sí queda firme son los extremos.
+
+Las tasas por grupo que se muestran abajo son descriptivas de la muestra, no
+efectos ajustados: mezclan el efecto propio del grupo con el de todo lo demás
+que lo acompaña.
         """)
 
 

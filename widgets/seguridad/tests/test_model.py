@@ -41,11 +41,11 @@ def test_el_modelo_de_neutralidad_usa_sus_propios_coeficientes(modelo_sintetico,
 def test_probabilidad_siempre_en_rango(modelo_sintetico):
     """Ningún perfil puede caer fuera de 0-100."""
     import itertools
-    for tramo, educ, ideol, vic, mvd, mujer, bal in itertools.product(
-            (1, 2, 3, 4), (1, 2, 3), (1, 2, 3), (1, 2, 3), (0, 1), (0, 1), (0, 1, 2)):
+    for tramo, educ, ideol, vic, mvd, mujer in itertools.product(
+            (1, 2, 3, 4), (1, 2, 3), (1, 2, 3, 4, 5, 6), (1, 2, 3), (0, 1), (0, 1)):
         p = predict_probability(
             modelo_sintetico, tramo_edad=tramo, es_mujer=mujer, nivel_educ=educ,
-            ideologia=ideol, victima=vic, es_montevideo=mvd, balotaje=bal,
+            ideologia=ideol, victima=vic, es_montevideo=mvd,
         )
         assert 0.0 <= p <= 100.0
 
@@ -72,22 +72,41 @@ class TestBuildFeatures:
 
     def test_las_dummies_que_no_ofrece_la_ui_quedan_siempre_en_cero(self, perfil_base):
         """
-        `victima_sin_dato`, `ideol_no_ubica` y `bal_no_recuerda` existen para que
-        los casos sin
+        `victima_sin_dato` e `ideol_no_ubica` existen para que los casos sin
         respuesta del entrenamiento no contaminen las categorías de referencia,
         pero la UI no los ofrece: ninguna combinación puede encenderlos, o se le
         estaría aplicando a un lector el coeficiente de quien no contestó.
         """
         import itertools
-        for vic, ideol, bal in itertools.product((1, 2, 3), (1, 2, 3), (0, 1, 2)):
+        for vic, ideol in itertools.product((1, 2, 3), (1, 2, 3, 4, 5, 6)):
             f = build_features(**{**perfil_base, "victima": vic,
-                                  "ideologia": ideol, "balotaje": bal})
+                                  "ideologia": ideol})
             assert f["victima_sin_dato"] == 0
             assert f["ideol_no_ubica"] == 0
-            assert f["bal_no_recuerda"] == 0
 
-    def test_centro_ideologico_es_la_referencia(self, perfil_base):
-        f = build_features(**{**perfil_base, "ideologia": 2})
-        assert f["ideol_izquierda"] == 0
-        assert f["ideol_derecha"] == 0
-        assert f["ideol_no_ubica"] == 0
+    def test_la_referencia_ideologica_deja_todas_las_dummies_en_cero(self, perfil_base):
+        """
+        La referencia es el tercer tramo (Centroizquierda, el 5 de la escala).
+        Si alguien reordena IDEOLOGIA_UI_TO_CODE sin tocar ESPEC_CRUDA, este
+        test se pone rojo — que es lo que tiene que pasar: los códigos de la UI
+        y los tramos de la especificación son posicionales entre sí.
+        """
+        from widgets.seguridad.config import ESPEC_CRUDA, IDEOLOGIA_UI_TO_CODE
+        nombres = [n for n, _, _ in ESPEC_CRUDA["ideol_tramos"]]
+        ref = ESPEC_CRUDA["ideol_referencia"]
+        codigo_ref = nombres.index(ref) + 1
+
+        f = build_features(**{**perfil_base, "ideologia": codigo_ref})
+        activas = [k for k in f if k.startswith("ideol_") and f[k]]
+        assert activas == [], f"la referencia encendió {activas}"
+
+        # Y cada tramo NO referencia enciende exactamente su propia dummy.
+        for codigo, nombre in enumerate(nombres, start=1):
+            if nombre == ref:
+                continue
+            f = build_features(**{**perfil_base, "ideologia": codigo})
+            activas = [k for k in f if k.startswith("ideol_") and f[k]]
+            assert activas == [f"ideol_{nombre}"], (
+                f"código {codigo} ({list(IDEOLOGIA_UI_TO_CODE)[codigo-1]}) "
+                f"encendió {activas}, se esperaba ideol_{nombre}"
+            )
