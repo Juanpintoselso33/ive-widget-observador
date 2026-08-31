@@ -165,21 +165,78 @@ EDUC_UI_TO_CODE = {
 # que todos los coeficientes se estimen contra pocos casos, que es el problema
 # que ya hubo con "Primaria o menos" y sus 28 casos.
 #
-# "No se ubica" NO se ofrece en la UI. En el entrenamiento esa dummy agrupa a
-# los 80 encuestados que no contestaron la escala. Y no contestar no es lo
+# "No se ubica" NO se ofrece en la UI. Esa dummy agrupa a quienes no
+# contestaron la escala: 80 en la encuesta completa, de los cuales 62 entran al
+# modelo principal de apoyo (los otros no tienen postura definida y quedan en el
+# modelo secundario de neutralidad). Y no contestar no es lo
 # mismo que ubicarse en el centro: el cuestionario NO ofrece "no sabe" entre
 # las opciones —son exactamente los once valores— así que un nulo es una
 # pregunta salteada. Sigue existiendo como predictor, para que esos casos no
 # contaminen la referencia, pero queda siempre en cero desde la interfaz.
-IDEOLOGIA_UI_TO_CODE = {
-    "Izquierda extrema (0-1)": 1,
-    "Izquierda (2-3)": 2,
-    "Centroizquierda (4)": 3,
-    "Centro (5)": 4,               # referencia
-    "Centroderecha (6)": 5,
-    "Derecha (7-8)": 6,
-    "Derecha extrema (9-10)": 7,
+# Especificación de la transformación dato crudo -> dummy. Vive acá, y no
+# repartida entre config y train_model, porque TODA ella tiene que entrar en la
+# huella: cambiar cualquiera de estos valores cambia el significado de las
+# dummies aunque los nombres queden iguales.
+ESPEC_CRUDA = {
+    # Escala nivel_educativo (1-10) del proveedor -> las 3 categorías del modelo.
+    "educ_colapso": {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 2, 8: 3, 9: 3, 10: 3},
+    # Cortes de edad (bordes de pd.cut) y sus códigos.
+    "edad_cortes": [17, 29, 44, 59, 120],
+    # Tramos de la autoubicación 0-10. Cada uno es [desde, hasta] inclusive y
+    # el nombre es el sufijo de la dummy. El tramo marcado como referencia no
+    # genera dummy. Van explícitos y no como dos umbrales sueltos porque ahora
+    # son seis cortes y un umbral no alcanza para describirlos.
+    # [sufijo de la dummy, desde, hasta, etiqueta] — inclusive en los dos
+    # bordes. Es la FUENTE ÚNICA: de acá salen las dummies del entrenamiento,
+    # las de la inferencia, las opciones del selector y las etiquetas del
+    # bloque comparativo. Antes las etiquetas vivían en un diccionario aparte
+    # y la correspondencia era posicional: reordenarlo dejaba los 71 tests en
+    # verde y le ponía nombres cambiados a las tasas publicadas.
+    "ideol_tramos": [
+        ["izq_extrema", 0, 1, "Izquierda extrema"],
+        ["izquierda", 2, 3, "Izquierda"],
+        ["centroizq", 4, 4, "Centroizquierda"],
+        ["centro", 5, 5, "Centro"],
+        ["centroderecha", 6, 6, "Centroderecha"],
+        ["derecha", 7, 8, "Derecha"],
+        ["der_extrema", 9, 10, "Derecha extrema"],
+    ],
+    "ideol_referencia": "centro",
+    # Códigos crudos de las demás variables.
+    "sexo_valores": {"mujer": "Mujer", "hombre": "Hombre"},
+    "dpto_montevideo": 1,
+    # Etiquetas crudas de victimización. Viven acá y no en train_model.py para
+    # que entren en la huella: son parte de la definición de las dummies.
+    "victima_etiquetas": {
+        "no": ["no"],
+        "sin_violencia": ["sí  sin violencia", "si  sin violencia", "sí sin violencia"],
+        "con_violencia": ["sí  con violencia", "si  con violencia", "sí con violencia"],
+    },
 }
+
+def _etiqueta_tramo(desde, hasta, etiqueta):
+    """«Centro (5)» si el tramo es un valor solo, «Izquierda (2-3)» si son dos."""
+    rango = f"{desde}" if desde == hasta else f"{desde}-{hasta}"
+    return f"{etiqueta} ({rango})"
+
+
+# Derivado de ESPEC_CRUDA["ideol_tramos"], no escrito a mano: el orden, los
+# valores de la escala y el nombre de la dummy salen todos de la misma lista,
+# así que no pueden desalinearse entre sí.
+IDEOLOGIA_UI_TO_CODE = {
+    _etiqueta_tramo(desde, hasta, etiqueta): i
+    for i, (_, desde, hasta, etiqueta) in enumerate(ESPEC_CRUDA["ideol_tramos"], start=1)
+}
+
+# Índice del selector: el tramo de referencia, que es el modal. Iba a mano y
+# quedó apuntando a la categoría equivocada al pasar de seis tramos a siete —
+# el widget abría en "Centroizquierda (4)" mientras el comentario decía
+# "Centro (5)".
+IDEOLOGIA_INDICE_DEFECTO = next(
+    i for i, (nombre, _, _, _) in enumerate(ESPEC_CRUDA["ideol_tramos"])
+    if nombre == ESPEC_CRUDA["ideol_referencia"]
+)
+
 
 VICTIMA_UI_TO_CODE = {
     "No": 1,                       # referencia
@@ -220,40 +277,6 @@ PREDICTORES = [
 # widget obliga a elegir una de las tres opciones reales. Es un predictor de
 # entrenamiento, no de interacción.
 
-# Especificación de la transformación dato crudo -> dummy. Vive acá, y no
-# repartida entre config y train_model, porque TODA ella tiene que entrar en la
-# huella: cambiar cualquiera de estos valores cambia el significado de las
-# dummies aunque los nombres queden iguales.
-ESPEC_CRUDA = {
-    # Escala nivel_educativo (1-10) del proveedor -> las 3 categorías del modelo.
-    "educ_colapso": {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 2, 8: 3, 9: 3, 10: 3},
-    # Cortes de edad (bordes de pd.cut) y sus códigos.
-    "edad_cortes": [17, 29, 44, 59, 120],
-    # Tramos de la autoubicación 0-10. Cada uno es [desde, hasta] inclusive y
-    # el nombre es el sufijo de la dummy. El tramo marcado como referencia no
-    # genera dummy. Van explícitos y no como dos umbrales sueltos porque ahora
-    # son seis cortes y un umbral no alcanza para describirlos.
-    "ideol_tramos": [
-        ["izq_extrema", 0, 1],
-        ["izquierda", 2, 3],
-        ["centroizq", 4, 4],
-        ["centro", 5, 5],
-        ["centroderecha", 6, 6],
-        ["derecha", 7, 8],
-        ["der_extrema", 9, 10],
-    ],
-    "ideol_referencia": "centro",
-    # Códigos crudos de las demás variables.
-    "sexo_valores": {"mujer": "Mujer", "hombre": "Hombre"},
-    "dpto_montevideo": 1,
-    # Etiquetas crudas de victimización. Viven acá y no en train_model.py para
-    # que entren en la huella: son parte de la definición de las dummies.
-    "victima_etiquetas": {
-        "no": ["no"],
-        "sin_violencia": ["sí  sin violencia", "si  sin violencia", "sí sin violencia"],
-        "con_violencia": ["sí  con violencia", "si  con violencia", "sí con violencia"],
-    },
-}
 
 
 def huella_contrato():
@@ -307,7 +330,8 @@ REFERENCIAS = {
     "edad": "18-29 años",
     "sexo": "Hombre",
     "educacion": "Secundaria o menos",
-    "ideologia": "Centro (5)",
+    "ideologia": _etiqueta_tramo(*[t[1:] for t in ESPEC_CRUDA["ideol_tramos"]
+                                  if t[0] == ESPEC_CRUDA["ideol_referencia"]][0]),
     "victima": "No fue víctima",
     "region": "Interior",
 }

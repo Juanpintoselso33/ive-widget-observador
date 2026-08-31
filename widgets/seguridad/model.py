@@ -64,10 +64,12 @@ def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima,
         # política que el lector pueda elegir.
         "ideol_no_ubica": 0,
     }
+    # El código que manda la UI es el índice del tramo dentro de
+    # ESPEC_CRUDA["ideol_tramos"] (1-based), porque IDEOLOGIA_UI_TO_CODE se
+    # deriva de esa misma lista. No hay dos estructuras que puedan
+    # desalinearse.
     referencia = ESPEC_CRUDA["ideol_referencia"]
-    nombres = [n for n, _, _ in ESPEC_CRUDA["ideol_tramos"]]
-    for codigo, etiqueta in enumerate(IDEOLOGIA_UI_TO_CODE, start=1):
-        nombre = nombres[codigo - 1]
+    for codigo, (nombre, _, _, _) in enumerate(ESPEC_CRUDA["ideol_tramos"], start=1):
         if nombre != referencia:
             features[f"ideol_{nombre}"] = int(ideologia == codigo)
     return features
@@ -165,32 +167,47 @@ def banda_decision(model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
     Extremos CONSERVADORES del intervalo, para decidir si se afirma de qué lado
     está la mayoría. No se muestran: sólo gobiernan esa decisión.
 
-    Por qué existe. El extremo del intervalo no se conoce, se SIMULA con B
-    réplicas, y esa simulación tiene su propio error. Con B=1.000 el percentil
-    97,5 de un perfil cualquiera se mueve alrededor de un punto y medio de una
-    corrida a otra. Eso es irrelevante para mostrar "15% a 49%", pero es
-    decisivo para una regla binaria que compara ese extremo contra 50: un perfil
-    cuyo extremo verdadero está en 49,5 cae de un lado o del otro según la
-    semilla.
+    POR QUÉ EXISTE. El extremo del intervalo no se conoce, se SIMULA con B
+    réplicas, y esa simulación tiene su propio error. Eso es irrelevante para
+    mostrar "15% a 49%", pero es decisivo para una regla binaria que compara ese
+    extremo contra 50: un perfil cuyo extremo verdadero está en 49,5 cae de un
+    lado o del otro según la semilla.
 
-    Codex lo midió sobre este mismo artefacto, remuestreando las réplicas
-    guardadas: 54 de los 1.296 perfiles cambian de conclusión en al menos 10% de
-    las corridas simuladas, y 30 en al menos 25%. El caso testigo —mujer de
-    18-29, terciaria incompleta, de izquierda, víctima sin violencia, del
-    interior, voto en blanco— se muestra hoy como 15%-49% y el widget afirma
-    "la amplia mayoría está en contra"; en 456 de 1.000 corridas ese extremo
-    llega a 50 y el texto correcto habría sido el prudente.
+    Codex lo midió sobre el artefacto anterior remuestreando las réplicas
+    guardadas: 54 de los perfiles cambiaban de conclusión en al menos 10% de las
+    corridas simuladas. Subir B no lo arregla, sólo lo achica.
 
-    Subir B no arregla esto, sólo lo achica: siempre hay perfiles cuyo extremo
-    verdadero está lo bastante cerca de 50 como para que la simulación no pueda
-    resolver el lado. Lo que corresponde es no exigirle a la simulación una
-    precisión que no tiene.
+    CÓMO. La POSICIÓN del cuantil q dentro de B réplicas ordenadas sigue una
+    binomial B(B, q), cuyo desvío expresado en escala de cuantil es
+    sqrt(q(1-q)/B). Se corren los dos extremos hacia afuera 1,96 de esos desvíos
+    y se toma el percentil resultante. Ojo con la distinción: eso mide la
+    incertidumbre de QUÉ POSICIÓN del orden estadístico corresponde al cuantil,
+    no la del VALOR de ese cuantil, que depende además de cuán apretadas estén
+    las réplicas ahí. Con q=0,975 y B=1.000 el cuantil exterior es 0,98468, y en
+    esa cola hay unas 25 observaciones esperadas: la normal está en zona
+    marginal, pero no se rompe.
 
-    Cómo. La posición del percentil q dentro de B réplicas sigue una binomial
-    B(B, q), así que su desvío en escala de cuantil es sqrt(q(1-q)/B). Se corren
-    los dos extremos hacia afuera ese desvío por 1,96 y se toma el percentil
-    resultante. Afirmar mayoría requiere entonces que TODA la banda quede de un
-    lado, no sólo el percentil puntual.
+    QUÉ TAN BIEN FUNCIONA, medido por Codex sobre este modelo remuestreando
+    1.000 veces las réplicas guardadas:
+
+      - cobertura conjunta de los dos extremos: 95,54% (el objetivo es 95%),
+        con un rango entre perfiles de 93,4% a 97,4%. O sea LIGERAMENTE
+        CONSERVADORA, que es el lado correcto para errar.
+      - afirmaciones del lado equivocado: 135 sobre 1.008.000 decisiones, o
+        0,0134%.
+      - costo: 3,77% de afirmaciones correctas que se suprimen y salen como
+        "no se puede afirmar".
+
+    QUÉ NO ARREGLA, y conviene tenerlo presente antes de titular: la banda
+    controla muy bien el riesgo de afirmar del lado equivocado, pero NO vuelve
+    la conclusión independiente del error Monte Carlo — mueve la frontera
+    aleatoria del cuantil 97,5 a su límite superior, y siempre queda algún
+    perfil cerca de la frontera nueva. Sobre los 1.008 perfiles actuales, 124
+    cambian de conclusión alguna vez entre pseudo-corridas y 26 lo hacen en al
+    menos el 25%. El más inestable —hombre de 30-44, terciaria completa,
+    centroizquierda, víctima con violencia, de Montevideo— sale 498 a 502 entre
+    "la mayoría está en contra" y "no se puede afirmar", y el artefacto publica
+    la prudente.
 
     Devuelve (bajo, alto) en 0-100, o None si el modelo no trae bootstrap.
     """
@@ -216,9 +233,10 @@ def _percentil(ordenados, q):
 
     La versión anterior hacía `ordenados[int(q * n)]`, que con 400 réplicas y
     q=0,025 devuelve la posición 11 en vez de interpolar alrededor de la 10,975:
-    corre los dos extremos hacia arriba y deja las colas asimétricas. Sobre los
-    1.296 perfiles eso movía algún extremo redondeado en 358 de ellos, hasta 2,5
-    puntos, y cambiaba la decisión sobre el 50% en 8.
+    corre los dos extremos hacia arriba y deja las colas asimétricas. Medido
+    cuando se corrigió —sobre el modelo de entonces, que tenía 1.296 perfiles—
+    movía algún extremo redondeado en 358 de ellos, hasta 2,5 puntos, y
+    cambiaba la decisión sobre el 50% en 8.
     """
     if not (0.0 <= q <= 1.0):
         raise ValueError(f"q tiene que estar entre 0 y 1, llegó {q}")

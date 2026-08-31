@@ -19,6 +19,7 @@ import streamlit as st
 from widgets.seguridad.config import (
     PREGUNTA, EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE,
     VICTIMA_UI_TO_CODE, REGION_UI_TO_CODE, ESPEC_CRUDA,
+    IDEOLOGIA_INDICE_DEFECTO,
 )
 
 # Escala neutra: la intensidad del color acompaña la magnitud, sin valorarla.
@@ -122,10 +123,12 @@ def render_inputs():
         )
 
     with col2:
-        # index=2 es "Centroizquierda (5)", la categoría modal y la referencia
-        # del modelo: el widget abre en el perfil más común, no en un extremo.
+        # El índice sale de config y no va a mano: apuntaba a la categoría
+        # equivocada desde que se pasó de seis tramos a siete —el widget abría
+        # en "Centroizquierda (4)" mientras el comentario decía "Centro (5)"—.
         ideol_sel = st.selectbox(
-            "Identificación ideológica", options=list(IDEOLOGIA_UI_TO_CODE), index=2,
+            "Identificación ideológica", options=list(IDEOLOGIA_UI_TO_CODE),
+            index=IDEOLOGIA_INDICE_DEFECTO,
             help="En política se habla normalmente de izquierda y derecha. En "
                  "una escala de 0 a 10, ¿dónde te ubicarías? Los tramos entre "
                  "paréntesis son los valores de esa escala.",
@@ -234,9 +237,11 @@ GRUPOS_LABEL = {
     # Las seis etiquetas ideológicas salen de IDEOLOGIA_UI_TO_CODE, que es la
     # misma tabla que ve el lector en el selector: si se renombra un tramo, se
     # renombra en los dos lados o en ninguno.
+    # De la misma lista que el selector, no de un zip entre dos estructuras
+    # paralelas: el zip le ponía etiquetas cambiadas a las tasas publicadas si
+    # alguien reordenaba el diccionario de la UI.
     **{f"ideol_{nombre}": etiqueta
-       for (nombre, _, _), etiqueta in zip(ESPEC_CRUDA["ideol_tramos"],
-                                           IDEOLOGIA_UI_TO_CODE)},
+       for nombre, _, _, etiqueta in ESPEC_CRUDA["ideol_tramos"]},
     "victima": "Fue víctima de un delito",
     "no_victima": "No fue víctima",
     "hombres": "Hombres",
@@ -259,7 +264,7 @@ GRUPOS_LABEL = {
 # si el apoyo crece de izquierda a derecha o no.
 GRUPOS_ORDEN = [
     ("Identificación ideológica",
-     [f"ideol_{nombre}" for nombre, _, _ in ESPEC_CRUDA["ideol_tramos"]]),
+     [f"ideol_{nombre}" for nombre, _, _, _ in ESPEC_CRUDA["ideol_tramos"]]),
     ("Victimización", ["victima", "no_victima"]),
     ("Nivel educativo", ["educ_secundaria", "educ_ter_incompleta", "educ_ter_completa"]),
     ("Edad", ["edad_18_29", "edad_60_plus"]),

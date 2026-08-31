@@ -92,7 +92,7 @@ class TestBuildFeatures:
         y los tramos de la especificación son posicionales entre sí.
         """
         from widgets.seguridad.config import ESPEC_CRUDA, IDEOLOGIA_UI_TO_CODE
-        nombres = [n for n, _, _ in ESPEC_CRUDA["ideol_tramos"]]
+        nombres = [n for n, _, _, _ in ESPEC_CRUDA["ideol_tramos"]]
         ref = ESPEC_CRUDA["ideol_referencia"]
         codigo_ref = nombres.index(ref) + 1
 

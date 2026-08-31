@@ -67,10 +67,13 @@ def test_los_tramos_ideologicos_salen_de_la_especificacion(base_minima, monkeypa
     assert normal.loc[1, "ideol_izq_extrema"] == 0
 
     espec = {**config.ESPEC_CRUDA,
-             "ideol_tramos": [["izq_extrema", 9, 10], ["izquierda", 2, 3],
-                              ["centroizq", 4, 4], ["centro", 5, 5],
-                              ["centroderecha", 6, 6], ["derecha", 7, 8],
-                              ["der_extrema", 0, 1]]}
+             "ideol_tramos": [["izq_extrema", 9, 10, "Izquierda extrema"],
+                              ["izquierda", 2, 3, "Izquierda"],
+                              ["centroizq", 4, 4, "Centroizquierda"],
+                              ["centro", 5, 5, "Centro"],
+                              ["centroderecha", 6, 6, "Centroderecha"],
+                              ["derecha", 7, 8, "Derecha"],
+                              ["der_extrema", 0, 1, "Derecha extrema"]]}
     monkeypatch.setattr(config, "ESPEC_CRUDA", espec)
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
 
@@ -88,14 +91,17 @@ def test_un_valor_de_la_escala_sin_tramo_aborta(base_minima, monkeypatch):
     o sea silenciosamente dentro de la referencia. Tiene que abortar.
     """
     espec = {**config.ESPEC_CRUDA,
-             "ideol_tramos": [["izq_extrema", 0, 1], ["izquierda", 2, 3],
-                              ["centroizq", 4, 4], ["centro", 5, 5],
-                              ["centroderecha", 6, 6], ["derecha", 7, 7],
-                              ["der_extrema", 9, 10]]}
+             "ideol_tramos": [["izq_extrema", 0, 1, "Izquierda extrema"],
+                              ["izquierda", 2, 3, "Izquierda"],
+                              ["centroizq", 4, 4, "Centroizquierda"],
+                              ["centro", 5, 5, "Centro"],
+                              ["centroderecha", 6, 6, "Centroderecha"],
+                              ["derecha", 7, 7, "Derecha"],
+                              ["der_extrema", 9, 10, "Derecha extrema"]]}
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
     df = base_minima.copy()
     df.loc[0, "var_242 | Autoubicacion izquierda-derecha (0-10)"] = 8
-    with pytest.raises(SystemExit, match="no caen en ningún tramo"):
+    with pytest.raises(SystemExit, match="no cubren"):
         tm.preparar(df)
 
 

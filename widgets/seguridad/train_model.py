@@ -226,8 +226,40 @@ def preparar(df):
     # balotaje.
     ideol = df["var_242 | Autoubicacion izquierda-derecha (0-10)"]
     referencia = ESPEC_CRUDA["ideol_referencia"]
+
+    # Los tramos tienen que ser una PARTICIÓN de 0-10: sin solaparse y sin
+    # dejar huecos. Si dos se pisan, un encuestado enciende dos dummies a la
+    # vez y el modelo estima sobre categorías que no son excluyentes; si queda
+    # un hueco, ese valor cae en la referencia sin avisar. Codex verificó que
+    # correr un borde en uno no lo detectaba ningún test: sólo cambiaba la
+    # huella contra el JSON viejo, así que un reentrenamiento lo habría dejado
+    # pasar en verde.
+    cubiertos = []
+    for nombre, desde, hasta, _ in ESPEC_CRUDA["ideol_tramos"]:
+        if desde > hasta:
+            raise SystemExit(f"tramo ideológico '{nombre}' invertido: {desde} > {hasta}")
+        cubiertos.extend(range(desde, hasta + 1))
+    repetidos = sorted({v for v in cubiertos if cubiertos.count(v) > 1})
+    if repetidos:
+        raise SystemExit(
+            f"los tramos ideológicos se solapan en {repetidos}: un encuestado "
+            "con esos valores encendería dos dummies a la vez"
+        )
+    huecos = sorted(set(range(0, 11)) - set(cubiertos))
+    if huecos:
+        raise SystemExit(
+            f"los tramos ideológicos no cubren {huecos}: esos valores caerían "
+            "silenciosamente en la categoría de referencia"
+        )
+    if {nombre for nombre, _, _, _ in ESPEC_CRUDA["ideol_tramos"]} \
+            != {t[0] for t in ESPEC_CRUDA["ideol_tramos"]} or \
+            referencia not in {t[0] for t in ESPEC_CRUDA["ideol_tramos"]}:
+        raise SystemExit(
+            f"la referencia ideológica '{referencia}' no es ninguno de los tramos"
+        )
+
     cubierto = ideol.isna()
-    for nombre, desde, hasta in ESPEC_CRUDA["ideol_tramos"]:
+    for nombre, desde, hasta, _ in ESPEC_CRUDA["ideol_tramos"]:
         en_tramo = ideol.between(desde, hasta)
         cubierto |= en_tramo
         if nombre != referencia:
@@ -354,15 +386,16 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
     información de conglomerados.
 
     C SE VUELVE A ELEGIR EN CADA RÉPLICA, con la misma CV ponderada que el
-    modelo principal. Fijarlo en el C del ajuste original trata la selección del
-    hiperparámetro como si fuera un dato y achica los intervalos: reestimando,
-    la amplitud mediana pasa de 25,8 a 29,1 puntos y unos 50 perfiles cambian
-    la conclusión sobre si el intervalo cruza el 50%. Es lo que hace que esto
-    tarde unos minutos, y vale la pena.
+    modelo principal —literalmente la misma función, `elegir_c`—. Fijarlo en el
+    C del ajuste original trata la selección del hiperparámetro como si fuera un
+    dato y achica los intervalos: medido sobre la especificación actual, la
+    amplitud mediana pasa de 25,10 a 27,85 puntos y 16 perfiles cambian la
+    conclusión sobre si el intervalo cruza el 50%. Es lo que hace que esto tarde
+    unos minutos, y vale la pena.
 
     Se guardan los coeficientes y no los intervalos por perfil: así la app puede
-    calcular el de cualquier combinación sin arrastrar 1.296 pares de números, y
-    `model.py` sigue sin depender de sklearn.
+    calcular el de cualquier combinación sin arrastrar los 1.008 pares de
+    números, y `model.py` sigue sin depender de sklearn.
 
     Devuelve (coeficientes, meta). `meta` va al JSON para que el artefacto sea
     auditable sin re-correr esto: cuántas réplicas se pidieron, cuántas
@@ -486,12 +519,12 @@ def main():
     #
     # El número de perfiles posibles se DERIVA de los mapeos de la UI en vez de
     # escribirse a mano. Antes era la constante 4*2*3*3*3*2*3; al sacar el
-    # balotaje y abrir la ideología a seis tramos habría quedado publicando
-    # 1.296 combinaciones sobre un espacio de 864, sin que nada lo detectara.
+    # balotaje y reabrir la ideología habría quedado publicando 1.296
+    # combinaciones sobre el espacio real, sin que nada lo detectara.
     elegibles = d[(d["victima_sin_dato"] == 0) & (d["ideol_no_ubica"] == 0)]
     ideol_codigo = sum(
         elegibles[f"ideol_{nombre}"] * i
-        for i, (nombre, _, _) in enumerate(ESPEC_CRUDA["ideol_tramos"], start=1)
+        for i, (nombre, _, _, _) in enumerate(ESPEC_CRUDA["ideol_tramos"], start=1)
         if nombre != ESPEC_CRUDA["ideol_referencia"]
     )
     perfiles = list(zip(
@@ -524,10 +557,10 @@ def main():
             f"ideol_{nombre}": (
                 df[f"ideol_{nombre}"] == 1 if nombre != ESPEC_CRUDA["ideol_referencia"]
                 else (df["ideol_no_ubica"] == 0) & (sum(
-                    df[f"ideol_{n}"] for n, _, _ in ESPEC_CRUDA["ideol_tramos"]
+                    df[f"ideol_{n}"] for n, _, _, _ in ESPEC_CRUDA["ideol_tramos"]
                     if n != ESPEC_CRUDA["ideol_referencia"]) == 0)
             )
-            for nombre, _, _ in ESPEC_CRUDA["ideol_tramos"]
+            for nombre, _, _, _ in ESPEC_CRUDA["ideol_tramos"]
         },
         "victima": (df["victima_sin_violencia"] == 1) | (df["victima_con_violencia"] == 1),
         # Sólo quienes contestaron "No": si se define por las dummies en cero
