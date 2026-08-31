@@ -21,8 +21,13 @@ from widgets.seguridad.components import (
     render_result_card, render_comparisons, render_methodology, render_footer,
 )
 
+from widgets.seguridad.config import PREGUNTA, PREGUNTA_ACTIVA, PREDICTORES
+
+# El título sale de la pregunta activa y no va hardcodeado: si se cambia la
+# pregunta, la pestaña del navegador tiene que acompañar. Antes decía "pena de
+# muerte" pasara lo que pasara.
 st.set_page_config(
-    page_title="¿Apoyás la pena de muerte? | El Observador",
+    page_title=f"{PREGUNTA['titulo_corto']} | El Observador",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
@@ -47,6 +52,29 @@ except FileNotFoundError:
     st.error(
         "No se encontró el archivo de coeficientes. "
         "Ejecutá primero `widgets/seguridad/train_model.py`."
+    )
+    st.stop()
+
+# El contrato entre la configuración y el modelo entrenado se verifica ACÁ, al
+# arrancar, y no sólo en los tests: cambiar PREGUNTA_ACTIVA sin re-entrenar
+# dejaría el título de una pregunta con los coeficientes de otra, y en
+# producción nadie corre pytest antes de servir la página. Mejor una pantalla
+# de error explícita que un widget que responde cualquier cosa con confianza.
+_slug = MODEL.get("pregunta_slug")
+if _slug != PREGUNTA_ACTIVA:
+    st.error(
+        f"El modelo entrenado corresponde a la pregunta «{_slug}» pero la "
+        f"configuración pide «{PREGUNTA_ACTIVA}». Volvé a correr "
+        "`widgets/seguridad/train_model.py` antes de publicar."
+    )
+    st.stop()
+
+_faltan = set(PREDICTORES) - set(MODEL.get("coefficients", {}))
+if _faltan:
+    st.error(
+        "El modelo entrenado no tiene todos los predictores que espera la "
+        f"aplicación (faltan: {', '.join(sorted(_faltan))}). Volvé a correr "
+        "`widgets/seguridad/train_model.py`."
     )
     st.stop()
 

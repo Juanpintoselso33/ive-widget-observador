@@ -34,7 +34,7 @@ def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima, es_mont
     Traduce los inputs de la UI (códigos de config.py) al vector de dummies.
 
     Cada bloque omite su categoría de referencia: 18-29 en edad, hombre en
-    sexo, primaria o menos en educación, centro en ideología, no víctima, e
+    sexo, secundaria o menos en educación, centro en ideología, no víctima, e
     interior en región.
     """
     return {
@@ -42,9 +42,8 @@ def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima, es_mont
         "edad_45_59": int(tramo_edad == 3),
         "edad_60_plus": int(tramo_edad == 4),
         "es_mujer": int(es_mujer),
-        "educ_secundaria": int(nivel_educ == 2),
-        "educ_ter_incomp": int(nivel_educ == 3),
-        "educ_ter_comp": int(nivel_educ == 4),
+        "educ_ter_incomp": int(nivel_educ == 2),
+        "educ_ter_comp": int(nivel_educ == 3),
         "ideol_izquierda": int(ideologia == 1),
         "ideol_derecha": int(ideologia == 3),
         "ideol_no_ubica": int(ideologia == 4),

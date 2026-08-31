@@ -52,7 +52,7 @@ class TestMapeosUI:
 
     @pytest.mark.parametrize("mapeo,esperados", [
         ("EDAD_UI_TO_CODE", {1, 2, 3, 4}),
-        ("EDUC_UI_TO_CODE", {1, 2, 3, 4}),
+        ("EDUC_UI_TO_CODE", {1, 2, 3}),
         ("IDEOLOGIA_UI_TO_CODE", {1, 2, 3, 4}),
         ("VICTIMA_UI_TO_CODE", {1, 2, 3}),
         ("REGION_UI_TO_CODE", {0, 1}),

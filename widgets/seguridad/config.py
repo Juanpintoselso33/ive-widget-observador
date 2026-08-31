@@ -51,30 +51,35 @@ PREGUNTAS = {
     "pena_muerte": {
         "columna": "var_229 | Pena de muerte por homicidio",
         "titulo": "¿Cuál es tu probabilidad de apoyar la pena de muerte para homicidas?",
+        "titulo_corto": "¿Apoyás la pena de muerte?",
         "afirma": "apoyar la pena de muerte para quien comete un homicidio",
         "verbo": "apoyes",
     },
     "cadena_perpetua": {
         "columna": "var_230 | Cadena perpetua tres delitos",
         "titulo": "¿Cuál es tu probabilidad de apoyar la cadena perpetua por tres delitos?",
+        "titulo_corto": "¿Apoyás la cadena perpetua?",
         "afirma": "apoyar la cadena perpetua para quien comete tres delitos graves",
         "verbo": "apoyes",
     },
     "aumentar_penas": {
         "columna": "var_228 | Aumentar penas todos los delitos",
         "titulo": "¿Cuál es tu probabilidad de apoyar el aumento de penas para todos los delitos?",
+        "titulo_corto": "¿Apoyás aumentar las penas?",
         "afirma": "apoyar el aumento de penas para todos los delitos",
         "verbo": "apoyes",
     },
     "politico_mano_dura": {
         "columna": "var_233 | Votaria politico de mano dura",
         "titulo": "¿Cuál es tu probabilidad de votar a un político de mano dura?",
+        "titulo_corto": "¿Votarías mano dura?",
         "afirma": "votar a un político que prometa mano dura contra el delito",
         "verbo": "lo votes",
     },
     "humillacion_presos": {
         "columna": "var_231 | Presos merecen humillacion",
         "titulo": "¿Cuál es tu probabilidad de creer que los presos merecen ser humillados?",
+        "titulo_corto": "¿Los presos merecen humillación?",
         "afirma": "creer que quien está preso merece pasar por situaciones humillantes",
         "verbo": "lo creas",
     },
@@ -111,11 +116,13 @@ EDAD_UI_TO_CODE = {
     "60 años o más": 4,
 }
 
+# Tres categorías: "Primaria o menos" se unió con "Secundaria" porque sola
+# tenía 28 casos y era la referencia del modelo. Ver EDUC_COLAPSO en
+# train_model.py.
 EDUC_UI_TO_CODE = {
-    "Primaria o menos": 1,   # referencia
-    "Secundaria": 2,
-    "Terciaria incompleta": 3,
-    "Terciaria completa o más": 4,
+    "Secundaria o menos": 1,   # referencia
+    "Terciaria incompleta": 2,
+    "Terciaria completa o más": 3,
 }
 
 # Autoubicación 0-10 agrupada. El centro es la referencia porque es la
@@ -146,7 +153,7 @@ REGION_UI_TO_CODE = {
 PREDICTORES = [
     "edad_30_44", "edad_45_59", "edad_60_plus",
     "es_mujer",
-    "educ_secundaria", "educ_ter_incomp", "educ_ter_comp",
+    "educ_ter_incomp", "educ_ter_comp",
     "ideol_izquierda", "ideol_derecha", "ideol_no_ubica",
     "victima_sin_violencia", "victima_con_violencia", "victima_sin_dato",
     "es_montevideo",
@@ -161,7 +168,7 @@ PREDICTORES = [
 REFERENCIAS = {
     "edad": "18-29 años",
     "sexo": "Hombre",
-    "educacion": "Primaria o menos",
+    "educacion": "Secundaria o menos",
     "ideologia": "Centro (4-6)",
     "victima": "No fue víctima",
     "region": "Interior",

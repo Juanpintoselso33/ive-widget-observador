@@ -22,23 +22,27 @@ from widgets.seguridad.config import (
 )
 
 # Escala neutra: la intensidad del color acompaña la magnitud, sin valorarla.
-# Cada plantilla trae su oración completa —no se le antepone "Es"— porque la
-# franja del medio no admite esa construcción ("Es estás dividido/a").
+#
+# El texto describe AL GRUPO, no a quien está mirando. La versión anterior decía
+# "Es probable que apoyes", que es una predicción individual — y la propia
+# sección de metodología aclara que el modelo no hace eso. Con un AUC de 0,74 el
+# modelo separa grupos de manera moderada; tutear al lector con un pronóstico
+# sobre él afirma bastante más de lo que el dato aguanta.
 INTENSIDAD = [
-    (70, "Es muy probable que {verbo}"),
-    (55, "Es probable que {verbo}"),
-    (45, "Estás dividido/a"),
-    (30, "Es poco probable que {verbo}"),
-    (0,  "Es muy poco probable que {verbo}"),
+    (70, "La mayoría de las personas con este perfil está a favor"),
+    (55, "Más de la mitad de las personas con este perfil está a favor"),
+    (45, "Las personas con este perfil se dividen casi por la mitad"),
+    (30, "La mayoría de las personas con este perfil está en contra"),
+    (0,  "La amplia mayoría de las personas con este perfil está en contra"),
 ]
 
 
 def interpretar(prob, colors):
     """Devuelve (color, texto) sin cargar valoración moral en el color."""
-    for umbral, plantilla in INTENSIDAD:
+    for umbral, texto in INTENSIDAD:
         if prob >= umbral:
-            return colors["primary"], plantilla.format(verbo=PREGUNTA["verbo"])
-    return colors["primary"], INTENSIDAD[-1][1].format(verbo=PREGUNTA["verbo"])
+            return colors["primary"], texto
+    return colors["primary"], INTENSIDAD[-1][1]
 
 
 def render_header(model):
@@ -127,12 +131,17 @@ def render_result_card(model, prob, colors, prob_neutral=None):
     diff = prob_r - nacional_r
     arrow = "↑" if diff > 0 else "↓" if diff < 0 else "="
 
+    # La tasa de "no toma posición" se muestra GENERAL, no por perfil. El modelo
+    # de neutralidad tiene un pseudo-R² de 0,03: prácticamente no distingue
+    # perfiles, pero al personalizarlo mostraba diferencias de más de veinte
+    # puntos entre uno y otro. Eso es ruido presentado como dato.
     neutral_html = ""
-    if prob_neutral is not None:
+    tasa_neutral = model.get("prob_neutral_nacional")
+    if tasa_neutral is not None:
         neutral_html = (
             f'<div style="margin-top:8px;font-size:0.85em;color:{colors["text_muted"]};">'
-            f'Además, <strong>{prob_neutral:.0f}%</strong> de las personas con tu perfil '
-            f'no toma posición clara sobre el tema.</div>'
+            f'Aparte, <strong>{tasa_neutral:.0f}%</strong> de los uruguayos no toma '
+            f'posición clara sobre el tema y queda fuera de este cálculo.</div>'
         )
 
     posicion = "por encima" if diff > 0 else "por debajo" if diff < 0 else "igual"
@@ -173,6 +182,9 @@ GRUPOS_LABEL = {
     "interior": "Interior",
     "edad_18_29": "18 a 29 años",
     "edad_60_plus": "60 años o más",
+    "educ_secundaria": "Secundaria o menos",
+    "educ_ter_incompleta": "Terciaria incompleta",
+    "educ_ter_completa": "Terciaria completa",
 }
 
 
@@ -223,11 +235,20 @@ de diseño muestral `{info.get('ponderador', 'w_norm')}`.
 - **Categorías de referencia:** {', '.join(f'{k}: {v}' for k, v in model.get('referencias', {}).items())}
 
 El resultado es **condicional a tener postura definida**: quien contesta "ni de
-acuerdo ni en desacuerdo" queda fuera del cálculo principal y se estima aparte.
+acuerdo ni en desacuerdo" queda fuera del cálculo principal.
 
-Son **probabilidades basadas en correlaciones estadísticas de la encuesta, no
-predicciones sobre una persona concreta**. Dos personas con el mismo perfil
-pueden opinar distinto: el modelo describe tendencias de grupo.
+Son **correlaciones estadísticas de una encuesta, no predicciones sobre una
+persona concreta ni relaciones de causa y efecto**. Dos personas con el mismo
+perfil pueden opinar distinto: el modelo describe tendencias de grupo, y las
+separa de manera moderada.
+
+**Qué sostiene y qué no.** Los factores que más pesan —nivel educativo, edad y
+autoubicación ideológica— se mantienen estables cuando se estima el modelo de
+otra forma. En cambio **el efecto del sexo y el de la región son chicos y no
+son robustos**: cambian de signo según la especificación, así que este widget
+no permite afirmar que las mujeres apoyen más que los varones, ni Montevideo
+más que el interior. Las tasas por grupo que se muestran abajo son descriptivas
+de la muestra, no efectos ajustados.
         """)
 
 

@@ -38,10 +38,31 @@ from widgets.seguridad.config import (
 RANDOM_STATE = 42
 C_GRID = [0.01, 0.1, 0.5, 1.0, 5.0, 10.0]
 
-# Escala nivel_educativo (1-10) del proveedor, colapsada igual que en el widget
-# IVE. El proveedor no entregó codebook; el mapeo se infirió de la escala
-# estándar INE/Mineduc y de la cross-tabulación con la variable colapsada.
-EDUC_COLAPSO = {1: 1, 2: 1, 3: 2, 4: 2, 5: 2, 6: 2, 7: 3, 8: 4, 9: 4, 10: 4}
+# Escala nivel_educativo (1-10) del proveedor, colapsada.
+#
+# El widget IVE advierte que este mapeo es "inferido, sin codebook". Para ESTA
+# base eso no corresponde: el colapso coincide exactamente con la columna
+# `nivel_educ` etiquetada que viene en la encuesta, así que las categorías están
+# verificadas y no inferidas. El caveat estaba copiado del otro widget.
+#
+# Tres categorías, no cuatro. El widget IVE separa "Primaria o menos" de
+# "Secundaria", pero en esta encuesta esa categoría tiene 28 casos de 2.672
+# (1,0%) — y era la REFERENCIA, o sea que los tres coeficientes de educación,
+# que son los más grandes del modelo, se estimaban contra 28 personas. Al
+# colapsarla con Secundaria la referencia pasa a tener 641 casos.
+#
+# Se pierde el contraste más extremo (los de primaria declaraban 58,6% de
+# apoyo, el valor más alto de toda la muestra), pero ese número no es
+# publicable con esa base. La muestra sobre-representa fuerte a los más
+# educados: 53% tiene terciaria completa.
+EDUC_COLAPSO = {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 2, 8: 3, 9: 3, 10: 3}
+
+# Columnas que la base tiene que traer sí o sí para poder entrenar.
+COLUMNAS_REQUERIDAS = [
+    "edad", "sexo", "nivel_educativo", "dpto_ech", PONDERADOR,
+    "var_241 | Victima de delito ultimos 12 meses",
+    "var_242 | Autoubicacion izquierda-derecha (0-10)",
+]
 
 
 def cargar():
@@ -63,6 +84,55 @@ def preparar(df):
         raise SystemExit(f"La columna '{col}' no está en la base.")
 
     df = df.copy()
+
+    # Validación de dominios, antes de construir nada.
+    #
+    # La etiqueta Likert ya se valida abajo, pero los predictores no se
+    # validaban: una edad fuera de rango caía en 18-29, un sexo desconocido en
+    # "hombre", una educación inesperada en "primaria", un departamento raro en
+    # "interior". Todas conversiones silenciosas a la categoría de referencia.
+    # Con la base actual no pasa, pero el widget está pensado para re-entrenarse
+    # con otras columnas y una base con otro formato produciría un modelo
+    # plausible y equivocado, sin un solo error en pantalla.
+    faltantes = [c for c in COLUMNAS_REQUERIDAS if c not in df.columns]
+    if faltantes:
+        raise SystemExit(f"La base no tiene estas columnas: {faltantes}")
+
+    problemas = []
+
+    sexos = set(df["sexo"].dropna().unique()) - {"Hombre", "Mujer"}
+    if sexos:
+        problemas.append(f"valores de 'sexo' no esperados: {sorted(sexos)}")
+
+    educ = set(df["nivel_educativo"].dropna().unique()) - set(EDUC_COLAPSO)
+    if educ:
+        problemas.append(f"códigos de 'nivel_educativo' fuera de 1-10: {sorted(educ)}")
+
+    ideol = df["var_242 | Autoubicacion izquierda-derecha (0-10)"].dropna()
+    fuera = ideol[(ideol < 0) | (ideol > 10)]
+    if len(fuera):
+        problemas.append(f"autoubicación fuera de 0-10: {len(fuera)} casos")
+
+    vic = set(df["var_241 | Victima de delito ultimos 12 meses"].dropna().unique())
+    vic_raros = {v for v in vic
+                 if "violencia" not in str(v).lower() and str(v).strip().lower() != "no"}
+    if vic_raros:
+        problemas.append(f"respuestas de victimización no esperadas: {sorted(vic_raros)}")
+
+    edades = df["edad"].dropna()
+    if len(edades[(edades < 18) | (edades > 110)]):
+        n_out = len(edades[(edades < 18) | (edades > 110)])
+        print(f"  aviso: {n_out} edad(es) fuera de 18-110, se pasan a NaN")
+
+    if df[PONDERADOR].isna().any() or (df[PONDERADOR] <= 0).any():
+        problemas.append("hay ponderadores nulos o no positivos")
+
+    if problemas:
+        raise SystemExit(
+            "La base no pasa la validación de dominios:\n  - "
+            + "\n  - ".join(problemas)
+            + "\nRevisá la base o actualizá los mapeos en config.py antes de entrenar."
+        )
 
     # Una etiqueta que no esté en LIKERT_MAP se mapearía a NaN y terminaría
     # contada como "no toma posición", produciendo coeficientes y tasas
@@ -103,9 +173,8 @@ def preparar(df):
     df["es_mujer"] = (df["sexo"] == "Mujer").astype(int)
 
     educ = df["nivel_educativo"].map(EDUC_COLAPSO)
-    df["educ_secundaria"] = (educ == 2).astype(int)
-    df["educ_ter_incomp"] = (educ == 3).astype(int)
-    df["educ_ter_comp"] = (educ == 4).astype(int)
+    df["educ_ter_incomp"] = (educ == 2).astype(int)
+    df["educ_ter_comp"] = (educ == 3).astype(int)
 
     # --- Ideología: 0-10 agrupada, centro como referencia.
     ideol = df["var_242 | Autoubicacion izquierda-derecha (0-10)"]
@@ -255,6 +324,12 @@ def main():
         "no_victima": df["victima_no_real"] == 1,
         "edad_18_29": df["tramo_edad"] == 1,
         "edad_60_plus": df["tramo_edad"] == 4,
+        # Educación es el predictor más fuerte del modelo y faltaba en el
+        # bloque comparativo: se mostraban sexo, edad, región, ideología y
+        # victimización, todos más débiles, y no el que más pesa.
+        "educ_secundaria": (df["educ_ter_incomp"] == 0) & (df["educ_ter_comp"] == 0),
+        "educ_ter_incompleta": df["educ_ter_incomp"] == 1,
+        "educ_ter_completa": df["educ_ter_comp"] == 1,
     }
     for nombre, mascara in grupos.items():
         sub = df[mascara & df["a_favor"].notna()]
