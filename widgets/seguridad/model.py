@@ -124,7 +124,26 @@ def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
 
     probabilidades.sort()
     cola = (100 - nivel) / 2 / 100
-    n = len(probabilidades)
-    bajo = probabilidades[max(0, int(cola * n))]
-    alto = probabilidades[min(n - 1, int((1 - cola) * n))]
-    return bajo, alto
+    return _percentil(probabilidades, cola), _percentil(probabilidades, 1 - cola)
+
+
+def _percentil(ordenados, q):
+    """
+    Percentil con interpolación lineal (el "tipo 7", que es el que usan numpy y
+    R por defecto).
+
+    La versión anterior hacía `ordenados[int(q * n)]`, que con 400 réplicas y
+    q=0,025 devuelve la posición 11 en vez de interpolar alrededor de la 10,975:
+    corre los dos extremos hacia arriba y deja las colas asimétricas. Sobre los
+    1.296 perfiles eso movía algún extremo redondeado en 358 de ellos, hasta 2,5
+    puntos, y cambiaba la decisión sobre el 50% en 8.
+    """
+    if not ordenados:
+        return None
+    if len(ordenados) == 1:
+        return ordenados[0]
+    pos = q * (len(ordenados) - 1)
+    bajo = int(pos)
+    alto = min(bajo + 1, len(ordenados) - 1)
+    peso = pos - bajo
+    return ordenados[bajo] * (1 - peso) + ordenados[alto] * peso

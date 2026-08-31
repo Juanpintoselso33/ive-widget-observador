@@ -137,15 +137,19 @@ posibles de la UI**; la peor discrepancia es 0,000000 pp.
 - **Pseudo-R² de McFadden ≈ 0,17**, bastante menor que el 0,37 del IVE. Es
   esperable: allá la religiosidad era un predictor potentísimo y acá no hay nada
   equivalente. Conviene decirlo, no maquillarlo.
-- **Los intervalos son amplios: rondan los 25 puntos.** Salen de un bootstrap
-  estratificado (400 réplicas, remuestreo dentro de cada uno de los 28 estratos
-  de la encuesta). Cuando el intervalo cruza el 50%, el widget deja de afirmar
-  de qué lado está la mayoría — con 43% y un intervalo de 31 a 58 no se puede
-  decir que la mayoría esté en contra.
-- **No es un bootstrap de diseño completo**: no hay información de
-  conglomerados en la base, así que captura la variabilidad entre estratos pero
-  no el efecto de conglomeración. Es mejor que el bootstrap simple, no
-  equivalente a uno con el diseño entero.
+- **Los intervalos son amplios: rondan los 25-30 puntos.** Salen de un bootstrap
+  estratificado de 1.000 réplicas, con remuestreo dentro de cada uno de los 28
+  estratos de la encuesta y **re-selección de `C` en cada réplica**. Fijar `C`
+  achica los intervalos artificialmente, porque trata la elección del
+  hiperparámetro como si fuera un dato conocido. Cuando el intervalo cruza el
+  50%, el widget deja de afirmar de qué lado está la mayoría.
+- **El estratificado se usa por respetar el diseño, no porque ensanche.** Medido
+  sobre esta base, el bootstrap sin estratificar da intervalos incluso un poco
+  más anchos (mediana 26,6 contra 25,8 puntos). Una versión anterior de este
+  README decía que el simple "subestimaría" el error: no está sustentado.
+- **No es un bootstrap de diseño completo**: la base no trae información de
+  conglomerados, así que respeta los estratos pero no el efecto de
+  conglomeración.
 - **Sin p-valores**: Ridge no provee errores estándar analíticos; los
   intervalos vienen del bootstrap, no de la teoría del estimador.
 - **Muchos perfiles no existen en la muestra.** De las 1.296 combinaciones que

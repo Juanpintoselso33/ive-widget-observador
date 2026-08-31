@@ -306,38 +306,69 @@ def _ajustar(X, y, w, etiqueta):
     return modelo, mejor_c, mejor_score
 
 
-def bootstrap_coeficientes(d, X, y, w, c, n_replicas=400):
+def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
     """
     Coeficientes de B réplicas bootstrap, para poder mostrar intervalos.
 
-    El remuestreo es ESTRATIFICADO: se remuestrea con reemplazo dentro de cada
-    estrato, conservando su tamaño. La encuesta trae la variable `estrato` (28
-    estratos: los departamentos del interior y tramos de ranking en Montevideo),
-    así que ignorar el diseño y remuestrear la muestra entera subestimaría el
-    error. No es un bootstrap de diseño completo —no hay información de
-    conglomerados— pero es bastante mejor que el simple.
+    El remuestreo es ESTRATIFICADO: con reemplazo dentro de cada uno de los 28
+    estratos de la encuesta (`estrato`: departamentos del interior y tramos de
+    ranking en Montevideo), conservando el tamaño de cada uno. Es lo apropiado
+    porque respeta el diseño disponible — no porque ensanche: medido sobre esta
+    base, el bootstrap sin estratificar da intervalos incluso un poco más
+    anchos. Sigue siendo una aproximación incompleta: la base no trae
+    información de conglomerados.
+
+    C SE VUELVE A ELEGIR EN CADA RÉPLICA, con la misma CV ponderada que el
+    modelo principal. Fijarlo en el C del ajuste original trata la selección del
+    hiperparámetro como si fuera un dato y achica los intervalos: reestimando,
+    la amplitud mediana pasa de 25,8 a 29,1 puntos y unos 50 perfiles cambian
+    la conclusión sobre si el intervalo cruza el 50%. Es lo que hace que esto
+    tarde unos minutos, y vale la pena.
 
     Se guardan los coeficientes y no los intervalos por perfil: así la app puede
-    calcular el intervalo de cualquier combinación sin arrastrar 1.296 pares de
-    números, y `model.py` sigue sin depender de sklearn.
+    calcular el de cualquier combinación sin arrastrar 1.296 pares de números, y
+    `model.py` sigue sin depender de sklearn.
     """
     estratos = d["estrato"].values
     indices_por_estrato = [np.where(estratos == e)[0] for e in np.unique(estratos)]
     rng = np.random.default_rng(RANDOM_STATE)
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
     coeficientes = []
 
-    for _ in range(n_replicas):
+    for i in range(n_replicas):
         idx = np.concatenate([
             rng.choice(indices, size=len(indices), replace=True)
             for indices in indices_por_estrato
         ])
-        # Una réplica puede quedar sin variación en la dependiente dentro de un
-        # estrato chico; si pasa en toda la muestra, se descarta esa réplica.
-        if len(np.unique(y[idx])) < 2:
+        Xb, yb, wb = X[idx], y[idx], w[idx]
+        # Una réplica puede quedar sin variación en la dependiente; se descarta.
+        if len(np.unique(yb)) < 2:
             continue
-        m = LogisticRegression(C=c, max_iter=2000, random_state=RANDOM_STATE)
-        m.fit(X[idx], y[idx], sample_weight=w[idx])
+
+        mejor_c, mejor = None, -np.inf
+        for c in C_GRID:
+            scores, masas = [], []
+            for tr, te in cv.split(Xb, yb):
+                if len(np.unique(yb[tr])) < 2:
+                    continue
+                m = LogisticRegression(C=c, max_iter=2000, random_state=RANDOM_STATE)
+                m.fit(Xb[tr], yb[tr], sample_weight=wb[tr])
+                p = m.predict_proba(Xb[te])[:, 1]
+                scores.append(-log_loss(yb[te], p, sample_weight=wb[te], labels=[0, 1]))
+                masas.append(wb[te].sum())
+            if scores:
+                s = float(np.average(scores, weights=masas))
+                if s > mejor:
+                    mejor_c, mejor = c, s
+        if mejor_c is None:
+            continue
+
+        m = LogisticRegression(C=mejor_c, max_iter=2000, random_state=RANDOM_STATE)
+        m.fit(Xb, yb, sample_weight=wb)
         coeficientes.append([float(m.intercept_[0])] + [float(v) for v in m.coef_[0]])
+
+        if (i + 1) % 200 == 0:
+            print(f"    {i + 1}/{n_replicas} réplicas")
 
     return coeficientes
 
@@ -382,9 +413,11 @@ def main():
     r2 = _mcfadden(modelo, X, y, w)
     print(f"  [principal] McFadden pseudo-R² = {r2:.4f}")
 
-    print("\nBootstrap estratificado para los intervalos...")
-    boot = bootstrap_coeficientes(d, X, y, w, c_ppal)
-    print(f"  {len(boot)} réplicas útiles sobre 400")
+    print("\nBootstrap estratificado para los intervalos (re-elige C en cada")
+    print("réplica, así que tarda unos minutos)...")
+    N_REPLICAS = 1000
+    boot = bootstrap_coeficientes(d, X, y, w, N_REPLICAS)
+    print(f"  {len(boot)} réplicas útiles sobre {N_REPLICAS}")
 
     coeficientes = {"intercept": float(modelo.intercept_[0])}
     for nombre, valor in zip(PREDICTORES, modelo.coef_[0]):

@@ -46,7 +46,10 @@ def interpretar(prob, colors, intervalo=None):
     43% puede corresponder tanto a una mayoría en contra como a favor, y decir
     "la mayoría está en contra" sería afirmar más de lo que el dato aguanta.
     """
-    if intervalo and intervalo[0] < 50 < intervalo[1]:
+    # La comparación va sobre los extremos REDONDEADOS, que son los que ve el
+    # lector, y es inclusiva: si en pantalla dice "entre 25% y 50%", afirmar que
+    # la mayoría está en contra contradice lo que el propio intervalo muestra.
+    if intervalo and round(intervalo[0]) <= 50 <= round(intervalo[1]):
         return colors["primary"], (
             "El margen de error no permite afirmar de qué lado está la mayoría "
             "en este perfil"
@@ -313,8 +316,8 @@ combinaciones se pueden elegir acá, pero sólo {cob.get('observados', '—')}
 aparecen en la encuesta, y apenas {cob.get('con_30_o_mas', '—')} tienen 30
 casos o más. El modelo es aditivo y estima las que faltan combinando
 información de perfiles parecidos, no observándolas: cuanto más inusual sea la
-combinación elegida, más extrapolación hay detrás del número, y no se muestran
-intervalos de confianza.
+combinación elegida, más extrapolación hay detrás del número y más ancho es
+su intervalo.
 
 **Qué sostiene y qué no.** Los factores que más pesan —nivel educativo, edad y
 autoubicación ideológica— se mantienen estables cuando se estima el modelo de

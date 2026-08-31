@@ -147,3 +147,13 @@ def test_la_cobertura_no_cuenta_perfiles_no_elegibles():
     cob = modelo["cobertura_perfiles"]
     assert cob["observados"] <= cob["posibles"]
     assert cob["con_30_o_mas"] <= cob["observados"]
+    # Los valores concretos, no sólo la coherencia: los incorrectos anteriores
+    # (597 observados, 5 con 30+) también pasaban las dos comprobaciones de
+    # arriba. Si la base cambia hay que actualizar estos números a propósito,
+    # que es justamente la idea.
+    assert cob["posibles"] == 1296
+    assert cob["observados"] == 566, (
+        "la cobertura cambió: si es por un cambio de base, actualizar el "
+        "número; si no, revisar que no se estén contando perfiles no elegibles"
+    )
+    assert cob["con_30_o_mas"] == 4
