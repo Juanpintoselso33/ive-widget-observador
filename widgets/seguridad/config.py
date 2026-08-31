@@ -213,9 +213,16 @@ ESPEC_CRUDA = {
     "ideol_izquierda_hasta": 3,
     "ideol_derecha_desde": 7,
     # Códigos crudos de las demás variables.
-    "sexo_mujer": "Mujer",
+    "sexo_valores": {"mujer": "Mujer", "hombre": "Hombre"},
     "dpto_montevideo": 1,
     "balotaje_codigos": {"orsi": 1, "delgado": 2, "referencia": [3, 4], "no_recuerda": 5},
+    # Etiquetas crudas de victimización. Viven acá y no en train_model.py para
+    # que entren en la huella: son parte de la definición de las dummies.
+    "victima_etiquetas": {
+        "no": ["no"],
+        "sin_violencia": ["sí  sin violencia", "si  sin violencia", "sí sin violencia"],
+        "con_violencia": ["sí  con violencia", "si  con violencia", "sí con violencia"],
+    },
 }
 
 

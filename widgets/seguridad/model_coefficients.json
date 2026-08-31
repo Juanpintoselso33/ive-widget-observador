@@ -1,6 +1,6 @@
 {
   "pregunta_slug": "pena_muerte",
-  "contrato": "9483dc98a34e183c",
+  "contrato": "faf2ee73548e1f56",
   "predictores": [
     "edad_30_44",
     "edad_45_59",
@@ -111,8 +111,8 @@
   },
   "cobertura_perfiles": {
     "posibles": 1296,
-    "observados": 597,
-    "con_30_o_mas": 5
+    "observados": 566,
+    "con_30_o_mas": 4
   },
   "model_info": {
     "n": 2672,
@@ -133,5 +133,5 @@
     "mcfadden_r2": 0.0307
   },
   "fuente": "Encuesta El Observador — Seguridad pública, mayo 2026",
-  "entrenado": "2026-08-30"
+  "entrenado": "2026-08-31"
 }

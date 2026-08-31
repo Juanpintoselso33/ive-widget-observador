@@ -139,9 +139,12 @@ posibles de la UI**; la peor discrepancia es 0,000000 pp.
   equivalente. Conviene decirlo, no maquillarlo.
 - **Sin errores estándar ni p-valores**: Ridge no los provee analíticamente, y
   los pesos se tratan como frecuencias.
-- **Muchos perfiles no existen en la muestra.** Las combinaciones posibles son
-  1.296 contra 2.672 casos con postura definida: buena parte se estima por
-  extrapolación aditiva, no por observación. Está advertido en la UI.
+- **Muchos perfiles no existen en la muestra.** De las 1.296 combinaciones que
+  el lector puede elegir, sólo **566** aparecen en la encuesta y apenas **4**
+  tienen 30 casos o más. El resto se estima por extrapolación aditiva. Está
+  advertido en la UI.
+- **El N efectivo es 571, no 2.672.** La dispersión de los ponderadores hace que
+  las respuestas rindan como esa cantidad a efectos de precisión (N de Kish).
 
 ## Decisión de diseño: el color no valora
 

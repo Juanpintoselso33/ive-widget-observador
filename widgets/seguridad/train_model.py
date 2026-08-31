@@ -112,7 +112,7 @@ def preparar(df):
             problemas.append(f"'{etiqueta}' tiene {n} valor(es) nulo(s), "
                              "que caerían en la categoría de referencia")
 
-    sexos = set(df["sexo"].dropna().unique()) - {"Hombre", "Mujer"}
+    sexos = set(df["sexo"].dropna().unique()) - set(ESPEC_CRUDA["sexo_valores"].values())
     if sexos:
         problemas.append(f"valores de 'sexo' no esperados: {sorted(sexos)}")
     revisar_nulos("sexo", "sexo")
@@ -130,9 +130,11 @@ def preparar(df):
 
     # IdBalotaje sólo se exigía como columna: un código nuevo caía en la
     # referencia sin avisar.
-    bal = set(df["IdBalotaje"].dropna().unique()) - {1, 2, 3, 4, 5}
+    _bc = ESPEC_CRUDA["balotaje_codigos"]
+    _bal_validos = {_bc["orsi"], _bc["delgado"], _bc["no_recuerda"], *_bc["referencia"]}
+    bal = set(df["IdBalotaje"].dropna().unique()) - _bal_validos
     if bal:
-        problemas.append(f"códigos de 'IdBalotaje' fuera de 1-5: {sorted(bal)}")
+        problemas.append(f"códigos de 'IdBalotaje' fuera de {sorted(_bal_validos)}: {sorted(bal)}")
     revisar_nulos("IdBalotaje", "IdBalotaje")
 
     # La escala es discreta 0-10: un 3,5 pasaba como válido y caía en "Centro".
@@ -150,9 +152,8 @@ def preparar(df):
     # Dominio CERRADO, no "cualquier texto que contenga violencia": algo como
     # "Sí, violencia desconocida" pasaba la validación y después se codificaba
     # como "No".
-    vic_validos = {"no", "sí  sin violencia", "sí  con violencia",
-                   "si  sin violencia", "si  con violencia",
-                   "sí sin violencia", "sí con violencia"}
+    _ve = ESPEC_CRUDA["victima_etiquetas"]
+    vic_validos = {e for grupo in _ve.values() for e in grupo}
     vic = {str(v).strip().lower()
            for v in df["var_241 | Victima de delito ultimos 12 meses"].dropna().unique()}
     vic_raros = vic - vic_validos
@@ -218,7 +219,7 @@ def preparar(df):
     df["edad_45_59"] = (df["tramo_edad"] == 3).astype(int)
     df["edad_60_plus"] = (df["tramo_edad"] == 4).astype(int)
 
-    df["es_mujer"] = (df["sexo"] == ESPEC_CRUDA["sexo_mujer"]).astype(int)
+    df["es_mujer"] = (df["sexo"] == ESPEC_CRUDA["sexo_valores"]["mujer"]).astype(int)
 
     educ = df["nivel_educativo"].map(EDUC_COLAPSO)
     df["educ_ter_incomp"] = (educ == 2).astype(int)
@@ -239,18 +240,13 @@ def preparar(df):
     # modelo y también la tasa del grupo "No fue víctima" que se publica en el
     # bloque comparativo.
     vic = df["var_241 | Victima de delito ultimos 12 meses"]
-    vic_norm = vic.astype(str).str.lower()
+    vic_norm = vic.astype(str).str.strip().str.lower()
+    _ve = ESPEC_CRUDA["victima_etiquetas"]
     df["victima_sin_dato"] = vic.isna().astype(int)
-    df["victima_sin_violencia"] = (
-        vic_norm.str.contains("sin violencia") & vic.notna()).astype(int)
-    df["victima_con_violencia"] = (
-        vic_norm.str.contains("con violencia") & vic.notna()).astype(int)
+    df["victima_sin_violencia"] = vic_norm.isin(_ve["sin_violencia"]).astype(int)
+    df["victima_con_violencia"] = vic_norm.isin(_ve["con_violencia"]).astype(int)
     # "No" real: contestó y no fue víctima. Es lo que alimenta stats_by_group.
-    df["victima_no_real"] = (
-        vic.notna()
-        & ~vic_norm.str.contains("sin violencia")
-        & ~vic_norm.str.contains("con violencia")
-    ).astype(int)
+    df["victima_no_real"] = vic_norm.isin(_ve["no"]).astype(int)
 
     n_vic_sd = int(df["victima_sin_dato"].sum())
     if n_vic_sd:
@@ -262,9 +258,10 @@ def preparar(df):
     # --- Balotaje 2024. IdBalotaje: 1=Orsi, 2=Delgado, 3=blanco, 4=no votó,
     # 5=no recuerda. La referencia son SÓLO 3 y 4: quienes no recuerdan llevan
     # dummy propia porque no acordarse no es lo mismo que haber votado en blanco.
-    df["bal_orsi"] = (df["IdBalotaje"] == 1).astype(int)
-    df["bal_delgado"] = (df["IdBalotaje"] == 2).astype(int)
-    df["bal_no_recuerda"] = (df["IdBalotaje"] == 5).astype(int)
+    _bc = ESPEC_CRUDA["balotaje_codigos"]
+    df["bal_orsi"] = (df["IdBalotaje"] == _bc["orsi"]).astype(int)
+    df["bal_delgado"] = (df["IdBalotaje"] == _bc["delgado"]).astype(int)
+    df["bal_no_recuerda"] = (df["IdBalotaje"] == _bc["no_recuerda"]).astype(int)
 
     return df
 
@@ -372,12 +369,23 @@ def main():
     # Cuántas de las combinaciones que el lector puede elegir existen de verdad
     # en la muestra. El modelo es aditivo y puede estimar las que faltan, pero
     # conviene decir cuántas salen de una extrapolación y no de casos reales.
+    # Sólo cuentan los casos que corresponden a un perfil REALMENTE elegible en
+    # la UI. Los que tienen alguna de las tres dummies ocultas activas quedan
+    # fuera: si no, un encuestado que "no recuerda" a quién votó se contaba
+    # dentro de "blanco, anulado o no votó", y la UI terminaba afirmando que un
+    # perfil aparece en la encuesta cuando en realidad no hay ningún caso
+    # exacto. Con la mezcla daban 597 observados y 5 con 30+; los reales son
+    # 566 y 4.
+    elegibles = d[(d["victima_sin_dato"] == 0)
+                  & (d["ideol_no_ubica"] == 0)
+                  & (d["bal_no_recuerda"] == 0)]
     perfiles = list(zip(
-        d["tramo_edad"], d["es_mujer"],
-        d["educ_ter_incomp"] * 1 + d["educ_ter_comp"] * 2,
-        d["ideol_izquierda"] * 1 + d["ideol_derecha"] * 2,
-        d["victima_sin_violencia"] * 1 + d["victima_con_violencia"] * 2,
-        d["es_montevideo"], d["bal_orsi"] * 1 + d["bal_delgado"] * 2,
+        elegibles["tramo_edad"], elegibles["es_mujer"],
+        elegibles["educ_ter_incomp"] * 1 + elegibles["educ_ter_comp"] * 2,
+        elegibles["ideol_izquierda"] * 1 + elegibles["ideol_derecha"] * 2,
+        elegibles["victima_sin_violencia"] * 1 + elegibles["victima_con_violencia"] * 2,
+        elegibles["es_montevideo"],
+        elegibles["bal_orsi"] * 1 + elegibles["bal_delgado"] * 2,
     ))
     conteo = pd.Series(perfiles).value_counts()
     cobertura = {
@@ -411,7 +419,7 @@ def main():
         "voto_delgado": df["bal_delgado"] == 1,
         # Sólo blanco/anulado/no votó: si se define por las dummies en cero se
         # cuelan los 153 que no recuerdan y la etiqueta publicada miente.
-        "voto_blanco_no_voto": df["IdBalotaje"].isin([3, 4]),
+        "voto_blanco_no_voto": df["IdBalotaje"].isin(ESPEC_CRUDA["balotaje_codigos"]["referencia"]),
     }
     for nombre, mascara in grupos.items():
         sub = df[mascara & df["a_favor"].notna()]
