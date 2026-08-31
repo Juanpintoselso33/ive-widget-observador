@@ -22,7 +22,12 @@ LIGHT_COLORS = {
 }
 
 DARK_COLORS = {
-    "primary": "#475ED1",
+    # Aclarado desde #475ED1 por accesibilidad: contra el fondo oscuro daba un
+    # contraste de 3,4 y contra las tarjetas 3,0, cuando WCAG AA pide 4,5 para
+    # texto normal. Este tono llega a 6,2 y 5,6 respectivamente, y es el mismo
+    # azul. Afecta a los dos widgets, sólo en modo oscuro: se usa para el
+    # número grande del resultado y para el extremo "A FAVOR" del gradiente.
+    "primary": "#7B8FE8",
     "accent": "#F6423C",
     "success": "#36E2BD",
     "danger": "#F6423C",

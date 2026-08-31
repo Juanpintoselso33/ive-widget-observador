@@ -43,45 +43,52 @@ DATA_FILE = Path(os.environ.get("SEGURIDAD_DATA_FILE", _DEFAULT_DATA))
 # Todas son Likert 1-5 con el mismo formato de respuesta, así que cambiar de
 # pregunta es cambiar PREGUNTA_ACTIVA y correr train_model.py de nuevo.
 #
-#   columna  : nombre exacto en base_etiquetada.csv
-#   titulo   : el que se muestra como pregunta del widget
-#   afirma   : qué significa "estar de acuerdo" (para redactar el resultado)
-#   verbo    : cómo se lee la probabilidad en la UI
+#   columna    : nombre exacto en base_etiquetada.csv
+#   enunciado  : el texto TEXTUAL del cuestionario, que se muestra al lector.
+#                No es decorativo: el widget mide acuerdo con esa frase exacta,
+#                y parafrasearla cambia lo que el numero significa.
+#   titulo     : encabezado del widget
+#   titulo_corto: para la pestaña del navegador
+#   afirma     : que significa estar de acuerdo, para redactar el resultado
 PREGUNTAS = {
     "pena_muerte": {
         "columna": "var_229 | Pena de muerte por homicidio",
-        "titulo": "¿Cuál es tu probabilidad de apoyar la pena de muerte para homicidas?",
+        "enunciado": "Una persona condenada por homicidio debería recibir la pena de muerte",
+        "titulo": "¿Cuál es tu probabilidad de estar de acuerdo con la pena de muerte?",
         "titulo_corto": "¿Apoyás la pena de muerte?",
-        "afirma": "apoyar la pena de muerte para quien comete un homicidio",
-        "verbo": "apoyes",
+        "afirma": "estar de acuerdo con que una persona condenada por homicidio reciba la pena de muerte",
     },
     "cadena_perpetua": {
         "columna": "var_230 | Cadena perpetua tres delitos",
-        "titulo": "¿Cuál es tu probabilidad de apoyar la cadena perpetua por tres delitos?",
+        "enunciado": ("Una persona que ha sido condenada por tres delitos graves debería "
+                      "recibir cadena perpetua sin posibilidad de libertad condicional"),
+        "titulo": "¿Cuál es tu probabilidad de estar de acuerdo con la cadena perpetua?",
         "titulo_corto": "¿Apoyás la cadena perpetua?",
-        "afirma": "apoyar la cadena perpetua para quien comete tres delitos graves",
-        "verbo": "apoyes",
+        "afirma": ("estar de acuerdo con la cadena perpetua sin libertad condicional "
+                   "para quien fue condenado por tres delitos graves"),
     },
     "aumentar_penas": {
         "columna": "var_228 | Aumentar penas todos los delitos",
-        "titulo": "¿Cuál es tu probabilidad de apoyar el aumento de penas para todos los delitos?",
+        "enunciado": "Se deberían aumentar las penas para todos los delitos",
+        "titulo": "¿Cuál es tu probabilidad de estar de acuerdo con aumentar las penas?",
         "titulo_corto": "¿Apoyás aumentar las penas?",
-        "afirma": "apoyar el aumento de penas para todos los delitos",
-        "verbo": "apoyes",
+        "afirma": "estar de acuerdo con que se aumenten las penas para todos los delitos",
     },
     "politico_mano_dura": {
         "columna": "var_233 | Votaria politico de mano dura",
+        "enunciado": "Votaría a un político que promoviera castigos más duros para los delincuentes",
         "titulo": "¿Cuál es tu probabilidad de votar a un político de mano dura?",
         "titulo_corto": "¿Votarías mano dura?",
-        "afirma": "votar a un político que prometa mano dura contra el delito",
-        "verbo": "lo votes",
+        "afirma": "votar a un político que promueva castigos más duros para los delincuentes",
     },
     "humillacion_presos": {
         "columna": "var_231 | Presos merecen humillacion",
-        "titulo": "¿Cuál es tu probabilidad de creer que los presos merecen ser humillados?",
+        "enunciado": ("Quienes están presos merecen la humillación, intimidación y "
+                      "degradación que allí puedan recibir"),
+        "titulo": "¿Cuál es tu probabilidad de estar de acuerdo con esta afirmación?",
         "titulo_corto": "¿Los presos merecen humillación?",
-        "afirma": "creer que quien está preso merece pasar por situaciones humillantes",
-        "verbo": "lo creas",
+        "afirma": ("estar de acuerdo con que quienes están presos merecen la humillación, "
+                   "intimidación y degradación que allí puedan recibir"),
     },
 }
 
@@ -127,11 +134,18 @@ EDUC_UI_TO_CODE = {
 
 # Autoubicación 0-10 agrupada. El centro es la referencia porque es la
 # categoría modal (32% de la muestra se ubica en el 5 exacto).
+#
+# "No se ubica" NO se ofrece en la UI. En el entrenamiento esa dummy agrupa a
+# los 80 encuestados que no contestaron la escala, y no contestar una encuesta
+# no es lo mismo que no ubicarse políticamente: ofrecérsela al lector le
+# aplicaría el coeficiente de un grupo definido por otra cosa. Sigue existiendo
+# como predictor —para que esos casos no contaminen el centro, que es la
+# referencia— pero queda siempre en cero desde la interfaz, igual que
+# victima_sin_dato.
 IDEOLOGIA_UI_TO_CODE = {
     "Izquierda (0-3)": 1,
     "Centro (4-6)": 2,        # referencia
     "Derecha (7-10)": 3,
-    "No se ubica": 4,
 }
 
 VICTIMA_UI_TO_CODE = {
@@ -143,6 +157,20 @@ VICTIMA_UI_TO_CODE = {
 REGION_UI_TO_CODE = {
     "Montevideo": 1,
     "Interior": 0,
+}
+
+# Voto en el balotaje 2024. Es el control que el widget IVE ya tenía y a éste
+# le faltaba: mejora la discriminación (AUC 0,748 -> 0,752) y sobre todo evita
+# atribuirle a la ideología declarada un efecto que en parte es del voto.
+#
+# La referencia es "blanco, anulado o no votó", y no es una categoría de
+# descarte: es justamente el grupo MÁS punitivo de la muestra. Tanto los
+# votantes de Orsi (OR 0,48) como los de Delgado (OR 0,65) apoyan menos la pena
+# de muerte que quienes no eligieron ninguno.
+BALOTAJE_UI_TO_CODE = {
+    "Orsi": 1,
+    "Delgado": 2,
+    "Blanco, anulado o no votó": 0,   # referencia
 }
 
 # ============================================================
@@ -157,6 +185,7 @@ PREDICTORES = [
     "ideol_izquierda", "ideol_derecha", "ideol_no_ubica",
     "victima_sin_violencia", "victima_con_violencia", "victima_sin_dato",
     "es_montevideo",
+    "bal_orsi", "bal_delgado",
 ]
 
 # `victima_sin_dato` existe para que los 53 casos sin respuesta no se mezclen
@@ -172,4 +201,5 @@ REFERENCIAS = {
     "ideologia": "Centro (4-6)",
     "victima": "No fue víctima",
     "region": "Interior",
+    "balotaje": "Blanco, anulado o no votó",
 }

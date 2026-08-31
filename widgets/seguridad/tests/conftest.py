@@ -47,8 +47,9 @@ def perfil_base():
     return dict(
         tramo_edad=1,      # 18-29
         es_mujer=0,        # hombre
-        nivel_educ=1,      # primaria o menos
+        nivel_educ=1,      # secundaria o menos
         ideologia=2,       # centro
         victima=1,         # no fue víctima
         es_montevideo=0,   # interior
+        balotaje=0,        # blanco, anulado o no votó
     )

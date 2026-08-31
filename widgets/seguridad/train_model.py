@@ -59,7 +59,7 @@ EDUC_COLAPSO = {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 2, 8: 3, 9: 3, 10: 3}
 
 # Columnas que la base tiene que traer sí o sí para poder entrenar.
 COLUMNAS_REQUERIDAS = [
-    "edad", "sexo", "nivel_educativo", "dpto_ech", PONDERADOR,
+    "edad", "sexo", "nivel_educativo", "dpto_ech", "IdBalotaje", PONDERADOR,
     "var_241 | Victima de delito ultimos 12 meses",
     "var_242 | Autoubicacion izquierda-derecha (0-10)",
 ]
@@ -211,6 +211,12 @@ def preparar(df):
 
     df["es_montevideo"] = (df["dpto_ech"] == 1).astype(int)
 
+    # --- Balotaje 2024. IdBalotaje: 1=Orsi, 2=Delgado, 3=blanco, 4=no votó,
+    # 5=no recuerda. La referencia junta 3, 4 y 5 (604 casos): es el grupo más
+    # punitivo, no un residuo.
+    df["bal_orsi"] = (df["IdBalotaje"] == 1).astype(int)
+    df["bal_delgado"] = (df["IdBalotaje"] == 2).astype(int)
+
     return df
 
 
@@ -330,6 +336,9 @@ def main():
         "educ_secundaria": (df["educ_ter_incomp"] == 0) & (df["educ_ter_comp"] == 0),
         "educ_ter_incompleta": df["educ_ter_incomp"] == 1,
         "educ_ter_completa": df["educ_ter_comp"] == 1,
+        "voto_orsi": df["bal_orsi"] == 1,
+        "voto_delgado": df["bal_delgado"] == 1,
+        "voto_blanco_no_voto": (df["bal_orsi"] == 0) & (df["bal_delgado"] == 0),
     }
     for nombre, mascara in grupos.items():
         sub = df[mascara & df["a_favor"].notna()]
@@ -343,7 +352,8 @@ def main():
         "pregunta_columna": PREGUNTA["columna"],
         "pregunta_titulo": PREGUNTA["titulo"],
         "pregunta_afirma": PREGUNTA["afirma"],
-        "pregunta_verbo": PREGUNTA["verbo"],
+        "pregunta_enunciado": PREGUNTA["enunciado"],
+        "pregunta_titulo_corto": PREGUNTA["titulo_corto"],
         "coefficients": coeficientes,
         "odds_ratios": odds,
         "coefficients_neutral": coef_neutral,

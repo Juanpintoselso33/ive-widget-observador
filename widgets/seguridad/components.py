@@ -18,7 +18,7 @@ import streamlit as st
 
 from widgets.seguridad.config import (
     PREGUNTA, EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE,
-    VICTIMA_UI_TO_CODE, REGION_UI_TO_CODE,
+    VICTIMA_UI_TO_CODE, REGION_UI_TO_CODE, BALOTAJE_UI_TO_CODE,
 )
 
 # Escala neutra: la intensidad del color acompaña la magnitud, sin valorarla.
@@ -50,10 +50,20 @@ def render_header(model):
         f'<h1 class="main-title">{model.get("pregunta_titulo", PREGUNTA["titulo"])}</h1>',
         unsafe_allow_html=True,
     )
+    # El enunciado textual del cuestionario, entre comillas. El widget mide el
+    # acuerdo con ESA frase; si arriba se muestra una paráfrasis y el modelo
+    # estima otra cosa, el número dice algo distinto de lo que el lector cree.
+    enunciado = model.get("pregunta_enunciado", PREGUNTA.get("enunciado", ""))
+    if enunciado:
+        st.markdown(
+            f'<p class="subtitle">A los encuestados se les leyó esta frase: '
+            f'<em>«{enunciado}»</em>.</p>',
+            unsafe_allow_html=True,
+        )
     st.markdown(
         '<p class="subtitle">Basado en la encuesta de El Observador sobre seguridad '
-        'pública, entre uruguayos <em>con opinión formada</em> sobre el tema. '
-        'Seleccioná tus características:</p>',
+        'pública de mayo de 2026, entre uruguayos <em>con opinión formada</em> sobre '
+        'el tema. Seleccioná tus características:</p>',
         unsafe_allow_html=True,
     )
 
@@ -64,8 +74,12 @@ def render_inputs():
     que espera model.predict_probability().
 
     Returns:
-        tuple: (tramo_edad, es_mujer, nivel_educ, ideologia, victima, es_montevideo)
+        tuple: (tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+                es_montevideo, balotaje)
     """
+    # Cuatro a la izquierda y tres a la derecha, agrupadas por tipo: quién sos
+    # de un lado, qué pensás y qué te pasó del otro. Repartirlas 3/4 dejaba un
+    # hueco visible al pie de la primera columna.
     col1, col2 = st.columns(2)
 
     with col1:
@@ -73,23 +87,32 @@ def render_inputs():
             "Edad", options=list(EDAD_UI_TO_CODE), index=1,
             help="Tu tramo de edad",
         )
-        sexo = st.selectbox("Sexo", options=["Hombre", "Mujer"], index=0)
+        sexo = st.selectbox(
+            "Sexo", options=["Hombre", "Mujer"], index=0,
+            help="La encuesta relevó esta variable de forma binaria, así que el "
+                 "modelo sólo puede estimar sobre esas dos categorías.",
+        )
         educ_sel = st.selectbox(
             "Nivel educativo", options=list(EDUC_UI_TO_CODE), index=1,
             help="El máximo nivel que alcanzaste",
+        )
+        region_sel = st.selectbox(
+            "Región", options=list(REGION_UI_TO_CODE), index=1,
         )
 
     with col2:
         ideol_sel = st.selectbox(
             "Ideología", options=list(IDEOLOGIA_UI_TO_CODE), index=1,
-            help="En política se habla de izquierda y derecha. ¿Dónde te ubicás?",
+            help="En política se habla normalmente de izquierda y derecha. "
+                 "En una escala de 0 a 10, ¿dónde te ubicarías?",
+        )
+        balotaje_sel = st.selectbox(
+            "¿A quién votaste en el balotaje de 2024?",
+            options=list(BALOTAJE_UI_TO_CODE), index=2,
         )
         victima_sel = st.selectbox(
             "¿Fuiste víctima de un delito en los últimos 12 meses?",
             options=list(VICTIMA_UI_TO_CODE), index=0,
-        )
-        region_sel = st.selectbox(
-            "Región", options=list(REGION_UI_TO_CODE), index=1,
         )
 
     return (
@@ -99,6 +122,7 @@ def render_inputs():
         IDEOLOGIA_UI_TO_CODE[ideol_sel],
         VICTIMA_UI_TO_CODE[victima_sel],
         REGION_UI_TO_CODE[region_sel],
+        BALOTAJE_UI_TO_CODE[balotaje_sel],
     )
 
 
@@ -185,6 +209,9 @@ GRUPOS_LABEL = {
     "educ_secundaria": "Secundaria o menos",
     "educ_ter_incompleta": "Terciaria incompleta",
     "educ_ter_completa": "Terciaria completa",
+    "voto_orsi": "Votó a Orsi",
+    "voto_delgado": "Votó a Delgado",
+    "voto_blanco_no_voto": "Blanco, anulado o no votó",
 }
 
 

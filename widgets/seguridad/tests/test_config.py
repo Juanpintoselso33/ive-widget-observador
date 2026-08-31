@@ -26,7 +26,7 @@ def test_la_pregunta_activa_existe_en_el_catalogo():
 
 def test_toda_pregunta_declara_los_campos_que_usa_la_ui():
     for slug, pregunta in config.PREGUNTAS.items():
-        for campo in ("columna", "titulo", "afirma", "verbo"):
+        for campo in ("columna", "enunciado", "titulo", "titulo_corto", "afirma"):
             assert campo in pregunta, f"'{slug}' no declara '{campo}'"
             assert pregunta[campo].strip(), f"'{slug}' tiene '{campo}' vacío"
 
@@ -53,7 +53,7 @@ class TestMapeosUI:
     @pytest.mark.parametrize("mapeo,esperados", [
         ("EDAD_UI_TO_CODE", {1, 2, 3, 4}),
         ("EDUC_UI_TO_CODE", {1, 2, 3}),
-        ("IDEOLOGIA_UI_TO_CODE", {1, 2, 3, 4}),
+        ("IDEOLOGIA_UI_TO_CODE", {1, 2, 3}),
         ("VICTIMA_UI_TO_CODE", {1, 2, 3}),
         ("REGION_UI_TO_CODE", {0, 1}),
     ])

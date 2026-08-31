@@ -29,13 +29,14 @@ def load_model():
         return json.load(f)
 
 
-def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima, es_montevideo):
+def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+                   es_montevideo, balotaje):
     """
     Traduce los inputs de la UI (códigos de config.py) al vector de dummies.
 
     Cada bloque omite su categoría de referencia: 18-29 en edad, hombre en
     sexo, secundaria o menos en educación, centro en ideología, no víctima, e
-    interior en región.
+    interior en región, y blanco/no votó en balotaje.
     """
     return {
         "edad_30_44": int(tramo_edad == 2),
@@ -54,6 +55,8 @@ def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima, es_mont
         # contaminen la categoría de referencia (ver config.PREDICTORES).
         "victima_sin_dato": 0,
         "es_montevideo": int(es_montevideo),
+        "bal_orsi": int(balotaje == 1),
+        "bal_delgado": int(balotaje == 2),
     }
 
 
@@ -70,22 +73,22 @@ def _sigmoid_pct(z):
 
 
 def predict_probability(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                        victima, es_montevideo):
+                        victima, es_montevideo, balotaje):
     """
     Probabilidad de estar a favor, condicional a tener postura definida.
     Returns: float en 0-100.
     """
     features = build_features(tramo_edad, es_mujer, nivel_educ, ideologia,
-                              victima, es_montevideo)
+                              victima, es_montevideo, balotaje)
     return _sigmoid_pct(_z(model["coefficients"], features))
 
 
 def predict_probability_neutral(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                                victima, es_montevideo):
+                                victima, es_montevideo, balotaje):
     """
     Probabilidad de no fijar postura (Likert=3 o sin respuesta) según el perfil.
     Returns: float en 0-100.
     """
     features = build_features(tramo_edad, es_mujer, nivel_educ, ideologia,
-                              victima, es_montevideo)
+                              victima, es_montevideo, balotaje)
     return _sigmoid_pct(_z(model["coefficients_neutral"], features))

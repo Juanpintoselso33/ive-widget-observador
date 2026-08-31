@@ -17,6 +17,10 @@ Editar `PREGUNTA_ACTIVA` en `config.py` y volver a entrenar:
 python widgets/seguridad/train_model.py
 ```
 
+Cada entrada lleva el **enunciado textual del cuestionario**, que es el que se
+muestra al lector: el widget mide acuerdo con esa frase exacta y parafrasearla
+cambia lo que el número significa.
+
 Candidatas ya cargadas en `PREGUNTAS`:
 
 | Slug | Variable | Pregunta |
@@ -61,9 +65,28 @@ se excluyen del modelo principal y se modelan aparte, igual que en el IVE, así
 que el porcentaje es **condicional a tener postura definida**.
 
 Predictores, con su categoría de referencia entre paréntesis: edad en cuatro
-tramos (18-29), sexo (hombre), educación en cuatro niveles (primaria o menos),
-autoubicación ideológica agrupada (centro), víctima de delito en 12 meses (no
-fue víctima) y región (interior).
+tramos (18-29), sexo (hombre), educación en **tres** niveles (secundaria o
+menos), autoubicación ideológica agrupada (centro), víctima de delito en 12
+meses (no fue víctima), región (interior) y **voto en el balotaje 2024**
+(blanco, anulado o no votó).
+
+El balotaje se incorporó tras la auditoría: es el control que el widget IVE ya
+tenía. Mejora la discriminación (AUC 0,748 → 0,752) y evita atribuirle a la
+ideología declarada un efecto que en parte es del voto. Su referencia no es un
+residuo: **quienes votaron en blanco, anularon o no votaron son el grupo más
+punitivo** — tanto los votantes de Orsi (OR 0,48) como los de Delgado (OR 0,65)
+apoyan menos la pena de muerte que ellos.
+
+Educación quedó en tres categorías y no cuatro: "Primaria o menos" tenía 28
+casos de 2.672 y era la referencia, así que los coeficientes más grandes del
+modelo se estimaban contra 28 personas.
+
+Dos dummies existen sólo para el entrenamiento y la UI nunca las enciende:
+`victima_sin_dato` e `ideol_no_ubica`. Agrupan a quienes no contestaron esas
+preguntas, y no contestar una encuesta no es lo mismo que no ubicarse
+políticamente ni que no haber sido víctima: ofrecérselas al lector le aplicaría
+el coeficiente de un grupo definido por otra cosa. Están para que esos casos no
+contaminen las categorías de referencia.
 
 Los sin dato llevan dummy propia (`ideol_no_ubica`, `victima_sin_dato`) en vez
 de caer en la referencia. `victima_sin_dato` queda siempre en cero desde la UI
@@ -93,8 +116,15 @@ problemas, todos corregidos:
    respuesta). Se exportan por separado y hay un assert más un test que
    verifican que los totales cierren contra el N de la encuesta.
 
+Segunda ronda (auditoría completa, comparando contra el widget IVE): la UI
+prometía una predicción individual que la propia metodología desmiente, el
+bloque de neutralidad se mostraba personalizado pese a no discriminar, faltaba
+educación en el comparativo, el título de la pestaña estaba fijo, el contrato
+config↔modelo sólo lo protegían los tests y los predictores no se validaban.
+Todo corregido; los detalles están en el historial de git.
+
 Verificación propia complementaria: se comparan las predicciones de sklearn
-re-entrenado contra la inferencia en Python puro sobre los **384 perfiles
+re-entrenado contra la inferencia en Python puro sobre los **1.296 perfiles
 posibles de la UI**; la peor discrepancia es 0,000000 pp.
 
 ## Caveats
@@ -102,7 +132,12 @@ posibles de la UI**; la peor discrepancia es 0,000000 pp.
 - **El mapeo de `nivel_educativo`** (escala 1-10 → 4 categorías) se hereda del
   widget IVE y fue **inferido**: el proveedor no entregó codebook. La jerarquía
   se sostiene, las etiquetas podrían no ser exactas.
-- **Pseudo-R² de McFadden ≈ 0,16**, bastante menor que el 0,37 del IVE. Es
+- **Sexo y región no son robustos.** La validación ordinal
+  (`scripts/validacion_ordinal.py`) muestra que cambian de signo según la
+  especificación: el widget **no** permite afirmar que las mujeres apoyen más
+  que los varones, ni Montevideo más que el interior. Los factores grandes
+  —educación, edad, ideología, víctima con violencia— sí se mantienen.
+- **Pseudo-R² de McFadden ≈ 0,17**, bastante menor que el 0,37 del IVE. Es
   esperable: allá la religiosidad era un predictor potentísimo y acá no hay nada
   equivalente. Conviene decirlo, no maquillarlo.
 - **Sin errores estándar ni p-valores**: Ridge no los provee analíticamente, y

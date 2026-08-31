@@ -40,18 +40,14 @@ def test_el_modelo_de_neutralidad_usa_sus_propios_coeficientes(modelo_sintetico,
 
 def test_probabilidad_siempre_en_rango(modelo_sintetico):
     """Ningún perfil puede caer fuera de 0-100."""
-    for tramo in (1, 2, 3, 4):
-        for educ in (1, 2, 3, 4):
-            for ideol in (1, 2, 3, 4):
-                for vic in (1, 2, 3):
-                    for mvd in (0, 1):
-                        for mujer in (0, 1):
-                            p = predict_probability(
-                                modelo_sintetico, tramo_edad=tramo, es_mujer=mujer,
-                                nivel_educ=educ, ideologia=ideol, victima=vic,
-                                es_montevideo=mvd,
-                            )
-                            assert 0.0 <= p <= 100.0
+    import itertools
+    for tramo, educ, ideol, vic, mvd, mujer, bal in itertools.product(
+            (1, 2, 3, 4), (1, 2, 3), (1, 2, 3), (1, 2, 3), (0, 1), (0, 1), (0, 1, 2)):
+        p = predict_probability(
+            modelo_sintetico, tramo_edad=tramo, es_mujer=mujer, nivel_educ=educ,
+            ideologia=ideol, victima=vic, es_montevideo=mvd, balotaje=bal,
+        )
+        assert 0.0 <= p <= 100.0
 
 
 class TestBuildFeatures:
@@ -74,16 +70,18 @@ class TestBuildFeatures:
         assert (sin_v["victima_sin_violencia"], sin_v["victima_con_violencia"]) == (1, 0)
         assert (con_v["victima_sin_violencia"], con_v["victima_con_violencia"]) == (0, 1)
 
-    def test_victima_sin_dato_nunca_se_activa_desde_la_ui(self, perfil_base):
+    def test_las_dummies_que_no_ofrece_la_ui_quedan_siempre_en_cero(self, perfil_base):
         """
-        La dummy existe sólo para que los sin dato del entrenamiento no
-        contaminen la referencia. Ninguna opción de la UI debe encenderla:
-        si alguna lo hiciera, se le estaría aplicando a un usuario real el
-        coeficiente de los que no contestaron.
+        `victima_sin_dato` e `ideol_no_ubica` existen para que los casos sin
+        respuesta del entrenamiento no contaminen las categorías de referencia,
+        pero la UI no los ofrece: ninguna combinación puede encenderlos, o se le
+        estaría aplicando a un lector el coeficiente de quien no contestó.
         """
-        for victima in (1, 2, 3):
-            f = build_features(**{**perfil_base, "victima": victima})
+        import itertools
+        for vic, ideol in itertools.product((1, 2, 3), (1, 2, 3)):
+            f = build_features(**{**perfil_base, "victima": vic, "ideologia": ideol})
             assert f["victima_sin_dato"] == 0
+            assert f["ideol_no_ubica"] == 0
 
     def test_centro_ideologico_es_la_referencia(self, perfil_base):
         f = build_features(**{**perfil_base, "ideologia": 2})
