@@ -200,6 +200,25 @@ PREDICTORES = [
 # widget obliga a elegir una de las tres opciones reales. Es un predictor de
 # entrenamiento, no de interacción.
 
+# Especificación de la transformación dato crudo -> dummy. Vive acá, y no
+# repartida entre config y train_model, porque TODA ella tiene que entrar en la
+# huella: cambiar cualquiera de estos valores cambia el significado de las
+# dummies aunque los nombres queden iguales.
+ESPEC_CRUDA = {
+    # Escala nivel_educativo (1-10) del proveedor -> las 3 categorías del modelo.
+    "educ_colapso": {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 2, 8: 3, 9: 3, 10: 3},
+    # Cortes de edad (bordes de pd.cut) y sus códigos.
+    "edad_cortes": [17, 29, 44, 59, 120],
+    # Corte de la autoubicación 0-10 en izquierda / centro / derecha.
+    "ideol_izquierda_hasta": 3,
+    "ideol_derecha_desde": 7,
+    # Códigos crudos de las demás variables.
+    "sexo_mujer": "Mujer",
+    "dpto_montevideo": 1,
+    "balotaje_codigos": {"orsi": 1, "delgado": 2, "referencia": [3, 4], "no_recuerda": 5},
+}
+
+
 def huella_contrato():
     """
     Huella de TODO el contrato entre la configuración y el modelo entrenado.
@@ -211,24 +230,39 @@ def huella_contrato():
     código detrás, así que un JSON viejo habría cargado sin protestar y la
     inferencia habría aplicado coeficientes de otra codificación.
 
-    Por eso la huella incluye los mapeos de la UI y las referencias, no sólo los
-    nombres: si cambia la semántica de una categoría, cambia el hash.
+    Incluye TODO lo que define el significado de una dummy: los mapeos de la UI,
+    las referencias, la escala Likert y la especificación de transformación
+    cruda (cortes de edad, colapso educativo, códigos de balotaje). Una versión
+    anterior de esta función decía en su docstring que cubría las referencias y
+    no las cubría, y sobre todo dejaba afuera `EDUC_COLAPSO` — con lo cual
+    cambiar el colapso educativo dejaba exactamente la misma huella, que es
+    justo el agujero que esto viene a tapar.
+
+    Los mapeos se ordenan antes de hashear: reordenar `PREDICTORES` no cambia el
+    modelo y no debería invalidar el JSON.
     """
     import hashlib
     import json as _json
     material = _json.dumps({
         "pregunta": PREGUNTA_ACTIVA,
         "columna": PREGUNTA["columna"],
-        "predictores": PREDICTORES,
-        "edad": EDAD_UI_TO_CODE,
-        "educacion": EDUC_UI_TO_CODE,
-        "ideologia": IDEOLOGIA_UI_TO_CODE,
-        "victima": VICTIMA_UI_TO_CODE,
-        "region": REGION_UI_TO_CODE,
-        "balotaje": BALOTAJE_UI_TO_CODE,
-        "likert": LIKERT_MAP,
-        "favor": list(LIKERT_FAVOR),
-        "contra": list(LIKERT_CONTRA),
+        # ordenados: el orden de la lista no tiene significado semántico
+        "predictores": sorted(PREDICTORES),
+        # los mapeos SÍ van como listas ordenadas de pares: cambiar qué opción
+        # ofrece la UI, o qué código le corresponde, cambia el contrato
+        "edad": sorted(EDAD_UI_TO_CODE.items()),
+        "educacion": sorted(EDUC_UI_TO_CODE.items()),
+        "ideologia": sorted(IDEOLOGIA_UI_TO_CODE.items()),
+        "victima": sorted(VICTIMA_UI_TO_CODE.items()),
+        "region": sorted(REGION_UI_TO_CODE.items()),
+        "balotaje": sorted(BALOTAJE_UI_TO_CODE.items()),
+        "referencias": sorted(REFERENCIAS.items()),
+        "likert": sorted(LIKERT_MAP.items()),
+        "favor": sorted(LIKERT_FAVOR),
+        "contra": sorted(LIKERT_CONTRA),
+        "neutral": LIKERT_NEUTRAL,
+        "ponderador": PONDERADOR,
+        "espec_cruda": _json.dumps(ESPEC_CRUDA, sort_keys=True),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
 

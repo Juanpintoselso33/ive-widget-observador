@@ -72,16 +72,19 @@ class TestBuildFeatures:
 
     def test_las_dummies_que_no_ofrece_la_ui_quedan_siempre_en_cero(self, perfil_base):
         """
-        `victima_sin_dato` e `ideol_no_ubica` existen para que los casos sin
+        `victima_sin_dato`, `ideol_no_ubica` y `bal_no_recuerda` existen para que
+        los casos sin
         respuesta del entrenamiento no contaminen las categorías de referencia,
         pero la UI no los ofrece: ninguna combinación puede encenderlos, o se le
         estaría aplicando a un lector el coeficiente de quien no contestó.
         """
         import itertools
-        for vic, ideol in itertools.product((1, 2, 3), (1, 2, 3)):
-            f = build_features(**{**perfil_base, "victima": vic, "ideologia": ideol})
+        for vic, ideol, bal in itertools.product((1, 2, 3), (1, 2, 3), (0, 1, 2)):
+            f = build_features(**{**perfil_base, "victima": vic,
+                                  "ideologia": ideol, "balotaje": bal})
             assert f["victima_sin_dato"] == 0
             assert f["ideol_no_ubica"] == 0
+            assert f["bal_no_recuerda"] == 0
 
     def test_centro_ideologico_es_la_referencia(self, perfil_base):
         f = build_features(**{**perfil_base, "ideologia": 2})

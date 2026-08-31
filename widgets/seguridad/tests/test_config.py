@@ -56,6 +56,7 @@ class TestMapeosUI:
         ("IDEOLOGIA_UI_TO_CODE", {1, 2, 3}),
         ("VICTIMA_UI_TO_CODE", {1, 2, 3}),
         ("REGION_UI_TO_CODE", {0, 1}),
+        ("BALOTAJE_UI_TO_CODE", {0, 1, 2}),
     ])
     def test_codigos_completos_y_sin_repetir(self, mapeo, esperados):
         valores = list(getattr(config, mapeo).values())
@@ -105,3 +106,55 @@ class TestModeloEntrenado:
         info = modelo["model_info"]
         assert info["n"] + info["n_excluidos"] == info["n_encuesta"]
         assert info["n_neutrales_explicitos"] + info["n_sin_respuesta"] == info["n_excluidos"]
+
+
+class TestHuellaContrato:
+    """
+    La huella es lo único que impide servir un modelo entrenado con otra
+    codificación. Estos tests son de mutación: cambian una pieza de la
+    especificación y verifican que la huella cambie. Sin ellos, la huella puede
+    quedarse corta sin que nadie se entere — que es lo que pasó con
+    EDUC_COLAPSO, que estaba fuera y dejaba el mismo hash.
+    """
+
+    def test_es_estable_entre_llamadas(self):
+        assert config.huella_contrato() == config.huella_contrato()
+
+    @pytest.mark.parametrize("clave,valor", [
+        ("educ_colapso", {1: 1, 2: 2, 3: 3, 4: 3, 5: 3, 6: 3, 7: 3, 8: 3, 9: 3, 10: 3}),
+        ("edad_cortes", [17, 34, 49, 64, 120]),
+        ("ideol_izquierda_hasta", 4),
+        ("ideol_derecha_desde", 8),
+        ("dpto_montevideo", 19),
+        ("sexo_mujer", "F"),
+    ])
+    def test_cambiar_la_especificacion_cruda_cambia_la_huella(self, clave, valor, monkeypatch):
+        original = config.huella_contrato()
+        espec = dict(config.ESPEC_CRUDA)
+        espec[clave] = valor
+        monkeypatch.setattr(config, "ESPEC_CRUDA", espec)
+        assert config.huella_contrato() != original, (
+            f"cambiar '{clave}' no cambió la huella: un JSON viejo cargaría igual"
+        )
+
+    def test_cambiar_un_mapeo_de_la_ui_cambia_la_huella(self, monkeypatch):
+        original = config.huella_contrato()
+        monkeypatch.setattr(config, "EDUC_UI_TO_CODE",
+                            {"Primaria": 1, "Secundaria": 2, "Terciaria": 3})
+        assert config.huella_contrato() != original
+
+    def test_reordenar_predictores_no_cambia_la_huella(self, monkeypatch):
+        """El orden de la lista no tiene significado: no debe invalidar el JSON."""
+        original = config.huella_contrato()
+        monkeypatch.setattr(config, "PREDICTORES", list(reversed(config.PREDICTORES)))
+        assert config.huella_contrato() == original
+
+    def test_el_json_entrenado_coincide_con_la_huella_actual(self):
+        if not config.MODEL_COEFFICIENTS_PATH.exists():
+            pytest.skip("El modelo todavía no fue entrenado")
+        with open(config.MODEL_COEFFICIENTS_PATH, encoding="utf-8") as f:
+            modelo = json.load(f)
+        assert modelo.get("contrato") == config.huella_contrato(), (
+            "El JSON entrenado no corresponde a la configuración actual: "
+            "hay que volver a correr train_model.py"
+        )

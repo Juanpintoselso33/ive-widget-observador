@@ -1,6 +1,6 @@
 {
   "pregunta_slug": "pena_muerte",
-  "contrato": "dfc6fc8fa9a14866",
+  "contrato": "9483dc98a34e183c",
   "predictores": [
     "edad_30_44",
     "edad_45_59",
@@ -109,21 +109,27 @@
     "region": "Interior",
     "balotaje": "Blanco, anulado o no votó"
   },
+  "cobertura_perfiles": {
+    "posibles": 1296,
+    "observados": 597,
+    "con_30_o_mas": 5
+  },
   "model_info": {
     "n": 2672,
+    "n_efectivo_kish": 571,
     "n_excluidos": 705,
     "n_neutrales_explicitos": 671,
     "n_sin_respuesta": 34,
     "n_encuesta": 3377,
     "C": 0.1,
-    "cv_neg_log_loss": -0.5711,
+    "cv_neg_log_loss": -0.5708,
     "mcfadden_r2": 0.1731,
     "ponderador": "w_norm"
   },
   "model_info_neutral": {
     "n": 3377,
     "C": 0.01,
-    "cv_neg_log_loss": -0.5312,
+    "cv_neg_log_loss": -0.5327,
     "mcfadden_r2": 0.0307
   },
   "fuente": "Encuesta El Observador — Seguridad pública, mayo 2026",

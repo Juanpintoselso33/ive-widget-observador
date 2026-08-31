@@ -218,8 +218,17 @@ GRUPOS_LABEL = {
 
 def render_comparisons(model, prob, colors):
     st.markdown('<hr class="editorial-divider">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Cómo se compara con otros grupos</div>',
+    st.markdown('<div class="section-header">Qué declaró cada grupo</div>',
                 unsafe_allow_html=True)
+    # Son tasas OBSERVADAS por grupo, no predicciones ajustadas. Antes se
+    # restaban contra la estimación del perfil elegido y ese delta mezclaba dos
+    # cosas distintas: un promedio descriptivo contra una predicción que
+    # controla por todo lo demás.
+    st.markdown(
+        f'<p class="subtitle">Porcentaje que se declaró a favor en cada grupo de '
+        f'la encuesta, sin ajustar por las demás características.</p>',
+        unsafe_allow_html=True,
+    )
 
     stats = model.get("stats_by_group", {})
     # Se omiten los grupos que el entrenamiento marcó como None (n < 30).
@@ -240,7 +249,7 @@ def render_comparisons(model, prob, colors):
                     <div class="metric-label">{GRUPOS_LABEL[clave]}</div>
                     <div class="metric-value">{valor_r}%</div>
                     <div class="metric-delta" style="color:{colors['text_muted']};">
-                        {'+' if delta > 0 else ''}{delta}pp vs. este perfil
+                        de la encuesta
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -248,6 +257,7 @@ def render_comparisons(model, prob, colors):
 
 def render_methodology(model):
     info = model.get("model_info", {})
+    cob = model.get("cobertura_perfiles", {})
     with st.expander("Cómo se calcula"):
         st.markdown(f"""
 El porcentaje sale de una **regresión logística ponderada** ajustada sobre la
@@ -256,6 +266,9 @@ de diseño muestral `{info.get('ponderador', 'w_norm')}`.
 
 - **Encuestados:** {info.get('n_encuesta', '—')}
 - **Casos con postura definida:** {info.get('n', '—')}
+- **Tamaño efectivo (Kish):** {info.get('n_efectivo_kish', '—')} — por la dispersión
+  de los ponderadores, esas respuestas rinden como esa cantidad a efectos de
+  precisión, bastante menos que el total nominal
 - **Excluidos:** {info.get('n_excluidos', '—')}
   ({info.get('n_neutrales_explicitos', '—')} contestaron "ni de acuerdo ni en desacuerdo"
   y {info.get('n_sin_respuesta', '—')} no contestaron)
@@ -270,18 +283,22 @@ persona concreta ni relaciones de causa y efecto**. Dos personas con el mismo
 perfil pueden opinar distinto: el modelo describe tendencias de grupo, y las
 separa de manera moderada.
 
-**Cuidado con los perfiles poco frecuentes.** Las combinaciones posibles son
-1.296 y la encuesta tiene 2.672 casos con postura definida, así que muchas
-combinaciones no aparecen en los datos: el modelo las estima combinando
-información de perfiles parecidos, no observándolas. Cuanto más inusual sea la
-combinación elegida, más extrapolación hay detrás del número.
+**Cuidado con los perfiles poco frecuentes.** {cob.get('posibles', '—')}
+combinaciones se pueden elegir acá, pero sólo {cob.get('observados', '—')}
+aparecen en la encuesta, y apenas {cob.get('con_30_o_mas', '—')} tienen 30
+casos o más. El modelo es aditivo y estima las que faltan combinando
+información de perfiles parecidos, no observándolas: cuanto más inusual sea la
+combinación elegida, más extrapolación hay detrás del número, y no se muestran
+intervalos de confianza.
 
 **Qué sostiene y qué no.** Los factores que más pesan —nivel educativo, edad y
 autoubicación ideológica— se mantienen estables cuando se estima el modelo de
-otra forma. En cambio **el efecto del sexo y el de la región son chicos y no
-son robustos**: cambian de signo según la especificación, así que este widget
-no permite afirmar que las mujeres apoyen más que los varones, ni Montevideo
-más que el interior. Las tasas por grupo que se muestran abajo son descriptivas
+otra forma. En cambio **el efecto del sexo, el de la región y el contraste entre 30-44 y
+18-29 años son chicos y no son robustos**: cambian de signo según la
+especificación, así que este widget no permite afirmar que las mujeres apoyen
+más que los varones, ni Montevideo más que el interior, ni que los de 30 a 44
+apoyen más que los más jóvenes. Lo que sí se sostiene en edad es el contraste
+de los mayores de 60, que apoyan claramente menos. Las tasas por grupo que se muestran abajo son descriptivas
 de la muestra, no efectos ajustados.
         """)
 

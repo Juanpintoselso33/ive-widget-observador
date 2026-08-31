@@ -82,8 +82,8 @@ Educación quedó en tres categorías y no cuatro: "Primaria o menos" tenía 28
 casos de 2.672 y era la referencia, así que los coeficientes más grandes del
 modelo se estimaban contra 28 personas.
 
-Dos dummies existen sólo para el entrenamiento y la UI nunca las enciende:
-`victima_sin_dato` e `ideol_no_ubica`. Agrupan a quienes no contestaron esas
+Tres dummies existen sólo para el entrenamiento y la UI nunca las enciende:
+`victima_sin_dato`, `ideol_no_ubica` y `bal_no_recuerda`. Agrupan a quienes no contestaron esas
 preguntas, y no contestar una encuesta no es lo mismo que no ubicarse
 políticamente ni que no haber sido víctima: ofrecérselas al lector le aplicaría
 el coeficiente de un grupo definido por otra cosa. Están para que esos casos no
