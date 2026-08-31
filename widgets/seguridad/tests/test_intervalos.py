@@ -24,7 +24,9 @@ import pytest
 
 from widgets.seguridad import config
 from widgets.seguridad.components import interpretar
-from widgets.seguridad.model import _percentil, intervalo_probabilidad
+from widgets.seguridad.model import (
+    _percentil, banda_decision, intervalo_probabilidad, predict_probability,
+)
 
 
 class TestPercentil:
@@ -111,3 +113,106 @@ class TestIntervaloProbabilidad:
         assert orden[0] == "intercept"
         assert orden[1:] == list(config.PREDICTORES)
         assert all(len(fila) == len(orden) for fila in modelo["bootstrap"]["replicas"])
+
+
+class TestBandaDeDecision:
+    """
+    El intervalo que se muestra y el que decide sobre el 50% son distintos a
+    propósito. Ver el docstring de model.banda_decision(): el extremo del
+    intervalo está simulado, y su propio error basta para dar vuelta una regla
+    binaria en decenas de perfiles.
+    """
+
+    PERFIL = dict(tramo_edad=2, es_mujer=0, nivel_educ=1, ideologia=2,
+                  victima=1, es_montevideo=0, balotaje=0)
+
+    # 18-29, mujer, terciaria incompleta, izquierda, víctima sin violencia,
+    # interior, blanco/no votó. Codex lo encontró remuestreando las réplicas
+    # guardadas: se mostraba como 15%-49% y el widget afirmaba "la amplia
+    # mayoría está en contra", pero en 456 de 1.000 corridas simuladas ese
+    # extremo llegaba a 50.
+    TESTIGO = dict(tramo_edad=1, es_mujer=1, nivel_educ=2, ideologia=1,
+                   victima=2, es_montevideo=0, balotaje=0)
+
+    COLORES = {"primary": "#000", "text_muted": "#888"}
+
+    def test_devuelve_none_sin_bootstrap(self):
+        assert banda_decision({"coefficients": {}}, **self.PERFIL) is None
+
+    @pytest.mark.skipif(not config.MODEL_COEFFICIENTS_PATH.exists(),
+                        reason="El modelo todavía no fue entrenado")
+    def test_la_banda_contiene_al_intervalo_mostrado(self):
+        with open(config.MODEL_COEFFICIENTS_PATH, encoding="utf-8") as f:
+            modelo = json.load(f)
+        for perfil in (self.PERFIL, self.TESTIGO):
+            iv = intervalo_probabilidad(modelo, **perfil)
+            bd = banda_decision(modelo, **perfil)
+            assert bd[0] <= iv[0] and bd[1] >= iv[1], (
+                "la banda de decisión tiene que ser al menos tan ancha como el "
+                "intervalo mostrado, nunca más angosta"
+            )
+
+    @pytest.mark.skipif(not config.MODEL_COEFFICIENTS_PATH.exists(),
+                        reason="El modelo todavía no fue entrenado")
+    def test_el_caso_testigo_ya_no_afirma_mayoria(self):
+        """
+        El test que fija el arreglo. Si alguien vuelve a decidir con el
+        intervalo mostrado, este caso vuelve a afirmar y el test se pone rojo.
+        """
+        with open(config.MODEL_COEFFICIENTS_PATH, encoding="utf-8") as f:
+            modelo = json.load(f)
+        prob = predict_probability(modelo, **self.TESTIGO)
+        iv = intervalo_probabilidad(modelo, **self.TESTIGO)
+        bd = banda_decision(modelo, **self.TESTIGO)
+
+        # La premisa del caso: el intervalo mostrado NO cruza el 50 y la banda SÍ.
+        assert round(iv[1]) < 50, f"cambió la base: el intervalo ahora es {iv}"
+        assert round(bd[1]) >= 50, f"cambió la base: la banda ahora es {bd}"
+
+        _, texto = interpretar(prob, self.COLORES, iv, bd)
+        assert "no permite afirmar" in texto
+
+    def test_la_banda_manda_sobre_el_intervalo(self):
+        """Sin tocar el modelo: si la banda cruza el 50, no se afirma."""
+        _, texto = interpretar(20, self.COLORES, (12.0, 29.0), (11.0, 51.0))
+        assert "no permite afirmar" in texto
+
+    def test_sin_banda_decide_el_intervalo(self):
+        """Compatibilidad: el llamado viejo de dos argumentos sigue andando."""
+        _, texto = interpretar(20, self.COLORES, (12.0, 29.0))
+        assert "en contra" in texto
+
+
+class TestBordeSimetricoDelCincuenta:
+    """
+    La regla tiene que suprimir la afirmación en los DOS bordes. El extremo
+    inferior no estaba cubierto: una mutación que redondeara sólo el superior
+    pasaba todos los tests.
+    """
+
+    COLORES = {"primary": "#000", "text_muted": "#888"}
+
+    def test_extremo_inferior_que_se_muestra_como_50(self):
+        _, texto = interpretar(65, self.COLORES, (50.4, 80.0))
+        assert "no permite afirmar" in texto, (
+            'en pantalla dice "50% a 80%": no se puede afirmar mayoría a favor'
+        )
+
+    def test_extremo_inferior_que_redondea_a_50(self):
+        _, texto = interpretar(65, self.COLORES, (50.0, 80.0))
+        assert "no permite afirmar" in texto
+
+    def test_extremo_inferior_apenas_por_encima_si_afirma(self):
+        _, texto = interpretar(65, self.COLORES, (50.6, 80.0))
+        assert "a favor" in texto
+
+
+class TestPercentilValidaQ:
+    def test_q_fuera_de_rango(self):
+        for q in (-0.01, 1.01, 2.0):
+            with pytest.raises(ValueError, match="entre 0 y 1"):
+                _percentil([1, 2, 3], q)
+
+    def test_los_extremos_exactos_son_validos(self):
+        assert _percentil([1, 2, 3], 0.0) == 1
+        assert _percentil([1, 2, 3], 1.0) == 3

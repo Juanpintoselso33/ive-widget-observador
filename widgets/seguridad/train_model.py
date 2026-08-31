@@ -266,6 +266,49 @@ def preparar(df):
     return df
 
 
+def elegir_c(X, y, w):
+    """
+    Elige C por validación cruzada ponderada. ÚNICA implementación.
+
+    La usan el ajuste principal y cada réplica bootstrap. Antes estaba escrita
+    dos veces y el requisito de que fueran la misma CV vivía en un comentario;
+    con eso, cualquier cambio en una de las dos copias desalineaba en silencio
+    los intervalos respecto del punto estimado, y ningún test lo notaba.
+
+    5 folds estratificados, la grilla de C_GRID, pesos muestrales tanto en el
+    ajuste como en la pérdida, y promedio de los folds ponderado por su masa de
+    pesos: cada log_loss ya está ponderado adentro, pero promediarlos por igual
+    le daría el mismo peso a folds con distinta masa muestral.
+
+    Devuelve (mejor_c, mejor_score), o (None, None) si algún fold queda sin las
+    dos clases en ENTRENAMIENTO. En ese caso la CV no es comparable entre
+    valores de C y el llamador decide qué hacer — la réplica se descarta, no se
+    saltea el fold. Saltearlo es peor de lo que parece: con una única
+    observación de la clase minoritaria, el único fold que la tiene en
+    validación es justamente el que se saltearía, así que C terminaría elegido
+    evaluando sólo folds de validación sin minoría.
+    """
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    particion = list(cv.split(X, y))
+    if any(len(np.unique(y[idx_train])) < 2 for idx_train, _ in particion):
+        return None, None
+
+    mejor_c, mejor_score = None, -np.inf
+    for c in C_GRID:
+        scores, masas = [], []
+        for idx_train, idx_test in particion:
+            m = LogisticRegression(C=c, max_iter=2000, random_state=RANDOM_STATE)
+            m.fit(X[idx_train], y[idx_train], sample_weight=w[idx_train])
+            p = m.predict_proba(X[idx_test])[:, 1]
+            scores.append(-log_loss(
+                y[idx_test], p, sample_weight=w[idx_test], labels=[0, 1],
+            ))
+            masas.append(w[idx_test].sum())
+        score = float(np.average(scores, weights=masas))
+        if score > mejor_score:
+            mejor_c, mejor_score = c, score
+
+    return mejor_c, mejor_score
 def _ajustar(X, y, w, etiqueta):
     """
     Elige C por CV ponderada y devuelve el modelo ajustado.
@@ -280,25 +323,13 @@ def _ajustar(X, y, w, etiqueta):
     recién desde scikit-learn 1.4, y deja el script compatible con el piso
     declarado en requirements.txt.
     """
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
-    mejor_c, mejor_score = None, -np.inf
-
-    for c in C_GRID:
-        scores, masas = [], []
-        for idx_train, idx_test in cv.split(X, y):
-            m = LogisticRegression(C=c, max_iter=2000, random_state=RANDOM_STATE)
-            m.fit(X[idx_train], y[idx_train], sample_weight=w[idx_train])
-            p = m.predict_proba(X[idx_test])[:, 1]
-            scores.append(-log_loss(
-                y[idx_test], p, sample_weight=w[idx_test], labels=[0, 1],
-            ))
-            masas.append(w[idx_test].sum())
-        # Promedio ponderado por la masa de pesos de cada fold: cada log_loss ya
-        # está ponderado adentro, pero promediarlos por igual le da el mismo
-        # peso a folds con distinta masa muestral.
-        score = float(np.average(scores, weights=masas))
-        if score > mejor_score:
-            mejor_c, mejor_score = c, score
+    # La CV vive en elegir_c() y no acá: ver el docstring de esa función.
+    mejor_c, mejor_score = elegir_c(X, y, w)
+    if mejor_c is None:
+        raise SystemExit(
+            f"[{etiqueta}] la validación cruzada no pudo correr: algún fold "
+            "quedó sin las dos clases en entrenamiento."
+        )
 
     modelo = LogisticRegression(C=mejor_c, max_iter=2000, random_state=RANDOM_STATE)
     modelo.fit(X, y, sample_weight=w)
@@ -328,12 +359,17 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
     Se guardan los coeficientes y no los intervalos por perfil: así la app puede
     calcular el de cualquier combinación sin arrastrar 1.296 pares de números, y
     `model.py` sigue sin depender de sklearn.
+
+    Devuelve (coeficientes, meta). `meta` va al JSON para que el artefacto sea
+    auditable sin re-correr esto: cuántas réplicas se pidieron, cuántas
+    sobrevivieron, con qué semilla y cómo se repartió el C elegido. Si alguna
+    vez se vuelve a fijar C, la distribución colapsa a un solo valor y se ve.
     """
     estratos = d["estrato"].values
     indices_por_estrato = [np.where(estratos == e)[0] for e in np.unique(estratos)]
     rng = np.random.default_rng(RANDOM_STATE)
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
     coeficientes = []
+    c_elegidos = []
 
     for i in range(n_replicas):
         idx = np.concatenate([
@@ -345,32 +381,28 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
         if len(np.unique(yb)) < 2:
             continue
 
-        mejor_c, mejor = None, -np.inf
-        for c in C_GRID:
-            scores, masas = [], []
-            for tr, te in cv.split(Xb, yb):
-                if len(np.unique(yb[tr])) < 2:
-                    continue
-                m = LogisticRegression(C=c, max_iter=2000, random_state=RANDOM_STATE)
-                m.fit(Xb[tr], yb[tr], sample_weight=wb[tr])
-                p = m.predict_proba(Xb[te])[:, 1]
-                scores.append(-log_loss(yb[te], p, sample_weight=wb[te], labels=[0, 1]))
-                masas.append(wb[te].sum())
-            if scores:
-                s = float(np.average(scores, weights=masas))
-                if s > mejor:
-                    mejor_c, mejor = c, s
+        # La MISMA CV que el ajuste principal, porque es literalmente la misma
+        # función. Si alguna réplica tiene un fold degenerado se descarta
+        # entera: ver el docstring de elegir_c().
+        mejor_c, _ = elegir_c(Xb, yb, wb)
         if mejor_c is None:
             continue
 
         m = LogisticRegression(C=mejor_c, max_iter=2000, random_state=RANDOM_STATE)
         m.fit(Xb, yb, sample_weight=wb)
         coeficientes.append([float(m.intercept_[0])] + [float(v) for v in m.coef_[0]])
+        c_elegidos.append(float(mejor_c))
 
         if (i + 1) % 200 == 0:
             print(f"    {i + 1}/{n_replicas} réplicas")
 
-    return coeficientes
+    meta = {
+        "solicitadas": int(n_replicas),
+        "utiles": len(coeficientes),
+        "semilla": int(RANDOM_STATE),
+        "c_por_replica": {str(c): c_elegidos.count(c) for c in sorted(set(c_elegidos))},
+    }
+    return coeficientes, meta
 
 
 def _mcfadden(modelo, X, y, w):
@@ -416,8 +448,9 @@ def main():
     print("\nBootstrap estratificado para los intervalos (re-elige C en cada")
     print("réplica, así que tarda unos minutos)...")
     N_REPLICAS = 1000
-    boot = bootstrap_coeficientes(d, X, y, w, N_REPLICAS)
-    print(f"  {len(boot)} réplicas útiles sobre {N_REPLICAS}")
+    boot, boot_meta = bootstrap_coeficientes(d, X, y, w, N_REPLICAS)
+    print(f"  {boot_meta['utiles']} réplicas útiles sobre {N_REPLICAS}")
+    print(f"  C elegido por réplica: {boot_meta['c_por_replica']}")
 
     coeficientes = {"intercept": float(modelo.intercept_[0])}
     for nombre, valor in zip(PREDICTORES, modelo.coef_[0]):
@@ -518,6 +551,7 @@ def main():
         "bootstrap": {
             "orden": ["intercept"] + list(PREDICTORES),
             "replicas": [[round(v, 5) for v in fila] for fila in boot],
+            **boot_meta,
         },
         "prob_favor_nacional": round(prop_pond, 2),
         "prob_neutral_nacional": round(prop_neutral, 2),

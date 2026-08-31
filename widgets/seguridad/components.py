@@ -37,7 +37,7 @@ INTENSIDAD = [
 ]
 
 
-def interpretar(prob, colors, intervalo=None):
+def interpretar(prob, colors, intervalo=None, banda=None):
     """
     Devuelve (color, texto) sin cargar valoración moral en el color.
 
@@ -45,11 +45,20 @@ def interpretar(prob, colors, intervalo=None):
     mayoría: con estos intervalos —que rondan los 25 puntos— una estimación de
     43% puede corresponder tanto a una mayoría en contra como a favor, y decir
     "la mayoría está en contra" sería afirmar más de lo que el dato aguanta.
+
+    `intervalo` es el que se MUESTRA; `banda` es el que DECIDE. Son distintos a
+    propósito: el extremo del intervalo está simulado con 1.000 réplicas y tiene
+    su propio error, que no importa para mostrar un rango pero sí para una regla
+    binaria contra el 50%. `banda` viene de model.banda_decision() y es ese
+    mismo intervalo corrido hacia afuera lo que la simulación no puede resolver.
+    Si no se pasa, se cae al intervalo mostrado — que es el comportamiento
+    anterior, menos prudente.
     """
+    decisorio = banda or intervalo
     # La comparación va sobre los extremos REDONDEADOS, que son los que ve el
     # lector, y es inclusiva: si en pantalla dice "entre 25% y 50%", afirmar que
     # la mayoría está en contra contradice lo que el propio intervalo muestra.
-    if intervalo and round(intervalo[0]) <= 50 <= round(intervalo[1]):
+    if decisorio and round(decisorio[0]) <= 50 <= round(decisorio[1]):
         return colors["primary"], (
             "El margen de error no permite afirmar de qué lado está la mayoría "
             "en este perfil"
@@ -158,8 +167,8 @@ def render_probability_bar(prob):
     """, unsafe_allow_html=True)
 
 
-def render_result_card(model, prob, colors, intervalo=None):
-    color, texto = interpretar(prob, colors, intervalo)
+def render_result_card(model, prob, colors, intervalo=None, banda=None):
+    color, texto = interpretar(prob, colors, intervalo, banda)
 
     # La diferencia se calcula sobre los valores YA redondeados que ve el
     # lector: si en pantalla dicen 53% y 37%, la brecha tiene que decir 16pp.
@@ -318,6 +327,13 @@ casos o más. El modelo es aditivo y estima las que faltan combinando
 información de perfiles parecidos, no observándolas: cuanto más inusual sea la
 combinación elegida, más extrapolación hay detrás del número y más ancho es
 su intervalo.
+
+**Por qué a veces el intervalo no llega al 50% y aun así no se afirma de qué
+lado está la mayoría.** El intervalo no se calcula con una fórmula cerrada: se
+simula, remuestreando la encuesta mil veces. Un extremo que cae en 49% podría
+haber caído en 51% con otra simulación, así que para afirmar que la mayoría está
+de un lado se exige un margen un poco más ancho que el que se muestra. Cuando el
+extremo queda pegado al 50%, el widget prefiere no afirmar.
 
 **Qué sostiene y qué no.** Los factores que más pesan —nivel educativo, edad y
 autoubicación ideológica— se mantienen estables cuando se estima el modelo de

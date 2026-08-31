@@ -15,6 +15,7 @@ from shared.styles import get_custom_css
 from shared.config import get_colors
 from widgets.seguridad.model import (
     load_model as _load_model, predict_probability, intervalo_probabilidad,
+    banda_decision,
 )
 from widgets.seguridad.components import (
     render_header, render_inputs, render_probability_bar,
@@ -103,9 +104,12 @@ inputs = render_inputs()
 # la posibilidad de que un JSON neutral defectuoso rompa la página.
 prob = predict_probability(MODEL, *inputs)
 intervalo = intervalo_probabilidad(MODEL, *inputs)
+# El que se muestra y el que decide sobre el 50% son distintos a propósito:
+# ver el docstring de model.banda_decision().
+banda = banda_decision(MODEL, *inputs)
 
 render_probability_bar(prob)
-render_result_card(MODEL, prob, colors, intervalo)
+render_result_card(MODEL, prob, colors, intervalo, banda)
 render_comparisons(MODEL, prob, colors)
 render_methodology(MODEL)
 render_footer(MODEL)

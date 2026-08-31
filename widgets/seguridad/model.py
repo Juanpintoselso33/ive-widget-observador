@@ -96,16 +96,12 @@ def predict_probability_neutral(model, tramo_edad, es_mujer, nivel_educ, ideolog
     return _sigmoid_pct(_z(model["coefficients_neutral"], features))
 
 
-def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                           victima, es_montevideo, balotaje, nivel=95):
+def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia,
+                              victima, es_montevideo, balotaje):
     """
-    Intervalo de confianza percentil para la probabilidad estimada.
+    Las B probabilidades del perfil, una por réplica bootstrap, ordenadas.
 
-    Se calcula sobre las réplicas bootstrap guardadas en el JSON: para cada una
-    se evalúa la logística con el mismo vector de features y se toman los
-    percentiles. Sin sklearn ni numpy — es aritmética sobre una lista.
-
-    Devuelve (bajo, alto) en 0-100, o None si el modelo no trae bootstrap.
+    Devuelve None si el modelo no trae bootstrap.
     """
     boot = model.get("bootstrap")
     if not boot or not boot.get("replicas"):
@@ -123,8 +119,83 @@ def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
         probabilidades.append(_sigmoid_pct(z))
 
     probabilidades.sort()
+    return probabilidades
+
+
+def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
+                           victima, es_montevideo, balotaje, nivel=95):
+    """
+    Intervalo de confianza percentil para la probabilidad estimada. ES EL QUE SE
+    MUESTRA: la decisión editorial sobre el 50% no se toma con éste, sino con
+    banda_decision() — ver el docstring de esa función.
+
+    Se calcula sobre las réplicas bootstrap guardadas en el JSON: para cada una
+    se evalúa la logística con el mismo vector de features y se toman los
+    percentiles. Sin sklearn ni numpy — es aritmética sobre una lista.
+
+    Devuelve (bajo, alto) en 0-100, o None si el modelo no trae bootstrap.
+    """
+    probabilidades = _probabilidades_bootstrap(
+        model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+        es_montevideo, balotaje)
+    if probabilidades is None:
+        return None
     cola = (100 - nivel) / 2 / 100
     return _percentil(probabilidades, cola), _percentil(probabilidades, 1 - cola)
+
+
+# 1,96: el z de una banda del 95% para la posición del percentil.
+_Z_MC = 1.959964
+
+
+def banda_decision(model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+                   es_montevideo, balotaje, nivel=95):
+    """
+    Extremos CONSERVADORES del intervalo, para decidir si se afirma de qué lado
+    está la mayoría. No se muestran: sólo gobiernan esa decisión.
+
+    Por qué existe. El extremo del intervalo no se conoce, se SIMULA con B
+    réplicas, y esa simulación tiene su propio error. Con B=1.000 el percentil
+    97,5 de un perfil cualquiera se mueve alrededor de un punto y medio de una
+    corrida a otra. Eso es irrelevante para mostrar "15% a 49%", pero es
+    decisivo para una regla binaria que compara ese extremo contra 50: un perfil
+    cuyo extremo verdadero está en 49,5 cae de un lado o del otro según la
+    semilla.
+
+    Codex lo midió sobre este mismo artefacto, remuestreando las réplicas
+    guardadas: 54 de los 1.296 perfiles cambian de conclusión en al menos 10% de
+    las corridas simuladas, y 30 en al menos 25%. El caso testigo —mujer de
+    18-29, terciaria incompleta, de izquierda, víctima sin violencia, del
+    interior, voto en blanco— se muestra hoy como 15%-49% y el widget afirma
+    "la amplia mayoría está en contra"; en 456 de 1.000 corridas ese extremo
+    llega a 50 y el texto correcto habría sido el prudente.
+
+    Subir B no arregla esto, sólo lo achica: siempre hay perfiles cuyo extremo
+    verdadero está lo bastante cerca de 50 como para que la simulación no pueda
+    resolver el lado. Lo que corresponde es no exigirle a la simulación una
+    precisión que no tiene.
+
+    Cómo. La posición del percentil q dentro de B réplicas sigue una binomial
+    B(B, q), así que su desvío en escala de cuantil es sqrt(q(1-q)/B). Se corren
+    los dos extremos hacia afuera ese desvío por 1,96 y se toma el percentil
+    resultante. Afirmar mayoría requiere entonces que TODA la banda quede de un
+    lado, no sólo el percentil puntual.
+
+    Devuelve (bajo, alto) en 0-100, o None si el modelo no trae bootstrap.
+    """
+    probabilidades = _probabilidades_bootstrap(
+        model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+        es_montevideo, balotaje)
+    if probabilidades is None:
+        return None
+
+    b = len(probabilidades)
+    cola = (100 - nivel) / 2 / 100
+    q_bajo, q_alto = cola, 1 - cola
+    holgura_bajo = _Z_MC * math.sqrt(q_bajo * (1 - q_bajo) / b)
+    holgura_alto = _Z_MC * math.sqrt(q_alto * (1 - q_alto) / b)
+    return (_percentil(probabilidades, max(0.0, q_bajo - holgura_bajo)),
+            _percentil(probabilidades, min(1.0, q_alto + holgura_alto)))
 
 
 def _percentil(ordenados, q):
@@ -138,6 +209,8 @@ def _percentil(ordenados, q):
     1.296 perfiles eso movía algún extremo redondeado en 358 de ellos, hasta 2,5
     puntos, y cambiaba la decisión sobre el 50% en 8.
     """
+    if not (0.0 <= q <= 1.0):
+        raise ValueError(f"q tiene que estar entre 0 y 1, llegó {q}")
     if not ordenados:
         return None
     if len(ordenados) == 1:
