@@ -32,8 +32,9 @@ Candidatas ya cargadas en `PREGUNTAS`:
 | `humillacion_presos` | `var_231` | Los presos merecen ser humillados |
 
 Todas comparten la escala Likert 1-5, así que el pipeline no cambia. Agregar una
-pregunta nueva es sumar una entrada al dict con `columna`, `titulo`, `afirma` y
-`verbo`; hay un test que verifica que ninguna quede incompleta.
+pregunta nueva es sumar una entrada al dict con `columna`, `enunciado`,
+`titulo`, `titulo_corto` y `afirma`; hay un test que verifica que ninguna quede
+incompleta.
 
 `test_config.py::test_el_json_corresponde_a_la_pregunta_activa` falla a propósito
 si el JSON entrenado no corresponde a `PREGUNTA_ACTIVA`, para que no se publique
@@ -88,12 +89,8 @@ políticamente ni que no haber sido víctima: ofrecérselas al lector le aplicar
 el coeficiente de un grupo definido por otra cosa. Están para que esos casos no
 contaminen las categorías de referencia.
 
-Los sin dato llevan dummy propia (`ideol_no_ubica`, `victima_sin_dato`) en vez
-de caer en la referencia. `victima_sin_dato` queda siempre en cero desde la UI
-—el widget obliga a elegir una opción real— y existe sólo para que los 53 casos
-sin respuesta no se mezclen con quienes contestaron "No", cosa que corría tanto
-la categoría de referencia como la tasa publicada de ese grupo (34,2% contra el
-34,6% real).
+En el caso de víctima, esa mezcla corría tanto la categoría de referencia como
+la tasa publicada del grupo "No fue víctima": 34,2% contra el 34,6% real.
 
 ## Revisión
 
@@ -129,9 +126,9 @@ posibles de la UI**; la peor discrepancia es 0,000000 pp.
 
 ## Caveats
 
-- **El mapeo de `nivel_educativo`** (escala 1-10 → 4 categorías) se hereda del
-  widget IVE y fue **inferido**: el proveedor no entregó codebook. La jerarquía
-  se sostiene, las etiquetas podrían no ser exactas.
+- **La muestra sobre-representa fuerte a los más educados**: 53% tiene terciaria
+  completa y sólo el 1% primaria o menos. El ponderador corrige la estimación
+  poblacional, pero no crea casos donde no los hay.
 - **Sexo y región no son robustos.** La validación ordinal
   (`scripts/validacion_ordinal.py`) muestra que cambian de signo según la
   especificación: el widget **no** permite afirmar que las mujeres apoyen más
