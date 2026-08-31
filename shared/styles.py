@@ -194,6 +194,123 @@ def get_custom_css(mode="light"):
         font-size: 0.85rem;
     }}
 
+    /* Van pegados al número grande, no sueltos con estilos inline. */
+    .result-intervalo {{
+        font-size: 0.9rem;
+        color: {c['text_muted']};
+        margin-top: 0.3rem;
+        margin-bottom: 0.9rem;
+    }}
+
+    .result-neutral {{
+        margin-top: 0.75rem;
+        font-size: 0.85rem;
+        color: {c['text_muted']};
+        line-height: 1.5;
+    }}
+
+    /* ============================================================
+       BARRAS COMPARATIVAS AGRUPADAS (widget de seguridad)
+
+       El widget IVE compara cuatro o cinco grupos por dimensión y le alcanza
+       con tabs de metric cards. El de seguridad tiene dieciséis grupos en siete
+       dimensiones de dos o tres cada una: en tabs quedaban casi vacías, y en
+       una grilla plana quedaban dieciséis cajas grises apiladas sin jerarquía.
+       Con barras el lector compara mirando, no leyendo dieciséis números.
+       ============================================================ */
+    .grupo-bloque {{
+        margin-bottom: 1.4rem;
+    }}
+
+    .grupo-titulo {{
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: {c['text_muted']};
+        margin-bottom: 0.45rem;
+        padding-bottom: 0.3rem;
+        border-bottom: 1px solid {c['border']};
+    }}
+
+    .grupo-fila {{
+        display: grid;
+        grid-template-columns: 12rem 1fr 2.8rem;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.32rem 0;
+    }}
+
+    .grupo-label {{
+        font-size: 0.85rem;
+        color: {c['text']};
+        line-height: 1.3;
+    }}
+
+    .grupo-barra {{
+        position: relative;
+        height: 10px;
+        border-radius: 5px;
+        background: {c['secondary_bg']};
+        overflow: visible;
+    }}
+
+    .grupo-barra-fill {{
+        height: 100%;
+        border-radius: 5px;
+        background: {c['primary']};
+    }}
+
+    /* Marca del promedio nacional: la misma tasa observada, así que la
+       comparación es contra algo del mismo tipo y no contra la estimación
+       ajustada del perfil elegido. */
+    .grupo-barra-ref {{
+        position: absolute;
+        top: -4px;
+        bottom: -4px;
+        width: 1px;
+        background: {c['text']};
+        opacity: 0.55;
+    }}
+
+    .grupo-valor {{
+        font-family: 'IBM Plex Serif', Georgia, serif;
+        font-weight: 700;
+        font-size: 1rem;
+        text-align: right;
+        color: {c['text']};
+        font-variant-numeric: tabular-nums;
+    }}
+
+    .grupo-nota-ref {{
+        font-size: 0.75rem;
+        color: {c['text_muted']};
+        margin-top: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }}
+
+    .grupo-nota-marca {{
+        display: inline-block;
+        width: 1px;
+        height: 12px;
+        background: {c['text']};
+        opacity: 0.55;
+    }}
+
+    @media (max-width: 640px) {{
+        .grupo-fila {{
+            grid-template-columns: 1fr 2.8rem;
+            grid-template-areas: "label valor" "barra barra";
+            gap: 0.3rem 0.6rem;
+            padding: 0.45rem 0;
+        }}
+        .grupo-label {{ grid-area: label; }}
+        .grupo-valor {{ grid-area: valor; }}
+        .grupo-barra {{ grid-area: barra; }}
+    }}
+
     /* ============================================================
        METRIC CARDS (COMPARACIONES)
        ============================================================ */

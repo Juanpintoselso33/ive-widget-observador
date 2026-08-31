@@ -110,6 +110,6 @@ banda = banda_decision(MODEL, *inputs)
 
 render_probability_bar(prob)
 render_result_card(MODEL, prob, colors, intervalo, banda)
-render_comparisons(MODEL, prob, colors)
+render_comparisons(MODEL)
 render_methodology(MODEL)
 render_footer(MODEL)

@@ -187,7 +187,7 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
     tasa_neutral = model.get("prob_neutral_nacional")
     if tasa_neutral is not None:
         neutral_html = (
-            f'<div style="margin-top:8px;font-size:0.85em;color:{colors["text_muted"]};">'
+            f'<div class="result-neutral">'
             f'Aparte, <strong>{tasa_neutral:.0f}%</strong> de los uruguayos no toman '
             f'posición clara sobre el tema y quedan fuera de este cálculo.</div>'
         )
@@ -199,8 +199,7 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
     if intervalo:
         bajo, alto = intervalo
         intervalo_html = (
-            f'<div style="margin-top:-6px;margin-bottom:10px;font-size:0.9em;'
-            f'color:{colors["text_muted"]};">Intervalo de confianza del 95%: '
+            f'<div class="result-intervalo">Intervalo de confianza del 95%: '
             f'entre <strong>{bajo:.0f}%</strong> y <strong>{alto:.0f}%</strong></div>'
         )
 
@@ -253,7 +252,24 @@ GRUPOS_LABEL = {
 }
 
 
-def render_comparisons(model, prob, colors):
+# Las dimensiones, y dentro de cada una el orden que tiene sentido leer
+# (izquierda a derecha, educación y edad de menor a mayor), no el orden por
+# valor: ordenar los dieciséis por magnitud daba un ranking sin estructura, en
+# el que "mujeres" quedaba pegado a "interior" por casualidad aritmética.
+GRUPOS_ORDEN = [
+    ("Ideología", ["izquierda", "derecha"]),
+    ("Voto en el balotaje de 2024", ["voto_orsi", "voto_delgado", "voto_blanco_no_voto"]),
+    ("Victimización", ["victima", "no_victima"]),
+    ("Nivel educativo", ["educ_secundaria", "educ_ter_incompleta", "educ_ter_completa"]),
+    ("Edad", ["edad_18_29", "edad_60_plus"]),
+    ("Sexo", ["hombres", "mujeres"]),
+    ("Región", ["montevideo", "interior"]),
+]
+
+
+def render_comparisons(model):
+    # Sin `prob` ni `colors`: las tasas por grupo son descriptivas y ya no se
+    # restan contra la estimación del perfil, y el color no codifica nada acá.
     st.markdown('<hr class="editorial-divider">', unsafe_allow_html=True)
     st.markdown('<div class="section-header">Qué declaró cada grupo</div>',
                 unsafe_allow_html=True)
@@ -262,34 +278,48 @@ def render_comparisons(model, prob, colors):
     # cosas distintas: un promedio descriptivo contra una predicción que
     # controla por todo lo demás.
     st.markdown(
-        f'<p class="subtitle">Porcentaje que se declaró a favor en cada grupo de '
-        f'la encuesta, sin ajustar por las demás características.</p>',
+        '<p class="subtitle">Porcentaje que se declaró a favor en cada grupo de '
+        'la encuesta, sin ajustar por las demás características.</p>',
         unsafe_allow_html=True,
     )
 
     stats = model.get("stats_by_group", {})
-    # Se omiten los grupos que el entrenamiento marcó como None (n < 30).
-    visibles = [(k, v) for k, v in stats.items() if v is not None and k in GRUPOS_LABEL]
-    visibles.sort(key=lambda kv: kv[1], reverse=True)
+    nacional = model.get("prob_favor_nacional")
 
-    prob_r = round(prob)
-    for i in range(0, len(visibles), 2):
-        cols = st.columns(2)
-        for col, (clave, valor) in zip(cols, visibles[i:i + 2]):
-            # Misma regla que en la tarjeta de resultado: la brecha se calcula
-            # sobre los porcentajes redondeados que se muestran.
-            valor_r = round(valor)
-            delta = valor_r - prob_r
-            with col:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-label">{GRUPOS_LABEL[clave]}</div>
-                    <div class="metric-value">{valor_r}%</div>
-                    <div class="metric-delta" style="color:{colors['text_muted']};">
-                        de la encuesta
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+    # Una sola llamada a st.markdown en vez de dieciséis: Streamlit envuelve
+    # cada una en su propio contenedor con margen, y eso era buena parte de la
+    # sensación de "bloques sueltos apilados".
+    bloques = []
+    for titulo, claves in GRUPOS_ORDEN:
+        # Se omiten los grupos que el entrenamiento marcó como None (n < 30).
+        filas = [(k, stats[k]) for k in claves
+                 if stats.get(k) is not None and k in GRUPOS_LABEL]
+        if not filas:
+            continue
+        html_filas = "".join(
+            f'<div class="grupo-fila">'
+            f'<div class="grupo-label">{GRUPOS_LABEL[clave]}</div>'
+            f'<div class="grupo-barra">'
+            f'<div class="grupo-barra-fill" style="width:{max(0, min(100, valor)):.1f}%"></div>'
+            + (f'<div class="grupo-barra-ref" style="left:{nacional:.1f}%"></div>'
+               if nacional is not None else "")
+            + f'</div>'
+            f'<div class="grupo-valor">{round(valor)}%</div>'
+            f'</div>'
+            for clave, valor in filas
+        )
+        bloques.append(
+            f'<div class="grupo-bloque">'
+            f'<div class="grupo-titulo">{titulo}</div>{html_filas}</div>'
+        )
+
+    if nacional is not None:
+        bloques.append(
+            f'<div class="grupo-nota-ref"><span class="grupo-nota-marca"></span>'
+            f'La línea marca el promedio nacional ({round(nacional)}%).</div>'
+        )
+
+    st.markdown("".join(bloques), unsafe_allow_html=True)
 
 
 def render_methodology(model):
