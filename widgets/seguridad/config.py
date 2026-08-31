@@ -132,43 +132,53 @@ EDUC_UI_TO_CODE = {
     "Terciaria completa o más": 3,
 }
 
-# Autoubicación en la escala de 0 a 10, en los seis tramos que pidió Tomer
-# (WhatsApp, 31/8/2026).
+# Autoubicación en la escala de 0 a 10, en siete tramos simétricos.
 #
-# DOS COSAS QUE NO CIERRAN CON LO QUE ÉL ESCRIBIÓ, y quedan asentadas acá
-# porque cambian lo que significa cada etiqueta:
+# Parte del esquema que pidió Tomer (WhatsApp, 31/8/2026) —extrema izquierda,
+# izquierda, centroizquierda, centroderecha, derecha, extrema derecha— y le
+# agrega "Centro", que es lo que falta al pasarlo a la escala real.
 #
-# 1. Él propuso los tramos sobre una escala de 1 a 10. La del cuestionario va
-#    de 0 a 10 y el 0 está usado: 33 personas de la muestra de modelado se
-#    ubicaron ahí. Como su tramo más a la izquierda es "1 a 2", el 0 quedaba
-#    sin categoría. Se lo mete en "Izquierda extrema", que es la única lectura
-#    razonable del extremo de la escala.
+# POR QUÉ NO SE USA SU REPARTO TAL CUAL. Él lo armó sobre una escala de 1 a 10.
+# La del cuestionario va de 0 a 10, y el enunciado es explícito: "en una escala
+# donde CERO es la extrema izquierda y 10 es la extrema derecha". O sea que el
+# 0 no es un valor residual: es, por definición de la pregunta, el extremo. Su
+# tramo más a la izquierda arranca en 1 y deja afuera justo ese valor.
 #
-# 2. En una escala de 1 a 10 el punto medio es 5,5 y llamar "centroizquierda"
-#    al 5 tiene sentido. En una de 0 a 10 el punto medio es el 5 EXACTO, y es
-#    la respuesta modal: 842 de 2.672 casos, el 32% de la muestra. La etiqueta
-#    "Centroizquierda" reclasifica como inclinado a la izquierda a un tercio
-#    de los encuestados que se pusieron justo en el centro. Se implementa como
-#    él lo pidió; si prefiere llamarlo "Centro", es cambiar el texto de esta
-#    tabla y re-entrenar.
+# Y en una escala de 1 a 10 el punto medio es 5,5, así que llamar
+# "centroizquierda" al 5 cierra; en una de 0 a 10 el 5 es el medio EXACTO y es
+# la respuesta modal (842 de 2.672 casos, el 32%).
 #
-# La referencia es el tramo del 5 por ser el modal: una referencia chica hace
+# POR QUÉ SIETE Y NO SEIS. Con once valores y el 5 solo en el centro, cualquier
+# reparto simétrico tiene que tener una cantidad IMPAR de categorías. Con seis
+# no hay forma: o el extremo izquierdo abarca tres valores contra dos del
+# derecho, o queda uno contra tres. Esa asimetría rompe justamente la
+# comparación en la que se apoya el hallazgo principal —que el extremo derecho
+# se despega— porque compararía una red ancha contra una angosta.
+#
+# Los siete tramos son simétricos alrededor del 5: anchos 2, 2, 1, 1, 1, 2, 2.
+#
+# CAVEAT DE TAMAÑO: "Izquierda extrema" (0-1) tiene 80 casos, el tramo más
+# chico. Es suficiente para entrar en el modelo pero es el número más frágil
+# del gráfico comparativo; conviene no titular con él.
+#
+# La referencia es el Centro por ser el tramo modal: una referencia chica hace
 # que todos los coeficientes se estimen contra pocos casos, que es el problema
 # que ya hubo con "Primaria o menos" y sus 28 casos.
 #
 # "No se ubica" NO se ofrece en la UI. En el entrenamiento esa dummy agrupa a
-# los 80 encuestados que no contestaron la escala, y no contestar una encuesta
-# no es lo mismo que no ubicarse políticamente: ofrecérsela al lector le
-# aplicaría el coeficiente de un grupo definido por otra cosa. Sigue existiendo
-# como predictor —para que esos casos no contaminen la referencia— pero queda
-# siempre en cero desde la interfaz, igual que victima_sin_dato.
+# los 80 encuestados que no contestaron la escala. Y no contestar no es lo
+# mismo que ubicarse en el centro: el cuestionario NO ofrece "no sabe" entre
+# las opciones —son exactamente los once valores— así que un nulo es una
+# pregunta salteada. Sigue existiendo como predictor, para que esos casos no
+# contaminen la referencia, pero queda siempre en cero desde la interfaz.
 IDEOLOGIA_UI_TO_CODE = {
-    "Izquierda extrema (0-2)": 1,
-    "Izquierda (3-4)": 2,
-    "Centroizquierda (5)": 3,      # referencia
-    "Centroderecha (6)": 4,
-    "Derecha (7-8)": 5,
-    "Derecha extrema (9-10)": 6,
+    "Izquierda extrema (0-1)": 1,
+    "Izquierda (2-3)": 2,
+    "Centroizquierda (4)": 3,
+    "Centro (5)": 4,               # referencia
+    "Centroderecha (6)": 5,
+    "Derecha (7-8)": 6,
+    "Derecha extrema (9-10)": 7,
 }
 
 VICTIMA_UI_TO_CODE = {
@@ -197,8 +207,9 @@ PREDICTORES = [
     "edad_30_44", "edad_45_59", "edad_60_plus",
     "es_mujer",
     "educ_ter_incomp", "educ_ter_comp",
-    "ideol_izq_extrema", "ideol_izquierda", "ideol_centroderecha",
-    "ideol_derecha", "ideol_der_extrema", "ideol_no_ubica",
+    "ideol_izq_extrema", "ideol_izquierda", "ideol_centroizq",
+    "ideol_centroderecha", "ideol_derecha", "ideol_der_extrema",
+    "ideol_no_ubica",
     "victima_sin_violencia", "victima_con_violencia", "victima_sin_dato",
     "es_montevideo",
 ]
@@ -223,14 +234,15 @@ ESPEC_CRUDA = {
     # genera dummy. Van explícitos y no como dos umbrales sueltos porque ahora
     # son seis cortes y un umbral no alcanza para describirlos.
     "ideol_tramos": [
-        ["izq_extrema", 0, 2],
-        ["izquierda", 3, 4],
-        ["centroizq", 5, 5],
+        ["izq_extrema", 0, 1],
+        ["izquierda", 2, 3],
+        ["centroizq", 4, 4],
+        ["centro", 5, 5],
         ["centroderecha", 6, 6],
         ["derecha", 7, 8],
         ["der_extrema", 9, 10],
     ],
-    "ideol_referencia": "centroizq",
+    "ideol_referencia": "centro",
     # Códigos crudos de las demás variables.
     "sexo_valores": {"mujer": "Mujer", "hombre": "Hombre"},
     "dpto_montevideo": 1,
@@ -295,7 +307,7 @@ REFERENCIAS = {
     "edad": "18-29 años",
     "sexo": "Hombre",
     "educacion": "Secundaria o menos",
-    "ideologia": "Centroizquierda (5)",
+    "ideologia": "Centro (5)",
     "victima": "No fue víctima",
     "region": "Interior",
 }

@@ -42,7 +42,7 @@ def test_probabilidad_siempre_en_rango(modelo_sintetico):
     """Ningún perfil puede caer fuera de 0-100."""
     import itertools
     for tramo, educ, ideol, vic, mvd, mujer in itertools.product(
-            (1, 2, 3, 4), (1, 2, 3), (1, 2, 3, 4, 5, 6), (1, 2, 3), (0, 1), (0, 1)):
+            (1, 2, 3, 4), (1, 2, 3), range(1, 8), (1, 2, 3), (0, 1), (0, 1)):
         p = predict_probability(
             modelo_sintetico, tramo_edad=tramo, es_mujer=mujer, nivel_educ=educ,
             ideologia=ideol, victima=vic, es_montevideo=mvd,
@@ -78,7 +78,7 @@ class TestBuildFeatures:
         estaría aplicando a un lector el coeficiente de quien no contestó.
         """
         import itertools
-        for vic, ideol in itertools.product((1, 2, 3), (1, 2, 3, 4, 5, 6)):
+        for vic, ideol in itertools.product((1, 2, 3), range(1, 8)):
             f = build_features(**{**perfil_base, "victima": vic,
                                   "ideologia": ideol})
             assert f["victima_sin_dato"] == 0
@@ -86,7 +86,7 @@ class TestBuildFeatures:
 
     def test_la_referencia_ideologica_deja_todas_las_dummies_en_cero(self, perfil_base):
         """
-        La referencia es el tercer tramo (Centroizquierda, el 5 de la escala).
+        La referencia es el Centro (el 5 de la escala), el cuarto tramo.
         Si alguien reordena IDEOLOGIA_UI_TO_CODE sin tocar ESPEC_CRUDA, este
         test se pone rojo — que es lo que tiene que pasar: los códigos de la UI
         y los tramos de la especificación son posicionales entre sí.

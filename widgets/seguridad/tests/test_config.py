@@ -53,7 +53,7 @@ class TestMapeosUI:
     @pytest.mark.parametrize("mapeo,esperados", [
         ("EDAD_UI_TO_CODE", {1, 2, 3, 4}),
         ("EDUC_UI_TO_CODE", {1, 2, 3}),
-        ("IDEOLOGIA_UI_TO_CODE", {1, 2, 3, 4, 5, 6}),
+        ("IDEOLOGIA_UI_TO_CODE", {1, 2, 3, 4, 5, 6, 7}),
         ("VICTIMA_UI_TO_CODE", {1, 2, 3}),
         ("REGION_UI_TO_CODE", {0, 1}),
     ])
@@ -122,9 +122,10 @@ class TestHuellaContrato:
     @pytest.mark.parametrize("clave,valor", [
         ("educ_colapso", {1: 1, 2: 2, 3: 3, 4: 3, 5: 3, 6: 3, 7: 3, 8: 3, 9: 3, 10: 3}),
         ("edad_cortes", [17, 34, 49, 64, 120]),
-        ("ideol_tramos", [["izq_extrema", 0, 3], ["izquierda", 4, 4],
-                          ["centroizq", 5, 5], ["centroderecha", 6, 6],
-                          ["derecha", 7, 8], ["der_extrema", 9, 10]]),
+        ("ideol_tramos", [["izq_extrema", 0, 2], ["izquierda", 3, 3],
+                          ["centroizq", 4, 4], ["centro", 5, 5],
+                          ["centroderecha", 6, 6], ["derecha", 7, 8],
+                          ["der_extrema", 9, 10]]),
         ("ideol_referencia", "derecha"),
         ("dpto_montevideo", 19),
         ("sexo_mujer", "F"),

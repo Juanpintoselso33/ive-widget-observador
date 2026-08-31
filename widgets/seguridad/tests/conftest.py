@@ -48,7 +48,7 @@ def perfil_base():
         tramo_edad=1,      # 18-29
         es_mujer=0,        # hombre
         nivel_educ=1,      # secundaria o menos
-        ideologia=3,       # centroizquierda (el 5 de la escala): la referencia
+        ideologia=4,       # Centro (el 5 de la escala): la referencia
         victima=1,         # no fue víctima
         es_montevideo=0,   # interior
     )

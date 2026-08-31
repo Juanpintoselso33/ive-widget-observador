@@ -62,14 +62,15 @@ def test_los_tramos_ideologicos_salen_de_la_especificacion(base_minima, monkeypa
     test se mantiene sobre los tramos ideológicos.
     """
     normal = tm.preparar(base_minima)
-    # ideologia 0 -> izquierda extrema (0-2); 5 -> centroizquierda (referencia)
+    # ideologia 0 -> izquierda extrema (0-1); 5 -> Centro (referencia)
     assert normal.loc[0, "ideol_izq_extrema"] == 1
     assert normal.loc[1, "ideol_izq_extrema"] == 0
 
     espec = {**config.ESPEC_CRUDA,
-             "ideol_tramos": [["izq_extrema", 9, 10], ["izquierda", 3, 4],
-                              ["centroizq", 5, 5], ["centroderecha", 6, 6],
-                              ["derecha", 7, 8], ["der_extrema", 0, 2]]}
+             "ideol_tramos": [["izq_extrema", 9, 10], ["izquierda", 2, 3],
+                              ["centroizq", 4, 4], ["centro", 5, 5],
+                              ["centroderecha", 6, 6], ["derecha", 7, 8],
+                              ["der_extrema", 0, 1]]}
     monkeypatch.setattr(config, "ESPEC_CRUDA", espec)
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
 
@@ -87,9 +88,10 @@ def test_un_valor_de_la_escala_sin_tramo_aborta(base_minima, monkeypatch):
     o sea silenciosamente dentro de la referencia. Tiene que abortar.
     """
     espec = {**config.ESPEC_CRUDA,
-             "ideol_tramos": [["izq_extrema", 0, 2], ["izquierda", 3, 4],
-                              ["centroizq", 5, 5], ["centroderecha", 6, 6],
-                              ["derecha", 7, 7], ["der_extrema", 9, 10]]}
+             "ideol_tramos": [["izq_extrema", 0, 1], ["izquierda", 2, 3],
+                              ["centroizq", 4, 4], ["centro", 5, 5],
+                              ["centroderecha", 6, 6], ["derecha", 7, 7],
+                              ["der_extrema", 9, 10]]}
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
     df = base_minima.copy()
     df.loc[0, "var_242 | Autoubicacion izquierda-derecha (0-10)"] = 8
@@ -162,9 +164,14 @@ def test_la_cobertura_no_cuenta_perfiles_no_elegibles():
     # (597 observados, 5 con 30+) también pasaban las dos comprobaciones de
     # arriba. Si la base cambia hay que actualizar estos números a propósito,
     # que es justamente la idea.
-    assert cob["posibles"] == 864
-    assert cob["observados"] == 531, (
+    #
+    # Con siete tramos ideológicos simétricos y sin balotaje: 1.008 perfiles
+    # posibles, 573 observados y 7 con 30 casos o más. La versión con balotaje
+    # daba 566 de 1.296 y sólo 4 con 30+, así que la cobertura relativa mejoró
+    # (57% contra 44%) aunque haya más categorías.
+    assert cob["posibles"] == 1008
+    assert cob["observados"] == 573, (
         "la cobertura cambió: si es por un cambio de base, actualizar el "
         "número; si no, revisar que no se estén contando perfiles no elegibles"
     )
-    assert cob["con_30_o_mas"] == 9
+    assert cob["con_30_o_mas"] == 7

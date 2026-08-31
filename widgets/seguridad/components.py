@@ -366,11 +366,13 @@ haber caído en 51% con otra simulación, así que para afirmar que la mayoría 
 de un lado se exige un margen un poco más ancho que el que se muestra. Cuando el
 extremo queda pegado al 50%, el widget prefiere no afirmar.
 
-**Sobre la escala ideológica.** Va de 0 a 10, así que **el 5 es el punto medio
-exacto** y es la respuesta más elegida: un tercio de los encuestados se ubica
-ahí. Las etiquetas de los seis tramos son una convención editorial, no una
-medición: quien se pone en el 5 está diciendo "en el medio", no "un poco a la
-izquierda".
+**Sobre la escala ideológica.** La pregunta fue: *"en una escala donde cero es
+la extrema izquierda y 10 es la extrema derecha, ¿dónde se ubicaría usted?"*.
+Va de 0 a 10, así que **el 5 es el punto medio exacto**, y es la respuesta más
+elegida: un tercio de los encuestados se ubica ahí. Los siete tramos son
+simétricos alrededor de ese centro, para que "extrema izquierda" y "extrema
+derecha" abarquen lo mismo y se puedan comparar. El más chico es *Izquierda
+extrema (0-1)*, con 80 casos: es el número más frágil de esta página.
 
 **Qué sostiene y qué no.** Estimado de otra manera —sobre la escala completa de
 acuerdo, sin excluir a los neutrales— el modelo mantiene los efectos grandes:
@@ -380,11 +382,11 @@ estudios terciarios y los mayores de 60. Haber sido víctima de un delito con
 violencia también aguanta.
 
 En cambio **no son robustos el efecto del sexo, el de la región, el contraste
-entre 30-44 y 18-29 años, ni los dos tramos del medio de la escala
+entre 30-44 y 18-29 años, ni los dos tramos de la derecha moderada
 (centroderecha y derecha)**: cambian de signo según cómo se estime. O sea que
 este widget no permite afirmar que las mujeres apoyen más que los varones, ni
-Montevideo más que el interior, ni ordenar con confianza el centro de la escala
-ideológica. Lo que sí queda firme son los extremos.
+Montevideo más que el interior, ni ordenar con confianza esa zona de la escala.
+Lo que sí queda firme son los extremos y la izquierda.
 
 Las tasas por grupo que se muestran abajo son descriptivas de la muestra, no
 efectos ajustados: mezclan el efecto propio del grupo con el de todo lo demás
