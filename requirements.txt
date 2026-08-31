@@ -12,5 +12,7 @@ numpy>=1.24.0
 scikit-learn>=1.3.0
 
 # Opcional: para desarrollo local
-# statsmodels>=0.14.0
+# Validacion ordinal (scripts/validacion_ordinal.py), no corre en produccion
+statsmodels>=0.14.0
+scipy>=1.10.0
 # openpyxl>=3.1.0  # Si la base está en Excel

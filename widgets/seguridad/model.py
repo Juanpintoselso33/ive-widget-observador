@@ -57,6 +57,8 @@ def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima,
         "es_montevideo": int(es_montevideo),
         "bal_orsi": int(balotaje == 1),
         "bal_delgado": int(balotaje == 2),
+        # Siempre 0 desde la UI, igual que las otras dummies de "sin dato".
+        "bal_no_recuerda": 0,
     }
 
 

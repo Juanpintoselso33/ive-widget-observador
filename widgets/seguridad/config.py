@@ -54,7 +54,7 @@ PREGUNTAS = {
     "pena_muerte": {
         "columna": "var_229 | Pena de muerte por homicidio",
         "enunciado": "Una persona condenada por homicidio debería recibir la pena de muerte",
-        "titulo": "¿Cuál es tu probabilidad de estar de acuerdo con la pena de muerte?",
+        "titulo": "¿Quiénes apoyan la pena de muerte en Uruguay?",
         "titulo_corto": "¿Apoyás la pena de muerte?",
         "afirma": "estar de acuerdo con que una persona condenada por homicidio reciba la pena de muerte",
     },
@@ -62,7 +62,7 @@ PREGUNTAS = {
         "columna": "var_230 | Cadena perpetua tres delitos",
         "enunciado": ("Una persona que ha sido condenada por tres delitos graves debería "
                       "recibir cadena perpetua sin posibilidad de libertad condicional"),
-        "titulo": "¿Cuál es tu probabilidad de estar de acuerdo con la cadena perpetua?",
+        "titulo": "¿Quiénes apoyan la cadena perpetua en Uruguay?",
         "titulo_corto": "¿Apoyás la cadena perpetua?",
         "afirma": ("estar de acuerdo con la cadena perpetua sin libertad condicional "
                    "para quien fue condenado por tres delitos graves"),
@@ -70,14 +70,14 @@ PREGUNTAS = {
     "aumentar_penas": {
         "columna": "var_228 | Aumentar penas todos los delitos",
         "enunciado": "Se deberían aumentar las penas para todos los delitos",
-        "titulo": "¿Cuál es tu probabilidad de estar de acuerdo con aumentar las penas?",
+        "titulo": "¿Quiénes apoyan aumentar las penas en Uruguay?",
         "titulo_corto": "¿Apoyás aumentar las penas?",
         "afirma": "estar de acuerdo con que se aumenten las penas para todos los delitos",
     },
     "politico_mano_dura": {
         "columna": "var_233 | Votaria politico de mano dura",
         "enunciado": "Votaría a un político que promoviera castigos más duros para los delincuentes",
-        "titulo": "¿Cuál es tu probabilidad de votar a un político de mano dura?",
+        "titulo": "¿Quiénes votarían a un político de mano dura?",
         "titulo_corto": "¿Votarías mano dura?",
         "afirma": "votar a un político que promueva castigos más duros para los delincuentes",
     },
@@ -85,7 +85,7 @@ PREGUNTAS = {
         "columna": "var_231 | Presos merecen humillacion",
         "enunciado": ("Quienes están presos merecen la humillación, intimidación y "
                       "degradación que allí puedan recibir"),
-        "titulo": "¿Cuál es tu probabilidad de estar de acuerdo con esta afirmación?",
+        "titulo": "¿Quiénes creen que los presos merecen humillación?",
         "titulo_corto": "¿Los presos merecen humillación?",
         "afirma": ("estar de acuerdo con que quienes están presos merecen la humillación, "
                    "intimidación y degradación que allí puedan recibir"),
@@ -163,10 +163,16 @@ REGION_UI_TO_CODE = {
 # le faltaba: mejora la discriminación (AUC 0,748 -> 0,752) y sobre todo evita
 # atribuirle a la ideología declarada un efecto que en parte es del voto.
 #
-# La referencia es "blanco, anulado o no votó", y no es una categoría de
-# descarte: es justamente el grupo MÁS punitivo de la muestra. Tanto los
-# votantes de Orsi (OR 0,48) como los de Delgado (OR 0,65) apoyan menos la pena
-# de muerte que quienes no eligieron ninguno.
+# La referencia es "blanco, anulado o no votó" (códigos 3 y 4), y no es una
+# categoría de descarte: es justamente el grupo MÁS punitivo de la muestra.
+# Tanto los votantes de Orsi como los de Delgado apoyan menos la pena de muerte
+# que quienes no eligieron ninguno.
+#
+# Los 153 que NO RECUERDAN a quién votaron (código 5) llevan dummy propia y no
+# entran en esa referencia: no acordarse no es lo mismo que haber votado en
+# blanco, y meterlos juntos hacía que la etiqueta publicada dijera una cosa y
+# el grupo fuera otra. Como ideol_no_ubica y victima_sin_dato, la UI no la
+# ofrece y queda siempre en cero.
 BALOTAJE_UI_TO_CODE = {
     "Orsi": 1,
     "Delgado": 2,
@@ -185,7 +191,7 @@ PREDICTORES = [
     "ideol_izquierda", "ideol_derecha", "ideol_no_ubica",
     "victima_sin_violencia", "victima_con_violencia", "victima_sin_dato",
     "es_montevideo",
-    "bal_orsi", "bal_delgado",
+    "bal_orsi", "bal_delgado", "bal_no_recuerda",
 ]
 
 # `victima_sin_dato` existe para que los 53 casos sin respuesta no se mezclen
@@ -193,6 +199,39 @@ PREDICTORES = [
 # publica del grupo "No fue víctima"—, pero en la UI queda siempre en cero: el
 # widget obliga a elegir una de las tres opciones reales. Es un predictor de
 # entrenamiento, no de interacción.
+
+def huella_contrato():
+    """
+    Huella de TODO el contrato entre la configuración y el modelo entrenado.
+
+    Verificar sólo que no falten predictores es un chequeo de subconjunto y deja
+    pasar el caso peligroso: que un nombre de dummy siga existiendo pero
+    signifique otra cosa. Pasó de verdad al colapsar educación de cuatro
+    categorías a tres — `educ_ter_incomp` sobrevivió con el mismo nombre y otro
+    código detrás, así que un JSON viejo habría cargado sin protestar y la
+    inferencia habría aplicado coeficientes de otra codificación.
+
+    Por eso la huella incluye los mapeos de la UI y las referencias, no sólo los
+    nombres: si cambia la semántica de una categoría, cambia el hash.
+    """
+    import hashlib
+    import json as _json
+    material = _json.dumps({
+        "pregunta": PREGUNTA_ACTIVA,
+        "columna": PREGUNTA["columna"],
+        "predictores": PREDICTORES,
+        "edad": EDAD_UI_TO_CODE,
+        "educacion": EDUC_UI_TO_CODE,
+        "ideologia": IDEOLOGIA_UI_TO_CODE,
+        "victima": VICTIMA_UI_TO_CODE,
+        "region": REGION_UI_TO_CODE,
+        "balotaje": BALOTAJE_UI_TO_CODE,
+        "likert": LIKERT_MAP,
+        "favor": list(LIKERT_FAVOR),
+        "contra": list(LIKERT_CONTRA),
+    }, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
+
 
 REFERENCIAS = {
     "edad": "18-29 años",

@@ -1,7 +1,7 @@
 # Widget de seguridad pública — El Observador
 
-Estima la probabilidad de apoyar una medida punitiva según el perfil de quien lo
-usa. Mismo molde que el widget IVE: regresión logística ponderada, coeficientes
+Estima qué proporción de las personas con determinadas características apoya
+una medida punitiva. Mismo molde que el widget IVE: regresión logística ponderada, coeficientes
 serializados a JSON, inferencia en Python puro.
 
 Pedido por Tomer Urwicz (19/8/2026) como contraparte del widget del IVE, para
@@ -130,8 +130,8 @@ posibles de la UI**; la peor discrepancia es 0,000000 pp.
   completa y sólo el 1% primaria o menos. El ponderador corrige la estimación
   poblacional, pero no crea casos donde no los hay.
 - **Sexo y región no son robustos.** La validación ordinal
-  (`scripts/validacion_ordinal.py`) muestra que cambian de signo según la
-  especificación: el widget **no** permite afirmar que las mujeres apoyen más
+  (`scripts/validacion_ordinal.py`) da 12/16 signos coincidentes y muestra que
+  cambian de signo según la especificación: el widget **no** permite afirmar que las mujeres apoyen más
   que los varones, ni Montevideo más que el interior. Los factores grandes
   —educación, edad, ideología, víctima con violencia— sí se mantienen.
 - **Pseudo-R² de McFadden ≈ 0,17**, bastante menor que el 0,37 del IVE. Es
@@ -139,6 +139,9 @@ posibles de la UI**; la peor discrepancia es 0,000000 pp.
   equivalente. Conviene decirlo, no maquillarlo.
 - **Sin errores estándar ni p-valores**: Ridge no los provee analíticamente, y
   los pesos se tratan como frecuencias.
+- **Muchos perfiles no existen en la muestra.** Las combinaciones posibles son
+  1.296 contra 2.672 casos con postura definida: buena parte se estima por
+  extrapolación aditiva, no por observación. Está advertido en la UI.
 
 ## Decisión de diseño: el color no valora
 

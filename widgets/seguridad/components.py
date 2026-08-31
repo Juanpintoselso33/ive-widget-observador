@@ -63,7 +63,7 @@ def render_header(model):
     st.markdown(
         '<p class="subtitle">Basado en la encuesta de El Observador sobre seguridad '
         'pública de mayo de 2026, entre uruguayos <em>con opinión formada</em> sobre '
-        'el tema. Seleccioná tus características:</p>',
+        'el tema. Elegí un perfil:</p>',
         unsafe_allow_html=True,
     )
 
@@ -143,7 +143,7 @@ def render_probability_bar(prob):
     """, unsafe_allow_html=True)
 
 
-def render_result_card(model, prob, colors, prob_neutral=None):
+def render_result_card(model, prob, colors):
     color, texto = interpretar(prob, colors)
 
     # La diferencia se calcula sobre los valores YA redondeados que ve el
@@ -164,23 +164,24 @@ def render_result_card(model, prob, colors, prob_neutral=None):
     if tasa_neutral is not None:
         neutral_html = (
             f'<div style="margin-top:8px;font-size:0.85em;color:{colors["text_muted"]};">'
-            f'Aparte, <strong>{tasa_neutral:.0f}%</strong> de los uruguayos no toma '
-            f'posición clara sobre el tema y queda fuera de este cálculo.</div>'
+            f'Aparte, <strong>{tasa_neutral:.0f}%</strong> de los uruguayos no toman '
+            f'posición clara sobre el tema y quedan fuera de este cálculo.</div>'
         )
 
     posicion = "por encima" if diff > 0 else "por debajo" if diff < 0 else "igual"
     brecha = (
-        f"{arrow} tu perfil está {abs(diff)}pp {posicion}"
-        if diff else "= tu perfil coincide con el promedio"
+        f"{arrow} este perfil está {abs(diff)}pp {posicion}"
+        if diff else "= este perfil coincide con el promedio"
     )
 
     st.markdown(f"""
     <div class="result-card">
         <div class="result-number" style="color: {color};">{prob_r}%</div>
         <div class="result-text">
-            Probabilidad de {model.get("pregunta_afirma", PREGUNTA["afirma"])},
-            <em>entre quienes tienen postura definida</em>.<br>
-            <strong style="color: {color};">{texto}</strong> según tus características.
+            El modelo estima que, entre quienes tienen estas características y
+            <em>postura definida</em>, ese es el porcentaje que declara
+            {model.get("pregunta_afirma", PREGUNTA["afirma"])}.<br>
+            <strong style="color: {color};">{texto}</strong>
         </div>
         <div class="result-nacional">
             Promedio nacional:
@@ -239,7 +240,7 @@ def render_comparisons(model, prob, colors):
                     <div class="metric-label">{GRUPOS_LABEL[clave]}</div>
                     <div class="metric-value">{valor_r}%</div>
                     <div class="metric-delta" style="color:{colors['text_muted']};">
-                        {'+' if delta > 0 else ''}{delta}pp vs. tu perfil
+                        {'+' if delta > 0 else ''}{delta}pp vs. este perfil
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -268,6 +269,12 @@ Son **correlaciones estadísticas de una encuesta, no predicciones sobre una
 persona concreta ni relaciones de causa y efecto**. Dos personas con el mismo
 perfil pueden opinar distinto: el modelo describe tendencias de grupo, y las
 separa de manera moderada.
+
+**Cuidado con los perfiles poco frecuentes.** Las combinaciones posibles son
+1.296 y la encuesta tiene 2.672 casos con postura definida, así que muchas
+combinaciones no aparecen en los datos: el modelo las estima combinando
+información de perfiles parecidos, no observándolas. Cuanto más inusual sea la
+combinación elegida, más extrapolación hay detrás del número.
 
 **Qué sostiene y qué no.** Los factores que más pesan —nivel educativo, edad y
 autoubicación ideológica— se mantienen estables cuando se estima el modelo de

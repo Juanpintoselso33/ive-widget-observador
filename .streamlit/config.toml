@@ -10,7 +10,10 @@ secondaryBackgroundColor = "#F2F2F2"
 textColor = "#121212"
 
 [theme.dark]
-primaryColor = "#475ED1"
+# Aclarado por contraste: #475ED1 daba 3,0 contra las tarjetas y AA pide 4,5.
+# Tiene que coincidir con DARK_COLORS["primary"] de shared/config.py, o los
+# controles nativos de Streamlit quedan con el color viejo.
+primaryColor = "#7B8FE8"
 backgroundColor = "#0E1117"
 secondaryBackgroundColor = "#1A1C2E"
 textColor = "#E8E8E8"

@@ -32,7 +32,7 @@ from sklearn.model_selection import StratifiedKFold
 from widgets.seguridad.config import (
     DATA_FILE, MODEL_COEFFICIENTS_PATH, PREGUNTA, PREGUNTA_ACTIVA,
     LIKERT_MAP, LIKERT_FAVOR, LIKERT_CONTRA, LIKERT_NEUTRAL,
-    PONDERADOR, PREDICTORES, REFERENCIAS,
+    PONDERADOR, PREDICTORES, REFERENCIAS, huella_contrato,
 )
 
 RANDOM_STATE = 42
@@ -100,32 +100,68 @@ def preparar(df):
 
     problemas = []
 
+    # Los NULOS se cuentan como problema, no sólo los valores raros: un nulo
+    # cae silenciosamente en la categoría de referencia, que es exactamente la
+    # conversión invisible que esta validación quiere evitar.
+    def revisar_nulos(col, etiqueta):
+        n = int(df[col].isna().sum())
+        if n:
+            problemas.append(f"'{etiqueta}' tiene {n} valor(es) nulo(s), "
+                             "que caerían en la categoría de referencia")
+
     sexos = set(df["sexo"].dropna().unique()) - {"Hombre", "Mujer"}
     if sexos:
         problemas.append(f"valores de 'sexo' no esperados: {sorted(sexos)}")
+    revisar_nulos("sexo", "sexo")
 
     educ = set(df["nivel_educativo"].dropna().unique()) - set(EDUC_COLAPSO)
     if educ:
         problemas.append(f"códigos de 'nivel_educativo' fuera de 1-10: {sorted(educ)}")
+    revisar_nulos("nivel_educativo", "nivel_educativo")
+
+    # dpto_ech no se validaba: cualquier código raro o nulo se volvía "Interior".
+    dptos = set(df["dpto_ech"].dropna().unique()) - set(range(1, 20))
+    if dptos:
+        problemas.append(f"códigos de 'dpto_ech' fuera de 1-19: {sorted(dptos)}")
+    revisar_nulos("dpto_ech", "dpto_ech")
+
+    # IdBalotaje sólo se exigía como columna: un código nuevo caía en la
+    # referencia sin avisar.
+    bal = set(df["IdBalotaje"].dropna().unique()) - {1, 2, 3, 4, 5}
+    if bal:
+        problemas.append(f"códigos de 'IdBalotaje' fuera de 1-5: {sorted(bal)}")
+    revisar_nulos("IdBalotaje", "IdBalotaje")
 
     ideol = df["var_242 | Autoubicacion izquierda-derecha (0-10)"].dropna()
     fuera = ideol[(ideol < 0) | (ideol > 10)]
     if len(fuera):
         problemas.append(f"autoubicación fuera de 0-10: {len(fuera)} casos")
 
-    vic = set(df["var_241 | Victima de delito ultimos 12 meses"].dropna().unique())
-    vic_raros = {v for v in vic
-                 if "violencia" not in str(v).lower() and str(v).strip().lower() != "no"}
+    # Dominio CERRADO, no "cualquier texto que contenga violencia": algo como
+    # "Sí, violencia desconocida" pasaba la validación y después se codificaba
+    # como "No".
+    vic_validos = {"no", "sí  sin violencia", "sí  con violencia",
+                   "si  sin violencia", "si  con violencia",
+                   "sí sin violencia", "sí con violencia"}
+    vic = {str(v).strip().lower()
+           for v in df["var_241 | Victima de delito ultimos 12 meses"].dropna().unique()}
+    vic_raros = vic - vic_validos
     if vic_raros:
         problemas.append(f"respuestas de victimización no esperadas: {sorted(vic_raros)}")
 
+    # La edad SÍ es un aviso y no un error: los outliers se pasan a NaN a
+    # propósito (la encuesta trae años de nacimiento cargados como edad), pero
+    # después caen en el tramo de referencia, así que se reporta cuántos son.
     edades = df["edad"].dropna()
-    if len(edades[(edades < 18) | (edades > 110)]):
-        n_out = len(edades[(edades < 18) | (edades > 110)])
-        print(f"  aviso: {n_out} edad(es) fuera de 18-110, se pasan a NaN")
+    n_out = int(len(edades[(edades < 18) | (edades > 110)]))
+    if n_out:
+        print(f"  aviso: {n_out} edad(es) fuera de 18-110 pasan a NaN y caen "
+              f"en el tramo de referencia (18-29)")
+    revisar_nulos("edad", "edad")
 
-    if df[PONDERADOR].isna().any() or (df[PONDERADOR] <= 0).any():
-        problemas.append("hay ponderadores nulos o no positivos")
+    w = df[PONDERADOR]
+    if w.isna().any() or (w <= 0).any() or not np.isfinite(w.dropna()).all():
+        problemas.append("hay ponderadores nulos, no positivos o no finitos")
 
     if problemas:
         raise SystemExit(
@@ -216,6 +252,7 @@ def preparar(df):
     # punitivo, no un residuo.
     df["bal_orsi"] = (df["IdBalotaje"] == 1).astype(int)
     df["bal_delgado"] = (df["IdBalotaje"] == 2).astype(int)
+    df["bal_no_recuerda"] = (df["IdBalotaje"] == 5).astype(int)
 
     return df
 
@@ -338,7 +375,9 @@ def main():
         "educ_ter_completa": df["educ_ter_comp"] == 1,
         "voto_orsi": df["bal_orsi"] == 1,
         "voto_delgado": df["bal_delgado"] == 1,
-        "voto_blanco_no_voto": (df["bal_orsi"] == 0) & (df["bal_delgado"] == 0),
+        # Sólo blanco/anulado/no votó: si se define por las dummies en cero se
+        # cuelan los 153 que no recuerdan y la etiqueta publicada miente.
+        "voto_blanco_no_voto": df["IdBalotaje"].isin([3, 4]),
     }
     for nombre, mascara in grupos.items():
         sub = df[mascara & df["a_favor"].notna()]
@@ -349,6 +388,8 @@ def main():
 
     salida = {
         "pregunta_slug": PREGUNTA_ACTIVA,
+        "contrato": huella_contrato(),
+        "predictores": list(PREDICTORES),
         "pregunta_columna": PREGUNTA["columna"],
         "pregunta_titulo": PREGUNTA["titulo"],
         "pregunta_afirma": PREGUNTA["afirma"],
