@@ -280,10 +280,22 @@ perfiles y aun así imprimir porcentajes corridos.
    que explicar. Las tres señales apuntan a lo mismo desde ángulos distintos:
    **es la pregunta más débil de las cuatro y la que menos conviene titular con
    diferencias entre perfiles.**
-2. **Mano dura sobreestima en el extremo bajo.** En el decil de menor apoyo
-   predice 21% y se observa 10%. Los perfiles que salen bajos en esta pregunta
-   salen *menos* bajos de lo que la encuesta muestra. El intervalo publicado
-   cubre esa diferencia, pero la estimación puntual está corrida.
+2. ~~**Mano dura sobreestima en el extremo bajo.**~~ **CORREGIDO: era ruido.**
+   La primera versión de esta sección reportaba el desvío de 11,7 pp del decil
+   más bajo como un sesgo del modelo. No lo es. Al medirlo bien:
+
+   - El **sesgo agregado es cero** en las cuatro preguntas (entre −0,2 y +0,1 pp
+     entre la media predicha y la observada).
+   - La **pendiente de calibración** va de 0,86 a 1,12, con 1,0 como el ideal.
+   - Y sobre todo: simulando 400 veces resultados a partir del propio modelo, el
+     peor desvío por decil que produce el **puro azar** tiene mediana 10,2 pp y
+     percentil 95 de 16,0 pp para mano dura. El 11,7 observado cae adentro. Lo
+     mismo en las otras tres.
+
+   Con un N efectivo de 576, un decil tiene unos 58 casos efectivos: desvíos de
+   diez puntos en un bin son lo esperable. **Las cuatro preguntas están
+   calibradas.** El error fue leer un máximo sobre diez bins como si fuera un
+   contraste, sin compararlo contra su distribución nula.
 
 **Lo que salió limpio:** el sobreajuste es leve (la caída del AUC va de 0,02 a
 0,06); no hay colinealidad (el VIF más alto es 3,49, en los tramos de edad, y el
@@ -294,6 +306,42 @@ no 0% ni 100%.
 **Efecto de diseño:** deff 4,70. Los 2.710 casos con postura definida rinden como
 576 (N de Kish), con ponderadores entre 0,20 y 12,83. Los intervalos del widget
 salen de bootstrap estratificado, así que ya lo incorporan.
+
+### ¿Se puede mejorar? Una palanca real y una falsa
+
+`buscar_especificacion()`, en el mismo script, compara alternativas midiendo
+siempre **fuera de muestra**. Dentro de muestra cualquier variable extra
+"mejora", así que ese número no se mira.
+
+| Especificación | Mano dura | Cadena perp. | Pena muerte | Humillación |
+|---|---:|---:|---:|---:|
+| **Base (la publicada)** | 0,776 | 0,665 | 0,782 | 0,814 |
+| `C` = 1 ó 10 | 0,773 | 0,659 | 0,781 | 0,815 |
+| Ideología lineal 0-10 | 0,775 | **0,682** | **0,747** | 0,815 |
+| + educación × ideología | 0,777 | 0,666 | 0,784 | 0,813 |
+| + tamaño del hogar | 0,782 | 0,665 | 0,779 | 0,815 |
+| + situación laboral | 0,775 | 0,664 | 0,776 | 0,816 |
+| **+ voto de balotaje** | **0,795** | **0,681** | 0,784 | 0,811 |
+
+**El modelo está cerca del techo de lo que dan estas variables.** El
+regularizador no es palanca, las interacciones tampoco, y el tamaño del hogar y
+la situación laboral mueven menos que el ruido.
+
+**La palanca real: reponer el voto de balotaje.** +0,019 en mano dura y +0,016 en
+cadena perpetua, sin costo en las otras dos. Está afuera por decisión editorial
+de Tomer (31/8/2026: *"poner identificación ideológica y sacar partidos
+políticos"*), no por un problema del modelo. Este número es **el precio de esa
+decisión, medido** — si alguna vez se reconsidera, es lo que se gana.
+
+**La palanca falsa: pasar la ideología a escala lineal.** Sube cadena perpetua
+(+0,017) pero **hunde pena de muerte** (−0,035): ahí la relación con la escala no
+es monótona y los siete tramos capturan algo que una recta borra. Arreglar la
+pregunta más débil rompiendo otra no es arreglar nada.
+
+Queda una vía que no se probó y no es del modelo sino del diseño: **cadena
+perpetua tiene 78,6% de apoyo**, y con esa concentración no hay mucho que
+explicar por más variables que se agreguen. Si esa pregunta tiene que discriminar
+mejor, el camino es editorial —elegir otra— no estadístico.
 
 ### Lo que sigue sin hacerse
 

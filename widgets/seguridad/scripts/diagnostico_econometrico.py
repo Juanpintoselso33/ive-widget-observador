@@ -151,3 +151,81 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ============================================================
+# ¿SE PUEDE MEJORAR? — búsqueda de especificación
+# ============================================================
+# Se corre aparte de main(): responde otra pregunta. main() dice cómo anda el
+# modelo que se publica; esto dice si alguna otra especificación anda mejor,
+# medido SIEMPRE fuera de muestra y ponderado. Dentro de muestra cualquier
+# variable extra "mejora": por eso no se mira ese número.
+#
+# Resultado del barrido del 7/9/2026, en AUC fuera de muestra:
+#
+#   especificación          mano dura  cad.perp.  pena mte.  humillación
+#   base (la publicada)         0,776     0,665      0,782       0,814
+#   C=1 / C=10                  0,773     0,659      0,781       0,815
+#   ideología lineal 0-10       0,775     0,682      0,747       0,815
+#   + educación x ideología     0,777     0,666      0,784       0,813
+#   + tamaño del hogar          0,782     0,665      0,779       0,815
+#   + situación laboral         0,775     0,664      0,776       0,816
+#   + VOTO DE BALOTAJE          0,795     0,681      0,784       0,811
+#
+# CONCLUSIÓN. El modelo está cerca del techo de lo que dan estas variables.
+# El regularizador no es palanca, las interacciones tampoco, y el hogar y la
+# situación laboral mueven menos que el ruido.
+#
+# Hay UNA palanca real y una falsa:
+#
+#   · REAL: reponer el voto de balotaje. +0,019 en mano dura y +0,016 en cadena
+#     perpetua, sin costo en las otras dos. Está afuera por decisión editorial
+#     de Tomer (31/8/2026: "poner identificación ideológica y sacar partidos
+#     políticos"), no por un problema del modelo. Es el precio de esa decisión,
+#     medido.
+#
+#   · FALSA: pasar la ideología a escala lineal 0-10. Sube cadena perpetua
+#     (+0,017) pero HUNDE pena de muerte (-0,035): ahí la relación no es
+#     monótona y los siete tramos capturan algo que una recta borra. Mejorar la
+#     pregunta más débil rompiendo otra no es mejorar.
+
+def buscar_especificacion():
+    """Compara especificaciones alternativas por AUC fuera de muestra."""
+    df0 = pd.read_csv(config.DATA_FILE, encoding="utf-8-sig")
+    ide_dummies = [f"ideol_{n}" for n, _, _, _ in config.ESPEC_CRUDA["ideol_tramos"]
+                   if n != config.ESPEC_CRUDA["ideol_referencia"]]
+
+    def auc(d, cols, C):
+        X = d[cols].values.astype(float)
+        y = d["a_favor"].values.astype(int)
+        w = d[config.PONDERADOR].values
+        return roc_auc_score(y, _fuera_de_muestra(X, y, w, C), sample_weight=w)
+
+    print(f"{'pregunta':20s} {'base':>6s} {'ideol lin':>10s} "
+          f"{'+hogar':>8s} {'+balotaje':>10s}")
+    for slug in config.SLUGS:
+        ruta = config.ruta_modelo(slug)
+        if not ruta.exists():
+            continue
+        df = tm.preparar(df0, config.PREGUNTAS[slug]).copy()
+        df["ideol_lineal"] = (
+            df["var_242 | Autoubicacion izquierda-derecha (0-10)"].fillna(5.0).astype(float))
+        df["hogar_3_4"] = df["cant_personas"].between(3, 4).astype(int)
+        df["hogar_5_plus"] = (df["cant_personas"] >= 5).astype(int)
+        b = df["Voto balotaje"]
+        df["bal_orsi"] = (b == "Orsi").astype(int)
+        df["bal_delgado"] = (b == "Delgado").astype(int)
+        d = df[df["a_favor"].notna()]
+
+        base = list(config.PREDICTORES)
+        sin_ide = [p for p in base if p not in ide_dummies]
+        with open(ruta, encoding="utf-8") as f:
+            C = json.load(f)["model_info"]["C"]
+
+        r = [auc(d, base, C),
+             auc(d, sin_ide + ["ideol_lineal"], C),
+             auc(d, base + ["hogar_3_4", "hogar_5_plus"], C),
+             auc(d, base + ["bal_orsi", "bal_delgado"], C)]
+        marca = lambda v: f"{v:.3f}" + ("*" if v > r[0] + 0.005 else " ")
+        print(f"{slug:20s} {r[0]:.3f}  " + " ".join(marca(v) for v in r[1:]))
+    print("\n* = mejora de más de 0,005 sobre la base, fuera de muestra y ponderado.")
