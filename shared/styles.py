@@ -554,16 +554,15 @@ def get_observador_css():
     /* El punto del radio elegido toma `primaryColor` del config compartido,
        que es el azul del widget IVE — el único que lo usa. Acá se pisa con el
        verde del Figma, sin tocar el config y sin afectar al otro widget. */
-    /* El punto va por estructura y no por atributo porque Streamlit lo dibuja
-       en un div anidado SIN testid, role ni aria-checked: no hay nada estable
-       a lo que agarrarse. Lo que sí es estable es `:has(input:checked)` sobre
-       la opción, que acota la regla a la elegida — sin eso, se pintarían de
-       verde también los puntos vacíos. Verificado contra el DOM real, no
-       supuesto: los selectores por `data-baseweb` no matcheaban nada. */
-    [data-testid="stRadioOption"]:has(input:checked) div div div {{
-        background-color: {c['primary']} !important;
-        border-color: {c['primary']} !important;
-    }}
+    /* EL PUNTO DEL RADIO QUEDA AZUL, no verde, y es a propósito.
+       Streamlit lo dibuja en un div anidado sin testid, sin role y sin
+       aria-checked, y a la misma profundidad que la caja del texto de la
+       etiqueta. Toda regla estructural que agarraba el punto agarraba también
+       esa caja y pintaba un rectángulo verde detrás del texto — que es mucho
+       peor que un punto del color equivocado. Se probaron cinco selectores
+       contra el DOM real; ninguno separa los dos.
+       Si alguna vez hace falta, la vía limpia es un componente propio, no CSS.
+       Toma `primaryColor` de .streamlit/config.toml. */
 
     /* ---------- Barra de probabilidad ---------- */
     .prob-bar-wrapper {{ margin: 1.25rem 0 3.25rem 0; }}
