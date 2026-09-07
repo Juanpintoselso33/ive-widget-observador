@@ -256,97 +256,122 @@ Firmes (≥95% de las réplicas): extrema izquierda → izquierda en mano dura
 
 ## Diagnóstico econométrico (7/9/2026)
 
-Lo corre `scripts/diagnostico_econometrico.py`. Responde tres preguntas que el
-pipeline anterior no respondía: si el modelo discrimina **fuera de muestra**, si
-las probabilidades están **calibradas**, y si hay colinealidad o celdas
-degeneradas.
+Lo corre `scripts/diagnostico_econometrico.py`. **Reescrito tras una auditoría
+adversarial de Codex que volteó dos conclusiones que yo había publicado acá.** Lo
+que sigue es la versión corregida; los errores quedan dichos porque el método por
+el que se llegó importa tanto como el número.
 
-La distinción entre las dos primeras importa acá más que de costumbre: el widget
-no publica un ranking, publica **un número**. Un modelo puede ordenar bien los
-perfiles y aun así imprimir porcentajes corridos.
+### El criterio estaba mal elegido
 
-| Pregunta | AUC dentro | AUC 5-fold | Caída | Brier | Peor desvío de calibración |
-|---|---:|---:|---:|---:|---:|
-| Mano dura | 0,811 | **0,776** | +0,034 | 0,163 | **11,7 pp** |
-| Cadena perpetua | 0,723 | **0,665** | +0,059 | 0,156 | 9,7 pp |
-| Pena de muerte | 0,805 | **0,782** | +0,023 | 0,180 | 6,7 pp |
-| Humillación | 0,850 | **0,814** | +0,036 | 0,085 | 5,5 pp |
+El AUC mide **ordenamiento individual**. Este widget no clasifica personas:
+publica **una tasa por perfil**. Dos modelos con el mismo AUC pueden imprimir
+porcentajes muy distintos, y una recalibración monótona puede mejorar mucho el
+producto sin mover el AUC ni un punto. El criterio ahora es **log-loss y Brier**;
+el AUC queda como diagnóstico de cuánta heterogeneidad hay entre perfiles.
 
-**Dos cosas que hay que tener presentes al publicar.**
+| Pregunta | log-loss | Brier | AUC *(diagnóstico)* |
+|---|---:|---:|---:|
+| Mano dura | 0,5244 | 0,16340 | 0,775 |
+| Cadena perpetua | 0,4896 | 0,15586 | 0,665 |
+| Pena de muerte | 0,5373 | 0,17994 | 0,782 |
+| Humillación | 0,2862 | 0,08558 | 0,813 |
 
-1. **Cadena perpetua discrimina poco: AUC fuera de muestra 0,665.** Es
-   coherente con su McFadden de 0,10 y con el Spearman de 0,20 de la validación
-   ordinal. Con 78,6% de apoyo casi todo el mundo está de acuerdo y queda poco
-   que explicar. Las tres señales apuntan a lo mismo desde ángulos distintos:
-   **es la pregunta más débil de las cuatro y la que menos conviene titular con
-   diferencias entre perfiles.**
-2. ~~**Mano dura sobreestima en el extremo bajo.**~~ **CORREGIDO: era ruido.**
-   La primera versión de esta sección reportaba el desvío de 11,7 pp del decil
-   más bajo como un sesgo del modelo. No lo es. Al medirlo bien:
+Todo con **CV anidada**: `C` se elige dentro de cada fold. La versión anterior
+usaba el `C` guardado en el JSON, elegido por CV sobre toda la muestra, así que
+el hiperparámetro había visto los folds de validación. La inflación medida era
+chica —unos +0,002 de AUC— pero el método estaba mal.
 
-   - El **sesgo agregado es cero** en las cuatro preguntas (entre −0,2 y +0,1 pp
-     entre la media predicha y la observada).
-   - La **pendiente de calibración** va de 0,86 a 1,12, con 1,0 como el ideal.
-   - Y sobre todo: simulando 400 veces resultados a partir del propio modelo, el
-     peor desvío por decil que produce el **puro azar** tiene mediana 10,2 pp y
-     percentil 95 de 16,0 pp para mano dura. El 11,7 observado cae adentro. Lo
-     mismo en las otras tres.
+### Mano dura SÍ está descalibrada
 
-   Con un N efectivo de 576, un decil tiene unos 58 casos efectivos: desvíos de
-   diez puntos en un bin son lo esperable. **Las cuatro preguntas están
-   calibradas.** El error fue leer un máximo sobre diez bins como si fuera un
-   contraste, sin compararlo contra su distribución nula.
+Es la corrección que más importa. Yo había afirmado que **las cuatro estaban
+calibradas**, y era falso.
 
-**Lo que salió limpio:** el sobreajuste es leve (la caída del AUC va de 0,02 a
-0,06); no hay colinealidad (el VIF más alto es 3,49, en los tramos de edad, y el
-corte habitual es 5); y no hay separación — las dos celdas por debajo de 50 casos
-(`ideol_izq_extrema` con 37 y `victima_sin_dato` con 37) tienen tasas interiores,
-no 0% ni 100%.
+La secuencia de mis dos errores: primero reporté el peor desvío por decil
+(11,7 pp) como un hallazgo, sin nula. Después construí la nula, vi que caía
+adentro, y concluí que estaba calibrado. Ese segundo paso también estaba mal, por
+dos razones: un **máximo sobre diez bins** tiene poca potencia y es ciego a que
+varios bins se desvíen de forma coordinada; y los bins salían de cuantiles **sin
+ponderar**, con masa entre 157 y 548, o sea que no eran décimos comparables de la
+población.
 
-**Efecto de diseño:** deff 4,70. Los 2.710 casos con postura definida rinden como
-576 (N de Kish), con ponderadores entre 0,20 y 12,83. Los intervalos del widget
-salen de bootstrap estratificado, así que ya lo incorporan.
+Con bins de igual masa ponderada y Hosmer-Lemeshow ponderado con varianza w²,
+calibrado por Monte Carlo:
 
-### ¿Se puede mejorar? Una palanca real y una falsa
+| Pregunta | HL | p | Sesgo agregado | Pendiente | Veredicto |
+|---|---:|---:|---:|---:|---|
+| **Mano dura** | 29,95 | **0,002** | +0,08 pp | 0,94 | **descalibrado** |
+| Cadena perpetua | 11,49 | 0,319 | +0,02 pp | 0,86 | sin descalibración detectable |
+| Pena de muerte | 4,30 | 0,936 | +0,02 pp | 1,12 | sin descalibración detectable |
+| Humillación | 8,31 | 0,527 | −0,15 pp | 0,96 | sin descalibración detectable |
 
-`buscar_especificacion()`, en el mismo script, compara alternativas midiendo
-siempre **fuera de muestra**. Dentro de muestra cualquier variable extra
-"mejora", así que ese número no se mira.
+Fijarse en que **el sesgo agregado y la pendiente de mano dura se ven bien**
+(+0,08 pp y 0,94) y el modelo está descalibrado igual: los desvíos cambian de
+signo a lo largo de la curva y se cancelan en el promedio. Es exactamente el
+patrón que un estadístico agregado no puede ver.
 
-| Especificación | Mano dura | Cadena perp. | Pena muerte | Humillación |
+**Qué significa para la publicación:** en mano dura, los porcentajes por perfil
+tienen un error sistemático que el intervalo no describe, además del error
+aleatorio que sí describe. Es la pregunta que abre el widget.
+
+### Lo que salió limpio
+
+Sobreajuste leve. Sin colinealidad: VIF máximo 3,49 en los tramos de edad, contra
+un corte de 5. Sin separación: las dos celdas por debajo de 50 casos
+(`ideol_izq_extrema` y `victima_sin_dato`, 37 cada una) tienen tasas interiores.
+Efecto de diseño 4,70 — los 2.710 casos rinden como 576.
+
+## ¿Se puede mejorar? Una palanca, y más chica de lo que dije
+
+Se descartaron, sin efecto en ninguna de las cuatro: mover `C`, interacción
+educación × ideología, tamaño del hogar, situación laboral, splines y cuadrática
+en edad, L1, elastic net y Firth. **Modelar el Likert completo PIERDE** contra el
+binario fuera de muestra (entre −0,003 y −0,019 de AUC, y peor Brier) — algo que
+la validación ordinal no había contestado, porque ajusta dentro de muestra y sin
+pesos. Abrir la ideología a escala lineal sube cadena perpetua y **hunde pena de
+muerte**: no es un reemplazo.
+
+Queda el **voto de balotaje**, medido con CV anidada sobre cinco particiones:
+
+| Pregunta | ΔAUC | ΔBrier | Δlog-loss | Gana en |
 |---|---:|---:|---:|---:|
-| **Base (la publicada)** | 0,776 | 0,665 | 0,782 | 0,814 |
-| `C` = 1 ó 10 | 0,773 | 0,659 | 0,781 | 0,815 |
-| Ideología lineal 0-10 | 0,775 | **0,682** | **0,747** | 0,815 |
-| + educación × ideología | 0,777 | 0,666 | 0,784 | 0,813 |
-| + tamaño del hogar | 0,782 | 0,665 | 0,779 | 0,815 |
-| + situación laboral | 0,775 | 0,664 | 0,776 | 0,816 |
-| **+ voto de balotaje** | **0,795** | **0,681** | 0,784 | 0,811 |
+| Mano dura | +0,0230 | −0,01028 | **−0,02045** | **5/5** |
+| Pena de muerte | +0,0033 | −0,00133 | **−0,00458** | **5/5** |
+| Cadena perpetua | +0,0083 | −0,00079 | −0,00038 | 3/5 |
+| Humillación | −0,0077 | +0,00075 | +0,00284 | 1/5 |
 
-**El modelo está cerca del techo de lo que dan estas variables.** El
-regularizador no es palanca, las interacciones tampoco, y el tamaño del hogar y
-la situación laboral mueven menos que el ruido.
+**Mi afirmación anterior —"mejora mano dura y cadena perpetua, sin costo en las
+otras dos"— era incorrecta en las dos mitades.** Con el método corregido: mejora
+claramente **mano dura**, mejora poco pero consistentemente **pena de muerte**,
+es indistinguible de cero en **cadena perpetua**, y **empeora humillación**.
 
-**La palanca real: reponer el voto de balotaje.** +0,019 en mano dura y +0,016 en
-cadena perpetua, sin costo en las otras dos. Está afuera por decisión editorial
-de Tomer (31/8/2026: *"poner identificación ideológica y sacar partidos
-políticos"*), no por un problema del modelo. Este número es **el precio de esa
-decisión, medido** — si alguna vez se reconsidera, es lo que se gana.
+El balotaje está afuera por decisión editorial de Tomer (31/8/2026: *"poner
+identificación ideológica y sacar partidos políticos"*). Sigue siendo la única
+palanca viva, pero alcanza a dos preguntas y no a las cuatro.
 
-**La palanca falsa: pasar la ideología a escala lineal.** Sube cadena perpetua
-(+0,017) pero **hunde pena de muerte** (−0,035): ahí la relación con la escala no
-es monótona y los siete tramos capturan algo que una recta borra. Arreglar la
-pregunta más débil rompiendo otra no es arreglar nada.
+**"Cerca del techo" queda como resumen empírico, no como conclusión demostrada.**
+Comparar muchas especificaciones sobre los mismos folds y quedarse con la mejor
+es en sí una forma de sobreajuste: estos números sirven para descartar palancas,
+no para probar que no hay ninguna.
 
-Queda una vía que no se probó y no es del modelo sino del diseño: **cadena
-perpetua tiene 78,6% de apoyo**, y con esa concentración no hay mucho que
-explicar por más variables que se agreguen. Si esa pregunta tiene que discriminar
-mejor, el camino es editorial —elegir otra— no estadístico.
+Y una vía que no es del modelo: **cadena perpetua tiene 78,6% de apoyo**. Con esa
+concentración no hay mucho que explicar por más variables que se agreguen. Si esa
+pregunta tiene que discriminar mejor, el camino es editorial —elegir otra— no
+estadístico.
 
 ### Lo que sigue sin hacerse
 
 - **Errores estándar design-aware por linealización de Taylor.** El bootstrap
   estratificado respeta los estratos pero la base no trae conglomerados.
+- **Recalibrar mano dura.** Está descalibrada y hoy se publica así. Lo estándar
+  es una recalibración isotónica o de Platt ajustada fuera de muestra, que no
+  toca el ordenamiento y corrige los porcentajes. No está hecha.
+- **Cobertura real de los intervalos.** El bootstrap los genera pero nadie
+  demostró que cubran el 95% frente a error de especificación. Son anchos
+  —mediana de 27,5, 24,5, 29,3 y 12,5 pp según la pregunta, y percentil 90 de
+  hasta 51 pp—, así que el caveat no es teórico.
+- **Validar tasas por celda agrupada.** Las 1.008 combinaciones no se pueden
+  validar una por una: la mediana de casos efectivos por perfil observado es
+  ~2, y sólo entre 45 y 54 celdas llegan a 10. Habría que preagrupar.
 - **Un conjunto de test separado de verdad.** La validación es cruzada, no
   out-of-sample sobre datos reservados; con n efectivo 576 reservar un test
   costaría más de lo que informa.
