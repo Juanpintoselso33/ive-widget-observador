@@ -219,7 +219,13 @@ Fuente y crédito se serializan dentro de cada JSON (`config.FUENTE`,
 > Encuesta El Observador-UMAD-Ferreira sobre seguridad pública, mayo de 2026.
 > Análisis y desarrollo: Juan Ignacio Pintos Elso.
 
-El código de embed, con las alturas medidas para escritorio y celular, está en
+Desplegado en **https://observador-seguridad.streamlit.app/**, una app de Streamlit Cloud aparte de la del IVE pero
+sobre el mismo repo, con *Main file path* `widgets/seguridad/app.py`. Sigue la
+rama `master`: lo que se ve ahí es lo que esté mergeado, no lo que haya en una
+rama de trabajo.
+
+El código de embed, ya con esa URL puesta y con las alturas medidas para
+escritorio y celular, está en
 [`docs/embed/seguridad-widget-embed.html`](../../docs/embed/seguridad-widget-embed.html).
 
 ## Correr

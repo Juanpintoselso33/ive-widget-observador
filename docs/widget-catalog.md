@@ -12,7 +12,7 @@ Registro de widgets disponibles en la plataforma.
 
 | Widget | Slug | Tema | Entry point | Estado |
 |--------|------|------|-------------|--------|
-| Mano dura, perfil por perfil | `seguridad` | Seguridad / punitivismo | `widgets/seguridad/app.py` | 🟡 Listo, sin desplegar |
+| Mano dura, perfil por perfil | `seguridad` | Seguridad / punitivismo | `widgets/seguridad/app.py` | ✅ Activo |
 
 El de seguridad publica **cuatro preguntas a la vez** y el lector elige cuál
 estimar con un selector: votar a un político de mano dura, cadena perpetua por
@@ -20,9 +20,9 @@ tres delitos, pena de muerte por homicidio y humillación a los presos. Hay un
 modelo entrenado por pregunta, en `widgets/seguridad/modelos/`. Ver
 `widgets/seguridad/WIDGET_README.md`.
 
-Para desplegarlo hay que crear una app aparte en Streamlit Cloud con entry point
-`widgets/seguridad/app.py` — el `app.py` de la raíz sirve el widget IVE y es el
-que está publicado hoy.
+Desplegado en **https://observador-seguridad.streamlit.app/** — es una app aparte de la del IVE, sobre el MISMO repo,
+con *Main file path* `widgets/seguridad/app.py`. Sigue la rama `master`, así que
+publica lo que esté mergeado. El `app.py` de la raíz sirve el widget IVE.
 
 Código de embed (nota, portada y variante con altura automática, con las alturas
 medidas): `docs/embed/seguridad-widget-embed.html`.
