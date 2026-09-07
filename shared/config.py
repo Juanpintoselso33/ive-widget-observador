@@ -67,3 +67,36 @@ def get_interpretation(prob, mode="light"):
         if prob >= threshold:
             return colors[color_key], text
     return colors["danger"], "muy probable que te opongas"
+
+
+# ============================================================
+# PALETA "PRODUCTO UY" — el Figma de la diseñadora
+# ============================================================
+# Sale del archivo de Figma "Producto UY" (node 1-2) que pasó Tomer el
+# 7/9/2026. Los valores están MUESTREADOS DE LA IMAGEN, no inspeccionados: el
+# archivo está compartido en modo vista y sin cuenta no se puede abrir el panel
+# de inspección, que es el único lugar donde están los hex exactos y los nombres
+# de las tipografías. Si alguien consigue acceso de edición, conviene reemplazar
+# estos valores por los reales antes de dar el diseño por cerrado.
+#
+# Es una paleta CLARA y sin variante oscura, porque el Figma no la tiene. El
+# widget que la use queda en claro pase lo que pase con el tema del lector.
+OBSERVADOR_COLORS = {
+    # Verde profundo: titular, número del resultado, botones y pill activa.
+    # Ajustado de #14392C: a tamaño de titular leía negro, no verde.
+    "primary": "#1B5E3F",
+    # Naranja: extremo "en contra" del gradiente y las diferencias negativas.
+    "accent": "#E07B39",
+    # Azul del extremo "a favor" del gradiente y de las diferencias positivas.
+    "azul": "#4A63C8",
+    "background": "#FFFFFF",
+    # Gris cálido del bloque de resultado, distinto del blanco de la tarjeta.
+    "secondary_bg": "#F4F4F1",
+    "text": "#1A1A1A",
+    "text_muted": "#6B6B6B",
+    "border": "#E2E2DE",
+    "card_bg": "#FFFFFF",
+    "card_shadow": "rgba(0,0,0,0.08)",
+    # Relleno de los selectores.
+    "input_bg": "#F0F0EE",
+}

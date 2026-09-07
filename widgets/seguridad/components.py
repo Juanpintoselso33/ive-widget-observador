@@ -186,8 +186,8 @@ def render_probability_bar(prob):
     st.markdown(f"""
     <div class="prob-bar-wrapper">
         <div class="prob-endpoints">
-            <span class="prob-endpoint prob-endpoint--contra">EN CONTRA</span>
-            <span class="prob-endpoint prob-endpoint--favor">A FAVOR</span>
+            <span class="prob-endpoint prob-endpoint--contra">En contra</span>
+            <span class="prob-endpoint prob-endpoint--favor">A favor</span>
         </div>
         <div class="prob-container">
             <div class="prob-indicator" style="left: {prob}%;">
@@ -344,10 +344,22 @@ GRUPOS_ORDEN = [
 
 
 def render_comparisons(model):
-    # Sin `prob` ni `colors`: las tasas por grupo son descriptivas y ya no se
-    # restan contra la estimación del perfil, y el color no codifica nada acá.
+    """
+    Comparación por grupos, con el formato del Figma: una solapa por dimensión
+    y adentro una fila de números grandes con su diferencia contra el promedio.
+
+    Reemplaza la lista de dieciséis barras apiladas. El Figma resuelve esto con
+    chips por dimensión —"Por religiosidad", "Por educación"…— y muestra sólo la
+    dimensión elegida, que es lo que evita el muro. Streamlit no tiene chips,
+    pero `st.tabs` con las solapas estilizadas como píldoras da la misma pieza.
+
+    La diferencia contra el promedio nacional se muestra debajo de cada número,
+    como en el Figma, y va en color: azul si el grupo está por encima, naranja
+    si está por debajo. Es la ÚNICA codificación de color del widget, y no
+    valora la medida: dice de qué lado del promedio cae el grupo.
+    """
     st.markdown('<hr class="editorial-divider">', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">Qué declaró cada grupo</div>',
+    st.markdown('<div class="section-header">Comparación con otros grupos</div>',
                 unsafe_allow_html=True)
     # Son tasas OBSERVADAS por grupo, no predicciones ajustadas. Antes se
     # restaban contra la estimación del perfil elegido y ese delta mezclaba dos
@@ -362,40 +374,53 @@ def render_comparisons(model):
     stats = model.get("stats_by_group", {})
     nacional = model.get("prob_favor_nacional")
 
-    # Una sola llamada a st.markdown en vez de dieciséis: Streamlit envuelve
-    # cada una en su propio contenedor con margen, y eso era buena parte de la
-    # sensación de "bloques sueltos apilados".
-    bloques = []
+    # Se arma primero y se dibuja después: una dimensión cuyos grupos estén
+    # todos por debajo del mínimo de casos no debe generar una solapa vacía.
+    dimensiones = []
     for titulo, claves in GRUPOS_ORDEN:
-        # Se omiten los grupos que el entrenamiento marcó como None (n < 30).
-        filas = [(k, stats[k]) for k in claves
-                 if stats.get(k) is not None and k in GRUPOS_LABEL]
-        if not filas:
-            continue
-        html_filas = "".join(
-            f'<div class="grupo-fila">'
-            f'<div class="grupo-label">{GRUPOS_LABEL[clave]}</div>'
-            f'<div class="grupo-barra">'
-            f'<div class="grupo-barra-fill" style="width:{max(0, min(100, valor)):.1f}%"></div>'
-            + (f'<div class="grupo-barra-ref" style="left:{nacional:.1f}%"></div>'
-               if nacional is not None else "")
-            + f'</div>'
-            f'<div class="grupo-valor">{round(valor)}%</div>'
-            f'</div>'
-            for clave, valor in filas
-        )
-        bloques.append(
-            f'<div class="grupo-bloque">'
-            f'<div class="grupo-titulo">{titulo}</div>{html_filas}</div>'
-        )
+        celdas = [(k, stats[k]) for k in claves
+                  if stats.get(k) is not None and k in GRUPOS_LABEL]
+        if celdas:
+            dimensiones.append((titulo, celdas))
+
+    if not dimensiones:
+        return
+
+    for solapa, (_, celdas) in zip(st.tabs([t for t, _ in dimensiones]), dimensiones):
+        with solapa:
+            html = []
+            for clave, valor in celdas:
+                delta_html = ""
+                if nacional is not None:
+                    # Sobre los valores YA redondeados, que son los que se ven:
+                    # restar antes y redondear después deja cuentas que no
+                    # cierran a la vista.
+                    d = round(valor) - round(nacional)
+                    if d:
+                        signo = "+" if d > 0 else "−"
+                        clase = "sube" if d > 0 else "baja"
+                        delta_html = (
+                            f'<div class="grupo-celda-delta '
+                            f'grupo-celda-delta--{clase}">{signo}{abs(d)}pp</div>'
+                        )
+                    else:
+                        delta_html = ('<div class="grupo-celda-delta">'
+                                      'igual al promedio</div>')
+                html.append(
+                    f'<div class="grupo-celda">'
+                    f'<div class="grupo-celda-label">{GRUPOS_LABEL[clave]}</div>'
+                    f'<div class="grupo-celda-valor">{round(valor)}%</div>'
+                    f'{delta_html}</div>'
+                )
+            st.markdown(f'<div class="grupo-cifras">{"".join(html)}</div>',
+                        unsafe_allow_html=True)
 
     if nacional is not None:
-        bloques.append(
-            f'<div class="grupo-nota-ref"><span class="grupo-nota-marca"></span>'
-            f'La línea marca el promedio nacional ({round(nacional)}%).</div>'
+        st.markdown(
+            f'<div class="grupo-nota-ref">La diferencia es contra el promedio '
+            f'nacional de esta pregunta ({round(nacional)}%).</div>',
+            unsafe_allow_html=True,
         )
-
-    st.markdown("".join(bloques), unsafe_allow_html=True)
 
 
 # Nombre legible de cada predictor, para poder redactar en castellano qué

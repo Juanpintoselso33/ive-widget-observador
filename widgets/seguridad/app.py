@@ -15,8 +15,8 @@ if str(_ROOT) not in sys.path:
 
 import streamlit as st
 
-from shared.styles import get_custom_css
-from shared.config import get_colors
+from shared.styles import get_observador_css
+from shared.config import OBSERVADOR_COLORS
 from widgets.seguridad.model import (
     load_modelos as _load_modelos, predict_probability, intervalo_probabilidad,
     banda_decision,
@@ -45,13 +45,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-try:
-    theme_mode = st.context.theme.type
-except AttributeError:
-    theme_mode = "light"
-
-colors = get_colors(theme_mode)
-st.markdown(get_custom_css(theme_mode), unsafe_allow_html=True)
+# El Figma "Producto UY" no tiene variante oscura, así que el widget deja de
+# seguir el tema del sistema del lector y queda siempre en claro. Con la paleta
+# oscura de Streamlit el verde profundo del titular y del número quedaba
+# ilegible, y elegir otro verde para el modo oscuro sería inventar una decisión
+# de diseño que la diseñadora no tomó.
+colors = OBSERVADOR_COLORS
+st.markdown(get_observador_css(), unsafe_allow_html=True)
 
 
 @st.cache_data

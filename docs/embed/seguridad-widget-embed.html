@@ -20,15 +20,20 @@
   widget con las CUATRO preguntas seleccionadas, una por una (7/9/2026):
 
       ancho    alto del contenido (peor caso de las cuatro)
-      375 px   3724
-      420 px   3557
-      640 px   3220
-      720 px   2619
-      900 px   2595
+      375 px   2819
+      420 px   2609
+      640 px   2321
+      720 px   1877
+      900 px   1852
 
   El salto entre 640 y 720 es el punto de quiebre del diseño: en 640 o menos los
   selectores se apilan en una columna, y arriba de eso van en dos. Por eso no
   alcanza con un solo alto para las dos orientaciones.
+
+  RE-MEDIDO el 7/9/2026 al aplicar el diseño del Figma. Bajó fuerte —en
+  escritorio de 2.619 a 1.877 px— porque la comparación por grupos pasó de una
+  lista de dieciséis barras apiladas a solapas que muestran una dimensión por
+  vez. Si volvés a ver franja blanca abajo con los valores viejos, es por esto.
 
   Los valores de abajo son esos, con un poco de margen. Si se agrega una
   pregunta con un enunciado más largo que el de "cadena perpetua", hay que
@@ -47,7 +52,7 @@
     src="https://observador-seguridad.streamlit.app/?embed=true"
     title="¿Quiénes apoyan las medidas de mano dura en Uruguay? — El Observador"
     width="100%"
-    height="2660"
+    height="1920"
     frameborder="0"
     scrolling="no"
     style="display:block;border:none;width:100%;"
@@ -70,7 +75,7 @@
     src="https://observador-seguridad.streamlit.app/?embed=true"
     title="¿Quiénes apoyan las medidas de mano dura en Uruguay? — El Observador"
     width="100%"
-    height="2660"
+    height="1920"
     frameborder="0"
     scrolling="no"
     style="display:block;border:none;width:100%;"
@@ -84,10 +89,10 @@
 
     // [ancho máximo, alto]. Se toma el primer tramo que aplique.
     var ALTOS = [
-      [400, 3780],   // celular angosto
-      [480, 3620],   // celular ancho
-      [640, 3280],   // tablet en vertical / columna angosta: aún apilado
-      [9999, 2660]   // arriba de 640 los selectores van en dos columnas
+      [400, 2870],   // celular angosto
+      [480, 2660],   // celular ancho
+      [640, 2370],   // tablet en vertical / columna angosta: aún apilado
+      [9999, 1920]   // arriba de 640 los selectores van en dos columnas
     ];
 
     function ajustar() {
@@ -111,8 +116,8 @@
 <!-- ============================================================
      2. HOME — módulo de portada
      ============================================================
-     ADVERTENCIA, para que no sorprenda: el widget completo mide entre 2.600 y
-     3.700 px de alto según el ancho. En un módulo de portada de 1.000 px, el
+     ADVERTENCIA, para que no sorprenda: el widget completo mide entre 1.850 y
+     2.820 px de alto según el ancho. En un módulo de portada de 1.000 px, el
      lector ve el selector de medida y los del perfil, y tiene que scrollear
      DENTRO del recuadro para llegar al resultado. Por eso va con
      `scrolling="yes"` y con el borde marcado, que avisa que ahí adentro hay más.
@@ -159,7 +164,7 @@
     lector del día puede ver el cartel de "waking up". No hay forma de evitarlo
     en el plan gratuito.
 
-  · TEMA CLARO U OSCURO: el widget sigue la preferencia del sistema del lector.
-    Si la nota siempre va sobre fondo blanco y se prefiere forzarlo, agregar
-    `&embed_options=light_theme` al final de la URL del src.
+  · TEMA: el widget es SIEMPRE claro, porque el Figma de la diseñadora no tiene
+    variante oscura. Ya no sigue la preferencia del sistema del lector, así que
+    no hace falta agregarle `&embed_options=light_theme`.
 -->
