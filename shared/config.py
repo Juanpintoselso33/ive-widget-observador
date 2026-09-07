@@ -9,9 +9,25 @@ Usada por todos los widgets de la plataforma.
 LIGHT_COLORS = {
     "primary": "#2E45B8",
     "accent": "#E3120B",
-    "success": "#1DC9A4",
-    "danger": "#E3120B",
-    "warning": "#D4A017",
+    # Verde, ámbar y rojo OSCURECIDOS por contraste (7/9/2026).
+    #
+    # Los valores anteriores —#1DC9A4 y #D4A017— daban 2,11:1 y 2,38:1 sobre
+    # blanco, y 1,89:1 y 2,12:1 sobre las tarjetas. WCAG AA pide 4,5 para texto
+    # normal y 3 para texto grande: no llegaban ni al mínimo del número grande
+    # del resultado, que es justo donde se usan (get_interpretation, más el
+    # delta chico del widget IVE).
+    #
+    # Se corrigen ahora porque el tema pasó a estar FIJO EN CLARO para las dos
+    # apps —ver .streamlit/config.toml—, así que quien antes recibía la paleta
+    # oscura, que sí tenía contraste suficiente, pasaría a ésta. Lo encontró
+    # Codex revisando ese cambio.
+    #
+    # Nuevos ratios, sobre blanco y sobre #F2F2F2: success 5,14 y 4,60;
+    # warning 5,54 y 4,95; danger 6,09 y 5,44. Los tres pasan AA en los dos
+    # fondos. `accent` no se toca: es la barra roja superior, no texto.
+    "success": "#0E7C63",
+    "danger": "#C50F09",
+    "warning": "#8A6100",
     "background": "#FFFFFF",
     "secondary_bg": "#F2F2F2",
     "text": "#121212",

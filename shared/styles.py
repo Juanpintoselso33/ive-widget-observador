@@ -326,7 +326,7 @@ def get_custom_css(mode="light"):
         font-weight: 600;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: {c['text_muted']} !important;
+        color: {c['text_muted']};
         margin-bottom: 0.4rem;
     }}
 
