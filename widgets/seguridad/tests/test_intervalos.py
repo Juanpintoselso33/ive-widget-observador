@@ -92,6 +92,27 @@ class TestReglaDelCincuenta:
         assert "en contra" in texto
 
 
+def _modelos_entrenados():
+    """
+    Los JSON de producción que existan, como (slug, modelo).
+
+    Los invariantes de esta sección valen para las CUATRO preguntas, no sólo
+    para la que esté por defecto: cada una tiene su propio bootstrap, y una
+    réplica desalineada en cualquiera de ellas publica un intervalo inventado.
+    """
+    salida = []
+    for slug in config.SLUGS:
+        ruta = config.ruta_modelo(slug)
+        if ruta.exists():
+            with open(ruta, encoding="utf-8") as f:
+                salida.append((slug, json.load(f)))
+    return salida
+
+
+HAY_MODELOS = any(config.ruta_modelo(s).exists() for s in config.SLUGS)
+SIN_MODELOS = "todavía no se entrenó ningún modelo"
+
+
 class TestIntervaloProbabilidad:
     PERFIL = dict(tramo_edad=2, es_mujer=0, nivel_educ=1, ideologia=2,
                   victima=1, es_montevideo=0)
@@ -99,20 +120,19 @@ class TestIntervaloProbabilidad:
     def test_devuelve_none_sin_bootstrap(self):
         assert intervalo_probabilidad({"coefficients": {}}, **self.PERFIL) is None
 
-    @pytest.mark.skipif(not config.MODEL_COEFFICIENTS_PATH.exists(),
-                        reason="El modelo todavía no fue entrenado")
-    def test_sobre_el_modelo_real(self):
-        with open(config.MODEL_COEFFICIENTS_PATH, encoding="utf-8") as f:
-            modelo = json.load(f)
-        bajo, alto = intervalo_probabilidad(modelo, **self.PERFIL)
-        assert 0 <= bajo <= alto <= 100
-        # El orden guardado tiene que arrancar con el intercepto y seguir con
-        # los predictores: si se desalinea, los coeficientes se aplican a la
-        # dummy equivocada y el intervalo sale de cualquier lado.
-        orden = modelo["bootstrap"]["orden"]
-        assert orden[0] == "intercept"
-        assert orden[1:] == list(config.PREDICTORES)
-        assert all(len(fila) == len(orden) for fila in modelo["bootstrap"]["replicas"])
+    @pytest.mark.skipif(not HAY_MODELOS, reason=SIN_MODELOS)
+    def test_sobre_los_modelos_reales(self):
+        for slug, modelo in _modelos_entrenados():
+            bajo, alto = intervalo_probabilidad(modelo, **self.PERFIL)
+            assert 0 <= bajo <= alto <= 100, slug
+            # El orden guardado tiene que arrancar con el intercepto y seguir
+            # con los predictores: si se desalinea, los coeficientes se aplican
+            # a la dummy equivocada y el intervalo sale de cualquier lado.
+            orden = modelo["bootstrap"]["orden"]
+            assert orden[0] == "intercept", slug
+            assert orden[1:] == list(config.PREDICTORES), slug
+            assert all(len(fila) == len(orden)
+                       for fila in modelo["bootstrap"]["replicas"]), slug
 
 
 class TestBandaDeDecision:
@@ -141,21 +161,21 @@ class TestBandaDeDecision:
     def test_devuelve_none_sin_bootstrap(self):
         assert banda_decision({"coefficients": {}}, **self.PERFIL) is None
 
-    @pytest.mark.skipif(not config.MODEL_COEFFICIENTS_PATH.exists(),
-                        reason="El modelo todavía no fue entrenado")
+    @pytest.mark.skipif(not HAY_MODELOS, reason=SIN_MODELOS)
     def test_la_banda_contiene_al_intervalo_mostrado(self):
-        with open(config.MODEL_COEFFICIENTS_PATH, encoding="utf-8") as f:
-            modelo = json.load(f)
+        for slug, modelo in _modelos_entrenados():
+            self._comprobar_banda_contiene(slug, modelo)
+
+    def _comprobar_banda_contiene(self, slug, modelo):
         for perfil in (self.PERFIL, self.TESTIGO):
             iv = intervalo_probabilidad(modelo, **perfil)
             bd = banda_decision(modelo, **perfil)
             assert bd[0] <= iv[0] and bd[1] >= iv[1], (
-                "la banda de decisión tiene que ser al menos tan ancha como el "
-                "intervalo mostrado, nunca más angosta"
+                f"[{slug}] la banda de decisión tiene que ser al menos tan "
+                "ancha como el intervalo mostrado, nunca más angosta"
             )
 
-    @pytest.mark.skipif(not config.MODEL_COEFFICIENTS_PATH.exists(),
-                        reason="El modelo todavía no fue entrenado")
+    @pytest.mark.skipif(not HAY_MODELOS, reason=SIN_MODELOS)
     def test_ningun_perfil_afirma_mayoria_si_la_banda_cruza_el_50(self):
         """
         El test que fija el arreglo, escrito como INVARIANTE y no como un caso
@@ -172,34 +192,45 @@ class TestBandaDeDecision:
              sea sin el arreglo.
         """
         import itertools
-        with open(config.MODEL_COEFFICIENTS_PATH, encoding="utf-8") as f:
-            modelo = json.load(f)
 
         n_ideol = len(config.IDEOLOGIA_UI_TO_CODE)
-        distinguen = 0
-        for te, mu, ed, id_, vi, mv in itertools.product(
+        perfiles = [
+            dict(tramo_edad=te, es_mujer=mu, nivel_educ=ed,
+                 ideologia=id_, victima=vi, es_montevideo=mv)
+            for te, mu, ed, id_, vi, mv in itertools.product(
                 range(1, 5), (0, 1), (1, 2, 3), range(1, n_ideol + 1),
-                (1, 2, 3), (0, 1)):
-            perfil = dict(tramo_edad=te, es_mujer=mu, nivel_educ=ed,
-                          ideologia=id_, victima=vi, es_montevideo=mv)
-            prob = predict_probability(modelo, **perfil)
-            iv = intervalo_probabilidad(modelo, **perfil)
-            bd = banda_decision(modelo, **perfil)
+                (1, 2, 3), (0, 1))
+        ]
 
-            cruza_banda = round(bd[0]) <= 50 <= round(bd[1])
-            cruza_iv = round(iv[0]) <= 50 <= round(iv[1])
-            _, texto = interpretar(prob, self.COLORES, iv, bd)
+        # El contador se acumula sobre las CUATRO preguntas y no se exige por
+        # pregunta. En "humillación a los presos" el apoyo ponderado es 11%: casi
+        # ningún perfil se acerca al 50, así que ahí la banda y el intervalo
+        # deciden igual sin que eso indique nada roto. Lo que tiene que existir
+        # es al menos un caso en alguna parte donde ensanchar cambie la
+        # conclusión; si no, banda_decision() no está haciendo nada.
+        distinguen = 0
+        for slug, modelo in _modelos_entrenados():
+            for perfil in perfiles:
+                prob = predict_probability(modelo, **perfil)
+                iv = intervalo_probabilidad(modelo, **perfil)
+                bd = banda_decision(modelo, **perfil)
 
-            if cruza_banda:
-                assert "no permite afirmar" in texto, (
-                    f"la banda {bd} cruza el 50 y el widget igual afirmó: {perfil}"
-                )
-            if cruza_banda and not cruza_iv:
-                distinguen += 1
+                cruza_banda = round(bd[0]) <= 50 <= round(bd[1])
+                cruza_iv = round(iv[0]) <= 50 <= round(iv[1])
+                _, texto = interpretar(prob, self.COLORES, iv, bd)
+
+                if cruza_banda:
+                    assert "no permite afirmar" in texto, (
+                        f"[{slug}] la banda {bd} cruza el 50 y el widget igual "
+                        f"afirmó: {perfil}"
+                    )
+                if cruza_banda and not cruza_iv:
+                    distinguen += 1
 
         assert distinguen > 0, (
-            "en ningún perfil la banda decide distinto del intervalo mostrado: "
-            "o banda_decision() dejó de ensanchar, o el test quedó vacío"
+            "en ningún perfil de ninguna pregunta la banda decide distinto del "
+            "intervalo mostrado: o banda_decision() dejó de ensanchar, o el "
+            "test quedó vacío"
         )
 
     def test_la_banda_manda_sobre_el_intervalo(self):

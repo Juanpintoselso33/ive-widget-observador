@@ -30,6 +30,11 @@ ive_widget/                         # Raíz del repo (plataforma multi-widget)
 │   │   ├── train_model.py          # Pipeline de entrenamiento
 │   │   ├── model_coefficients.json # Coeficientes serializados
 │   │   └── tests/                  # Tests con coeficientes sintéticos
+│   ├── seguridad/                  # Widget de punitivismo — CUATRO preguntas
+│   │   ├── app.py                  # Entry: streamlit run widgets/seguridad/app.py
+│   │   ├── modelos/                # Un model_<slug>.json por pregunta
+│   │   ├── scripts/                # validacion_ordinal, verificar_inferencia
+│   │   └── tests/
 │   └── _template/                  # Scaffold para nuevos widgets
 │       ├── app.py / model.py / components.py / config.py
 │       └── WIDGET_README.md        # Guía para crear widget nuevo
@@ -55,8 +60,15 @@ ive_widget/                         # Raíz del repo (plataforma multi-widget)
 |-----------|---------|
 | Correr el IVE widget (actual deploy) | `streamlit run app.py` |
 | Correr el IVE widget standalone | `streamlit run widgets/ive/app.py` |
+| Correr el widget de seguridad | `streamlit run widgets/seguridad/app.py` |
 | Correr widget nuevo | `streamlit run widgets/<nombre>/app.py` |
 | Correr tests IVE | `pytest widgets/ive/tests/ -v` |
+| Correr tests de seguridad | `pytest widgets/seguridad/tests -q` |
+
+> El widget de **seguridad** no comparte el modelo estadístico que se documenta
+> abajo: es otra encuesta, otros predictores y **cuatro modelos**, uno por
+> pregunta punitiva. Todo lo suyo está en `widgets/seguridad/WIDGET_README.md`.
+> Lo que sigue en este archivo es del widget IVE.
 
 ## Modelo estadístico
 

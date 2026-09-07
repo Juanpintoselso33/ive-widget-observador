@@ -1,6 +1,10 @@
 """
 Widget de seguridad pública — El Observador
 Entry point standalone. También importable desde el root app.py.
+
+Publica las CUATRO preguntas punitivas que pidió Tomer y deja que el lector
+elija cuál estimar: hay un modelo entrenado por pregunta y todos se cargan al
+arrancar.
 """
 
 import sys
@@ -14,23 +18,29 @@ import streamlit as st
 from shared.styles import get_custom_css
 from shared.config import get_colors
 from widgets.seguridad.model import (
-    load_model as _load_model, predict_probability, intervalo_probabilidad,
+    load_modelos as _load_modelos, predict_probability, intervalo_probabilidad,
     banda_decision,
 )
 from widgets.seguridad.components import (
-    render_header, render_inputs, render_probability_bar,
-    render_result_card, render_comparisons, render_methodology, render_footer,
+    render_selector_pregunta, render_header, render_inputs,
+    render_probability_bar, render_result_card, render_comparisons,
+    render_methodology, render_footer, CLAVE_PREGUNTA,
 )
 
 from widgets.seguridad.config import (
-    PREGUNTA, PREGUNTA_ACTIVA, PREDICTORES, huella_contrato,
+    PREGUNTAS, SLUGS, PREGUNTA_DEFECTO, ETIQUETA_A_SLUG, PREDICTORES,
+    huella_contrato,
 )
 
-# El título sale de la pregunta activa y no va hardcodeado: si se cambia la
-# pregunta, la pestaña del navegador tiene que acompañar. Antes decía "pena de
-# muerte" pasara lo que pasara.
+# El título de la pestaña sigue a la pregunta elegida. Se lee de session_state
+# ANTES de set_page_config porque ésa tiene que ser la primera orden de
+# Streamlit de la corrida; leer el estado no dibuja nada, así que es válido.
+# En la primera corrida todavía no hay nada guardado y sale la de por defecto.
+_etiqueta_elegida = st.session_state.get(CLAVE_PREGUNTA)
+_slug_inicial = ETIQUETA_A_SLUG.get(_etiqueta_elegida, PREGUNTA_DEFECTO)
+
 st.set_page_config(
-    page_title=f"{PREGUNTA['titulo_corto']} | El Observador",
+    page_title=f"{PREGUNTAS[_slug_inicial]['titulo_corto']} | El Observador",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
@@ -45,56 +55,72 @@ st.markdown(get_custom_css(theme_mode), unsafe_allow_html=True)
 
 
 @st.cache_data
-def load_model():
-    return _load_model()
+def load_modelos():
+    return _load_modelos()
 
 
 try:
-    MODEL = load_model()
-except FileNotFoundError:
+    MODELOS = load_modelos()
+except FileNotFoundError as e:
     st.error(
-        "No se encontró el archivo de coeficientes. "
-        "Ejecutá primero `widgets/seguridad/train_model.py`."
+        f"Falta un archivo de coeficientes ({e.filename}). Ejecutá primero "
+        "`python widgets/seguridad/train_model.py`."
     )
     st.stop()
 
-# El contrato entre la configuración y el modelo entrenado se verifica ACÁ, al
-# arrancar, y no sólo en los tests: cambiar PREGUNTA_ACTIVA sin re-entrenar
-# dejaría el título de una pregunta con los coeficientes de otra, y en
-# producción nadie corre pytest antes de servir la página. Mejor una pantalla
-# de error explícita que un widget que responde cualquier cosa con confianza.
-_slug = MODEL.get("pregunta_slug")
-if _slug != PREGUNTA_ACTIVA:
+# El contrato entre la configuración y cada modelo entrenado se verifica ACÁ, al
+# arrancar, y no sólo en los tests: un JSON desalineado dejaría el título de una
+# pregunta con los coeficientes de otra, y en producción nadie corre pytest
+# antes de servir la página. Mejor una pantalla de error explícita que un widget
+# que responde cualquier cosa con confianza.
+#
+# Se verifican los CUATRO aunque el lector vaya a mirar uno: si se validara sólo
+# el elegido, un JSON roto quedaría escondido hasta que alguien seleccionara esa
+# pregunta, que es justo el momento en que ya no hay nadie mirando la consola.
+_problemas = []
+for _slug in SLUGS:
+    _modelo = MODELOS[_slug]
+
+    if _modelo.get("pregunta_slug") != _slug:
+        _problemas.append(
+            f"«{_slug}»: el JSON dice ser de «{_modelo.get('pregunta_slug')}»"
+        )
+        continue
+
+    # La huella cubre los mapeos y las referencias, no sólo los nombres de las
+    # dummies: si una categoría cambia de significado conservando su nombre, el
+    # chequeo de "no falta ninguna" pasaría igual y la inferencia aplicaría
+    # coeficientes entrenados con otra codificación.
+    _contrato = _modelo.get("contrato")
+    if _contrato != huella_contrato(_slug):
+        _problemas.append(
+            f"«{_slug}»: contrato {_contrato} contra {huella_contrato(_slug)} "
+            "— cambió algún mapeo, predictor o categoría"
+        )
+        continue
+
+    _esperados = set(PREDICTORES)
+    _reales = set(_modelo.get("coefficients", {})) - {"intercept"}
+    if _esperados != _reales or "intercept" not in _modelo.get("coefficients", {}):
+        _problemas.append(
+            f"«{_slug}»: predictores distintos "
+            f"(faltan: {sorted(_esperados - _reales)}; "
+            f"sobran: {sorted(_reales - _esperados)})"
+        )
+
+if _problemas:
     st.error(
-        f"El modelo entrenado corresponde a la pregunta «{_slug}» pero la "
-        f"configuración pide «{PREGUNTA_ACTIVA}». Volvé a correr "
-        "`widgets/seguridad/train_model.py` antes de publicar."
+        "Los modelos entrenados no corresponden a la configuración actual:\n\n- "
+        + "\n- ".join(_problemas)
+        + "\n\nVolvé a correr `python widgets/seguridad/train_model.py`."
     )
     st.stop()
 
-# La huella cubre los mapeos y las referencias, no sólo los nombres de las
-# dummies: si una categoría cambia de significado conservando su nombre, el
-# chequeo de "no falta ninguna" pasaría igual y la inferencia aplicaría
-# coeficientes entrenados con otra codificación.
-_contrato = MODEL.get("contrato")
-if _contrato != huella_contrato():
-    st.error(
-        "El modelo entrenado no corresponde a la configuración actual "
-        f"(contrato {_contrato} contra {huella_contrato()}). Cambió algún mapeo, "
-        "predictor o categoría: volvé a correr `widgets/seguridad/train_model.py`."
-    )
-    st.stop()
-
-_esperados = set(PREDICTORES)
-_reales = set(MODEL.get("coefficients", {})) - {"intercept"}
-if _esperados != _reales or "intercept" not in MODEL.get("coefficients", {}):
-    st.error(
-        "Los predictores del modelo no coinciden exactamente con los que espera "
-        f"la aplicación (faltan: {sorted(_esperados - _reales)}; "
-        f"sobran: {sorted(_reales - _esperados)}). Volvé a correr "
-        "`widgets/seguridad/train_model.py`."
-    )
-    st.stop()
+# ============================================================
+# RENDER
+# ============================================================
+slug = render_selector_pregunta()
+MODEL = MODELOS[slug]
 
 render_header(MODEL)
 inputs = render_inputs()

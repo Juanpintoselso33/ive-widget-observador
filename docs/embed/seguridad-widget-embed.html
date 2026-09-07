@@ -1,0 +1,165 @@
+<!--
+  ============================================================
+  CÓDIGO DE EMBED — Widget de seguridad pública
+  Encuesta El Observador-UMAD-Ferreira, mayo de 2026
+  ============================================================
+
+  ANTES DE PEGAR NADA: reemplazá WIDGET_URL por la URL pública del widget en
+  Streamlit Cloud. Aparece una vez por variante.
+
+  El `?embed=true` NO es opcional. Sin él, Streamlit dibuja su propia barra
+  superior con el menú de hamburguesa y el botón de "Deploy": dentro de una nota
+  se ve como un error, y el menú deja al lector reiniciar la app. Con
+  `embed=true` queda sólo el contenido.
+
+  ============================================================
+  ALTURAS — medidas, no estimadas
+  ============================================================
+  Un iframe de otro dominio no deja que la página que lo contiene mida su
+  contenido, así que el alto se fija a mano. Estos números salen de medir el
+  widget con las CUATRO preguntas seleccionadas, una por una (7/9/2026):
+
+      ancho    alto del contenido (peor caso de las cuatro)
+      375 px   3724
+      420 px   3557
+      640 px   3220
+      720 px   2619
+      900 px   2595
+
+  El salto entre 640 y 720 es el punto de quiebre del diseño: en 640 o menos los
+  selectores se apilan en una columna, y arriba de eso van en dos. Por eso no
+  alcanza con un solo alto para las dos orientaciones.
+
+  Los valores de abajo son esos, con un poco de margen. Si se agrega una
+  pregunta con un enunciado más largo que el de "cadena perpetua", hay que
+  volver a medir.
+-->
+
+
+<!-- ============================================================
+     1. NOTA — la del cuerpo del artículo. Copiar desde acá.
+     ============================================================
+     Alto fijo para escritorio. Si la nota se lee sobre todo en celular,
+     conviene la variante 3, que ajusta el alto al ancho real.
+-->
+<div style="width:100%;max-width:720px;margin:2rem auto;">
+  <iframe
+    src="WIDGET_URL/?embed=true"
+    title="¿Quiénes apoyan las medidas de mano dura en Uruguay? — El Observador"
+    width="100%"
+    height="2660"
+    frameborder="0"
+    scrolling="no"
+    style="display:block;border:none;width:100%;"
+    loading="lazy"
+  ></iframe>
+</div>
+<!-- FIN NOTA -->
+
+
+<!-- ============================================================
+     3. NOTA CON ALTURA AUTOMÁTICA — la recomendada
+     ============================================================
+     Preferible a la 1 si el CMS permite <script> inline. Mide el ancho REAL del
+     iframe —no el de la ventana— con ResizeObserver, así que también acierta
+     cuando el widget va dentro de una columna angosta de una nota ancha, y se
+     reacomoda si el lector gira el teléfono.
+-->
+<div class="obs-seguridad-embed" style="width:100%;max-width:720px;margin:2rem auto;">
+  <iframe
+    src="WIDGET_URL/?embed=true"
+    title="¿Quiénes apoyan las medidas de mano dura en Uruguay? — El Observador"
+    width="100%"
+    height="2660"
+    frameborder="0"
+    scrolling="no"
+    style="display:block;border:none;width:100%;"
+    loading="lazy"
+  ></iframe>
+</div>
+<script>
+  (function () {
+    var caja = document.currentScript.previousElementSibling;
+    var iframe = caja.querySelector('iframe');
+
+    // [ancho máximo, alto]. Se toma el primer tramo que aplique.
+    var ALTOS = [
+      [400, 3780],   // celular angosto
+      [480, 3620],   // celular ancho
+      [640, 3280],   // tablet en vertical / columna angosta: aún apilado
+      [9999, 2660]   // arriba de 640 los selectores van en dos columnas
+    ];
+
+    function ajustar() {
+      var ancho = iframe.getBoundingClientRect().width;
+      for (var i = 0; i < ALTOS.length; i++) {
+        if (ancho <= ALTOS[i][0]) { iframe.height = ALTOS[i][1]; return; }
+      }
+    }
+
+    ajustar();
+    if (window.ResizeObserver) {
+      new ResizeObserver(ajustar).observe(caja);
+    } else {
+      window.addEventListener('resize', ajustar);
+    }
+  })();
+</script>
+<!-- FIN NOTA CON ALTURA AUTOMÁTICA -->
+
+
+<!-- ============================================================
+     2. HOME — módulo de portada
+     ============================================================
+     ADVERTENCIA, para que no sorprenda: el widget completo mide entre 2.600 y
+     3.700 px de alto según el ancho. En un módulo de portada de 1.000 px, el
+     lector ve el selector de medida y los del perfil, y tiene que scrollear
+     DENTRO del recuadro para llegar al resultado. Por eso va con
+     `scrolling="yes"` y con el borde marcado, que avisa que ahí adentro hay más.
+
+     Si en portada se quiere algo que entre entero en la pantalla, no alcanza con
+     recortar el iframe: hay que hacer una versión reducida del widget (sin el
+     bloque comparativo ni la metodología). Es media hora de trabajo, pero es
+     otra pieza, no un parámetro de este embed.
+-->
+<div style="width:100%;max-width:560px;margin:0 auto;border:1px solid #e3e3e3;border-radius:8px;overflow:hidden;">
+  <iframe
+    src="WIDGET_URL/?embed=true"
+    title="El apoyo a las medidas de mano dura, perfil por perfil — El Observador"
+    width="100%"
+    height="1000"
+    frameborder="0"
+    scrolling="yes"
+    style="display:block;border:none;width:100%;"
+    loading="lazy"
+  ></iframe>
+</div>
+<!-- FIN HOME -->
+
+
+<!--
+  ============================================================
+  NOTAS PARA QUIEN PEGUE ESTO
+  ============================================================
+
+  · El widget YA trae la fuente y el crédito en su pie, así que la nota no
+    necesita repetirlos adentro del recuadro. Si el manual de estilo pide un
+    epígrafe igual, la fuente es:
+        Encuesta El Observador-UMAD-Ferreira sobre seguridad pública, mayo de 2026.
+        Análisis y desarrollo: Juan Ignacio Pintos Elso.
+
+  · Si abajo queda una franja en blanco, bajá el `height`. Si el contenido se
+    corta, subilo. Es el único número que hay que tocar.
+
+  · `loading="lazy"` evita que el widget despierte al servidor de Streamlit
+    mientras el lector todavía no llegó a esa altura de la nota. Conviene dejarlo.
+
+  · PRIMERA CARGA: las apps gratuitas de Streamlit Cloud se duermen sin tráfico y
+    tardan unos segundos en levantar. En una nota con poco tráfico, el primer
+    lector del día puede ver el cartel de "waking up". No hay forma de evitarlo
+    en el plan gratuito.
+
+  · TEMA CLARO U OSCURO: el widget sigue la preferencia del sistema del lector.
+    Si la nota siempre va sobre fondo blanco y se prefiere forzarlo, agregar
+    `&embed_options=light_theme` al final de la URL del src.
+-->

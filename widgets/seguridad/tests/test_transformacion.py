@@ -26,6 +26,16 @@ import pytest
 from widgets.seguridad import config
 from widgets.seguridad import train_model as tm
 
+# La transformación cruda es la MISMA para las cuatro preguntas: sólo cambia la
+# columna de la que sale la dependiente. Estos tests miran las dummies, así que
+# alcanza con una cualquiera; se usa la de por defecto para que el fixture no
+# tenga que declarar las cuatro columnas.
+PREGUNTA_TEST = config.PREGUNTAS[config.PREGUNTA_DEFECTO]
+
+
+def preparar(df):
+    return tm.preparar(df, PREGUNTA_TEST)
+
 
 @pytest.fixture
 def base_minima():
@@ -47,7 +57,7 @@ def base_minima():
             "estrato": f"dpto-{dpto}",
             "var_241 | Victima de delito ultimos 12 meses": vic,
             "var_242 | Autoubicacion izquierda-derecha (0-10)": ideol,
-            config.PREGUNTA["columna"]: "De acuerdo",
+            PREGUNTA_TEST["columna"]: "De acuerdo",
         })
     return pd.DataFrame(filas)
 
@@ -61,23 +71,23 @@ def test_los_tramos_ideologicos_salen_de_la_especificacion(base_minima, monkeypa
     modelo, pero el agujero se puede reabrir en cualquier variable, así que el
     test se mantiene sobre los tramos ideológicos.
     """
-    normal = tm.preparar(base_minima)
-    # ideologia 0 -> izquierda extrema (0-1); 5 -> Centro (referencia)
+    normal = preparar(base_minima)
+    # ideologia 0 -> extrema izquierda (sólo el 0); 5 -> Centro (referencia)
     assert normal.loc[0, "ideol_izq_extrema"] == 1
     assert normal.loc[1, "ideol_izq_extrema"] == 0
 
     espec = {**config.ESPEC_CRUDA,
-             "ideol_tramos": [["izq_extrema", 9, 10, "Izquierda extrema"],
+             "ideol_tramos": [["izq_extrema", 9, 10, "Extrema izquierda"],
                               ["izquierda", 2, 3, "Izquierda"],
                               ["centroizq", 4, 4, "Centroizquierda"],
                               ["centro", 5, 5, "Centro"],
                               ["centroderecha", 6, 6, "Centroderecha"],
                               ["derecha", 7, 8, "Derecha"],
-                              ["der_extrema", 0, 1, "Derecha extrema"]]}
+                              ["der_extrema", 0, 1, "Extrema derecha"]]}
     monkeypatch.setattr(config, "ESPEC_CRUDA", espec)
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
 
-    invertido = tm.preparar(base_minima)
+    invertido = preparar(base_minima)
     assert invertido.loc[0, "ideol_der_extrema"] == 1, (
         "invertir los extremos en ESPEC_CRUDA no invirtió las dummies: "
         "la especificación no se está consumiendo de verdad"
@@ -91,39 +101,39 @@ def test_un_valor_de_la_escala_sin_tramo_aborta(base_minima, monkeypatch):
     o sea silenciosamente dentro de la referencia. Tiene que abortar.
     """
     espec = {**config.ESPEC_CRUDA,
-             "ideol_tramos": [["izq_extrema", 0, 1, "Izquierda extrema"],
+             "ideol_tramos": [["izq_extrema", 0, 1, "Extrema izquierda"],
                               ["izquierda", 2, 3, "Izquierda"],
                               ["centroizq", 4, 4, "Centroizquierda"],
                               ["centro", 5, 5, "Centro"],
                               ["centroderecha", 6, 6, "Centroderecha"],
                               ["derecha", 7, 7, "Derecha"],
-                              ["der_extrema", 9, 10, "Derecha extrema"]]}
+                              ["der_extrema", 9, 10, "Extrema derecha"]]}
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
     df = base_minima.copy()
     df.loc[0, "var_242 | Autoubicacion izquierda-derecha (0-10)"] = 8
     with pytest.raises(SystemExit, match="no cubren"):
-        tm.preparar(df)
+        preparar(df)
 
 
 def test_los_cortes_de_edad_salen_de_la_especificacion(base_minima, monkeypatch):
-    normal = tm.preparar(base_minima)
+    normal = preparar(base_minima)
     assert normal.loc[0, "edad_30_44"] == 0   # 25 años cae en 18-29
 
     espec = {**config.ESPEC_CRUDA, "edad_cortes": [17, 20, 44, 59, 120]}
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
-    movido = tm.preparar(base_minima)
+    movido = preparar(base_minima)
     assert movido.loc[0, "edad_30_44"] == 1, "mover los cortes no movió el tramo"
 
 
 def test_el_colapso_educativo_sale_de_la_especificacion(base_minima, monkeypatch):
-    normal = tm.preparar(base_minima)
+    normal = preparar(base_minima)
     assert normal.loc[1, "educ_ter_comp"] == 1   # código 8 -> terciaria completa
 
     espec = {**config.ESPEC_CRUDA,
              "educ_colapso": {k: 1 for k in range(1, 11)}}
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
     monkeypatch.setattr(tm, "EDUC_COLAPSO", espec["educ_colapso"])
-    colapsado = tm.preparar(base_minima)
+    colapsado = preparar(base_minima)
     assert colapsado.loc[1, "educ_ter_comp"] == 0, (
         "colapsar todo a una categoría no cambió las dummies educativas"
     )
@@ -136,48 +146,62 @@ def test_las_etiquetas_de_victima_son_de_dominio_cerrado(base_minima):
     df = base_minima.copy()
     df.loc[0, "var_241 | Victima de delito ultimos 12 meses"] = "Sí, violencia desconocida"
     with pytest.raises(SystemExit, match="victimización"):
-        tm.preparar(df)
+        preparar(df)
 
 
 def test_el_codigo_de_montevideo_sale_de_la_especificacion(base_minima, monkeypatch):
-    normal = tm.preparar(base_minima)
+    normal = preparar(base_minima)
     assert normal.loc[0, "es_montevideo"] == 1   # dpto 1
 
     espec = {**config.ESPEC_CRUDA, "dpto_montevideo": 3}
     monkeypatch.setattr(tm, "ESPEC_CRUDA", espec)
-    movido = tm.preparar(base_minima)
+    movido = preparar(base_minima)
     assert movido.loc[0, "es_montevideo"] == 0
     assert movido.loc[1, "es_montevideo"] == 1
 
 
-def test_la_cobertura_no_cuenta_perfiles_no_elegibles():
+# Cobertura medida el 7/9/2026, con los siete tramos ideológicos de la base
+# etiquetada de Tomer. Varía por pregunta porque el conjunto elegible son los
+# casos CON postura definida sobre esa pregunta, y eso cambia de una a otra.
+COBERTURA_ESPERADA = {
+    "politico_mano_dura": (562, 7),
+    "cadena_perpetua": (571, 11),
+    "pena_muerte": (534, 9),
+    "humillacion_presos": (549, 12),
+}
+
+
+@pytest.mark.parametrize("slug", list(COBERTURA_ESPERADA))
+def test_la_cobertura_no_cuenta_perfiles_no_elegibles(slug):
     """
-    Los casos con una dummy oculta activa (no recuerda el voto, no se ubica
-    ideológicamente, sin dato de victimización) no corresponden a ningún perfil
-    que el lector pueda elegir, así que no deben contarse como "observados".
-    Contarlos hacía que la UI afirmara que un perfil aparece en la encuesta
-    cuando no hay ni un caso exacto.
+    Los casos con una dummy oculta activa (no se ubica ideológicamente, sin dato
+    de victimización) no corresponden a ningún perfil que el lector pueda
+    elegir, así que no deben contarse como "observados". Contarlos hacía que la
+    UI afirmara que un perfil aparece en la encuesta cuando no hay ni un caso
+    exacto.
     """
     import json
-    if not config.MODEL_COEFFICIENTS_PATH.exists():
-        pytest.skip("El modelo todavía no fue entrenado")
-    with open(config.MODEL_COEFFICIENTS_PATH, encoding="utf-8") as f:
+    ruta = config.ruta_modelo(slug)
+    if not ruta.exists():
+        pytest.skip(f"«{slug}» todavía no fue entrenada")
+    with open(ruta, encoding="utf-8") as f:
         modelo = json.load(f)
     cob = modelo["cobertura_perfiles"]
     assert cob["observados"] <= cob["posibles"]
     assert cob["con_30_o_mas"] <= cob["observados"]
+
     # Los valores concretos, no sólo la coherencia: los incorrectos anteriores
     # (597 observados, 5 con 30+) también pasaban las dos comprobaciones de
     # arriba. Si la base cambia hay que actualizar estos números a propósito,
     # que es justamente la idea.
     #
-    # Con siete tramos ideológicos simétricos y sin balotaje: 1.008 perfiles
-    # posibles, 573 observados y 7 con 30 casos o más. La versión con balotaje
-    # daba 566 de 1.296 y sólo 4 con 30+, así que la cobertura relativa mejoró
-    # (57% contra 44%) aunque haya más categorías.
+    # `posibles` sale de multiplicar los mapeos de la UI: 4 edades × 2 sexos ×
+    # 3 educaciones × 7 tramos ideológicos × 3 victimizaciones × 2 regiones.
+    observados, con_30 = COBERTURA_ESPERADA[slug]
     assert cob["posibles"] == 1008
-    assert cob["observados"] == 573, (
-        "la cobertura cambió: si es por un cambio de base, actualizar el "
-        "número; si no, revisar que no se estén contando perfiles no elegibles"
+    assert cob["observados"] == observados, (
+        "la cobertura cambió: si es por un cambio de base o de tramos, "
+        "actualizar el número; si no, revisar que no se estén contando "
+        "perfiles no elegibles"
     )
-    assert cob["con_30_o_mas"] == 7
+    assert cob["con_30_o_mas"] == con_30

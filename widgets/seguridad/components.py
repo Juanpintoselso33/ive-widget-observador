@@ -17,10 +17,18 @@ if str(_ROOT) not in sys.path:
 import streamlit as st
 
 from widgets.seguridad.config import (
-    PREGUNTA, EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE,
+    PREGUNTAS, SLUGS, PREGUNTA_DEFECTO, ETIQUETA_A_SLUG,
+    EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE,
     VICTIMA_UI_TO_CODE, REGION_UI_TO_CODE, ESPEC_CRUDA,
-    IDEOLOGIA_INDICE_DEFECTO,
+    IDEOLOGIA_INDICE_DEFECTO, CREDITO, PREDICTORES_OCULTOS,
 )
+
+# Clave del selector de pregunta en st.session_state. Vive acá y la importa
+# app.py, que la necesita para saber qué título de pestaña poner ANTES de
+# dibujar el selector. Escrita a mano en los dos lados, un renombre en uno
+# dejaría al otro leyendo una clave que no existe y la pestaña se quedaría
+# siempre en la pregunta por defecto, en silencio.
+CLAVE_PREGUNTA = "seguridad_pregunta"
 
 # Escala neutra: la intensidad del color acompaña la magnitud, sin valorarla.
 #
@@ -70,21 +78,43 @@ def interpretar(prob, colors, intervalo=None, banda=None):
     return colors["primary"], INTENSIDAD[-1][1]
 
 
+def render_selector_pregunta():
+    """
+    Selector de la medida punitiva. Devuelve el slug elegido.
+
+    Va ARRIBA del título y no entre los selectores de perfil porque no es una
+    característica del lector: es qué se está midiendo. Mezclarlo con edad y
+    región lo haría leer como un atributo más del perfil.
+
+    El valor se guarda en session_state bajo CLAVE_PREGUNTA, que es lo que
+    app.py lee para titular la pestaña.
+    """
+    etiquetas = [PREGUNTAS[s]["etiqueta"] for s in SLUGS]
+    etiqueta = st.radio(
+        "Medida",
+        options=etiquetas,
+        index=SLUGS.index(PREGUNTA_DEFECTO),
+        key=CLAVE_PREGUNTA,
+        horizontal=True,
+        help="Las cuatro se preguntaron en la misma encuesta, con la misma "
+             "escala de acuerdo. Cada una tiene su propio modelo.",
+    )
+    return ETIQUETA_A_SLUG[etiqueta]
+
+
 def render_header(model):
     st.markdown(
-        f'<h1 class="main-title">{model.get("pregunta_titulo", PREGUNTA["titulo"])}</h1>',
+        f'<h1 class="main-title">{model["pregunta_titulo"]}</h1>',
         unsafe_allow_html=True,
     )
     # El enunciado textual del cuestionario, entre comillas. El widget mide el
     # acuerdo con ESA frase; si arriba se muestra una paráfrasis y el modelo
     # estima otra cosa, el número dice algo distinto de lo que el lector cree.
-    enunciado = model.get("pregunta_enunciado", PREGUNTA.get("enunciado", ""))
-    if enunciado:
-        st.markdown(
-            f'<p class="subtitle">A los encuestados se les leyó esta frase: '
-            f'<em>«{enunciado}»</em>.</p>',
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        f'<p class="subtitle">A los encuestados se les leyó esta frase: '
+        f'<em>«{model["pregunta_enunciado"]}»</em>.</p>',
+        unsafe_allow_html=True,
+    )
     st.markdown(
         '<p class="subtitle">Basado en la encuesta de El Observador sobre seguridad '
         'pública de mayo de 2026, entre uruguayos <em>con opinión formada</em> sobre '
@@ -217,7 +247,7 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
         <div class="result-text">
             El modelo estima que, entre quienes tienen estas características y
             <em>postura definida</em>, ese es el porcentaje que declara
-            {model.get("pregunta_afirma", PREGUNTA["afirma"])}.<br>
+            {model["pregunta_afirma"]}.<br>
             <strong style="color: {color};">{texto}</strong>
         </div>
         <div class="result-nacional">
@@ -328,9 +358,105 @@ def render_comparisons(model):
     st.markdown("".join(bloques), unsafe_allow_html=True)
 
 
+# Nombre legible de cada predictor, para poder redactar en castellano qué
+# efectos aguantan y cuáles no sin escribir la lista a mano por pregunta.
+PREDICTOR_LABEL = {
+    "edad_30_44": "tener entre 30 y 44 años",
+    "edad_45_59": "tener entre 45 y 59",
+    "edad_60_plus": "tener 60 o más",
+    "es_mujer": "el sexo",
+    "educ_ter_incomp": "la terciaria incompleta",
+    "educ_ter_comp": "la terciaria completa",
+    "victima_sin_violencia": "haber sido víctima sin violencia",
+    "victima_con_violencia": "haber sido víctima con violencia",
+    "victima_sin_dato": "no haber contestado sobre victimización",
+    "es_montevideo": "vivir en Montevideo",
+    "ideol_no_ubica": "no ubicarse en la escala ideológica",
+    **{f"ideol_{nombre}": f"ubicarse en {etiqueta.lower()}"
+       for nombre, _, _, etiqueta in ESPEC_CRUDA["ideol_tramos"]},
+}
+
+
+def _robustez_md(model):
+    """
+    El párrafo de "qué sostiene y qué no", redactado desde los datos de la
+    validación ordinal que trae el JSON.
+
+    Si el modelo NO trae `robustez`, devuelve una advertencia en vez de
+    inventar la lista. La versión anterior tenía las conclusiones escritas a
+    mano —"no son robustos el sexo, la región…"— y valían para una sola
+    pregunta y un corte ideológico que ya no es el que usa el widget: al pasar
+    a cuatro modelos, ese párrafo habría seguido en pantalla afirmando de las
+    otras tres algo que nadie verificó.
+    """
+    rob = model.get("robustez")
+    if not rob:
+        return (
+            "**Qué sostiene y qué no.** Para esta pregunta todavía no se corrió "
+            "la validación sobre la escala completa de acuerdo, así que no hay "
+            "nada verificado acá sobre qué efectos aguantan al estimarlos de "
+            "otra manera. Leé el ordenamiento con esa reserva."
+        )
+
+    # Se descartan las dummies que la UI nunca enciende: decirle al lector que
+    # no se puede afirmar nada sobre "no ubicarse en la escala" es ruido, porque
+    # no es una opción que él pueda elegir. Siguen contadas en el total, que es
+    # una propiedad del modelo, no de lo que se ofrece en pantalla.
+    frágiles = [PREDICTOR_LABEL.get(p, p) for p in rob.get("no_sostienen", [])
+                if p not in PREDICTORES_OCULTOS]
+    firmes = [PREDICTOR_LABEL.get(p, p) for p in rob.get("sostienen_top", [])
+              if p not in PREDICTORES_OCULTOS]
+
+    partes = [
+        "**Qué sostiene y qué no.** Estimado de otra manera —sobre la escala "
+        "completa de acuerdo, sin excluir a los neutrales— "
+        f"{rob['signos_coincidentes']} de los {rob['n_predictores']} efectos "
+        "mantienen el signo."
+    ]
+    if firmes:
+        partes.append(f"Los más grandes aguantan: {_enumerar(firmes)}.")
+    if frágiles:
+        cuales = _enumerar(frágiles)
+        verbo = "Da vuelta el signo" if len(frágiles) == 1 else "Dan vuelta el signo"
+        partes.append(
+            f"**{verbo} según cómo se estime**: {cuales}. O sea que este widget "
+            "no permite afirmar nada sobre eso, aunque el modelo le asigne un "
+            "valor."
+        )
+    else:
+        partes.append(
+            "Ningún efecto cambia de signo entre las dos formas de estimar."
+        )
+    return " ".join(partes)
+
+
+def _enumerar(items):
+    """«a, b y c». Vacío si no hay nada."""
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    return ", ".join(items[:-1]) + " y " + items[-1]
+
+
 def render_methodology(model):
     info = model.get("model_info", {})
     cob = model.get("cobertura_perfiles", {})
+    robustez_md = _robustez_md(model)
+    # Los dos extremos ideológicos son un solo valor de la escala cada uno, así
+    # que son los tramos más chicos; el número sale del JSON y no va escrito a
+    # mano, que es como quedó publicando "80 casos" después de mover los bordes.
+    tam = model.get("tamanio_tramos_ideologicos", {})
+    extremos = _enumerar([
+        f"*{etiqueta}* ({tam[f'ideol_{nombre}']} casos)"
+        for nombre, _, _, etiqueta in ESPEC_CRUDA["ideol_tramos"]
+        if f"ideol_{nombre}" in tam and nombre in ("izq_extrema", "der_extrema")
+    ])
+    frágiles_md = (
+        f"Los tramos más chicos son {extremos}: son los números más frágiles "
+        "de esta página."
+        if extremos else ""
+    )
     with st.expander("Cómo se calcula"):
         st.markdown(f"""
 El porcentaje sale de una **regresión logística ponderada** ajustada sobre la
@@ -374,24 +500,12 @@ extremo queda pegado al 50%, el widget prefiere no afirmar.
 **Sobre la escala ideológica.** La pregunta fue: *"en una escala donde cero es
 la extrema izquierda y 10 es la extrema derecha, ¿dónde se ubicaría usted?"*.
 Va de 0 a 10, así que **el 5 es el punto medio exacto**, y es la respuesta más
-elegida: un tercio de los encuestados se ubica ahí. Los siete tramos son
-simétricos alrededor de ese centro, para que "extrema izquierda" y "extrema
-derecha" abarquen lo mismo y se puedan comparar. El más chico es *Izquierda
-extrema (0-1)*, con 80 casos: es el número más frágil de esta página.
+elegida: un tercio de los encuestados se ubica ahí. Los siete tramos son los
+que trae la base etiquetada de la encuesta, simétricos alrededor de ese centro,
+para que "extrema izquierda" y "extrema derecha" abarquen lo mismo y se puedan
+comparar. {frágiles_md}
 
-**Qué sostiene y qué no.** Estimado de otra manera —sobre la escala completa de
-acuerdo, sin excluir a los neutrales— el modelo mantiene los efectos grandes:
-**quienes se ubican en el extremo derecho de la escala apoyan mucho más**, y
-apoyan claramente menos quienes se ubican a la izquierda, quienes tienen
-estudios terciarios y los mayores de 60. Haber sido víctima de un delito con
-violencia también aguanta.
-
-En cambio **no son robustos el efecto del sexo, el de la región, el contraste
-entre 30-44 y 18-29 años, ni los dos tramos de la derecha moderada
-(centroderecha y derecha)**: cambian de signo según cómo se estime. O sea que
-este widget no permite afirmar que las mujeres apoyen más que los varones, ni
-Montevideo más que el interior, ni ordenar con confianza esa zona de la escala.
-Lo que sí queda firme son los extremos y la izquierda.
+{robustez_md}
 
 Las tasas por grupo que se muestran abajo son descriptivas de la muestra, no
 efectos ajustados: mezclan el efecto propio del grupo con el de todo lo demás
@@ -400,9 +514,14 @@ que lo acompaña.
 
 
 def render_footer(model):
+    # La fuente y el crédito salen del JSON, no de una constante importada acá:
+    # así el pie dice de qué encuesta salieron ESTOS coeficientes y no de cuál
+    # salen los que se entrenarían hoy. El fallback a config es para un JSON
+    # viejo, anterior a que el crédito se serializara.
     st.markdown(f"""
     <p class="footer-text">
-        Fuente: {model.get('fuente', 'Encuesta El Observador')} ·
+        Fuente: {model.get('fuente', 'Encuesta El Observador')}<br>
+        {model.get('credito', CREDITO)} ·
         Modelo actualizado el {model.get('entrenado', '—')}
     </p>
     """, unsafe_allow_html=True)
