@@ -21,14 +21,27 @@ import json
 import math
 
 from widgets.seguridad.config import (
-    MODEL_COEFFICIENTS_PATH, PREDICTORES, ESPEC_CRUDA, IDEOLOGIA_UI_TO_CODE,
+    PREDICTORES, ESPEC_CRUDA, SLUGS, ruta_modelo,
 )
 
 
-def load_model():
-    """Carga los coeficientes del modelo desde JSON."""
-    with open(MODEL_COEFFICIENTS_PATH, "r", encoding="utf-8") as f:
+def load_model(slug):
+    """Carga los coeficientes de una pregunta desde su JSON."""
+    with open(ruta_modelo(slug), "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def load_modelos():
+    """
+    Los cuatro modelos, indexados por slug.
+
+    Se cargan los cuatro al arrancar y no bajo demanda. Pesan unos 330 KB cada
+    uno —casi todo son las 1.000 réplicas bootstrap—, o sea 1,3 MB que quedan
+    cacheados una sola vez por sesión; a cambio, si falta un JSON o está
+    desalineado, la página lo dice al abrir y no cuando el lector elige esa
+    pregunta y ya está leyendo un número.
+    """
+    return {slug: load_model(slug) for slug in SLUGS}
 
 
 def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima,

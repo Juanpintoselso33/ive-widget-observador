@@ -3,14 +3,21 @@ Entrenamiento del modelo del widget de seguridad.
 
 Replica el enfoque del widget IVE: regresión logística binaria con penalización
 L2, ponderada por diseño muestral (w_norm), C elegido por validación cruzada.
-Exporta model_coefficients.json, que es lo único que consume la app.
+Exporta un JSON de coeficientes por pregunta, que es lo único que consume la app.
 
-La pregunta modelada sale de config.PREGUNTA_ACTIVA. Cambiarla y volver a
-correr este script alcanza para cambiar de pregunta: no hay nada específico de
-"pena de muerte" en el código.
+Entrena UNA pregunta por corrida o las cuatro de config.PREGUNTAS, y escribe un
+JSON por pregunta en widgets/seguridad/modelos/. No hay nada específico de
+"pena de muerte" en el código: agregar una pregunta es sumar una entrada al
+dict de config y volver a correr esto.
+
+Cada pregunta lleva su propio bootstrap de 1.000 réplicas con re-elección de C,
+así que entrenar las cuatro tarda bastante más que entrenar una.
 
 Uso:
+    # las cuatro
     SEGURIDAD_DATA_FILE=/ruta/base.csv python widgets/seguridad/train_model.py
+    # una sola
+    python widgets/seguridad/train_model.py --pregunta pena_muerte
 """
 
 import sys
@@ -30,15 +37,23 @@ from sklearn.metrics import log_loss
 from sklearn.model_selection import StratifiedKFold
 
 from widgets.seguridad.config import (
-    DATA_FILE, MODEL_COEFFICIENTS_PATH, PREGUNTA, PREGUNTA_ACTIVA,
+    DATA_FILE, MODELOS_DIR, ruta_modelo, PREGUNTAS, SLUGS,
     LIKERT_MAP, LIKERT_FAVOR, LIKERT_CONTRA, LIKERT_NEUTRAL,
     PONDERADOR, PREDICTORES, REFERENCIAS, huella_contrato, ESPEC_CRUDA,
+    FUENTE, CREDITO,
     EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE, VICTIMA_UI_TO_CODE,
     REGION_UI_TO_CODE,
 )
 
 RANDOM_STATE = 42
 C_GRID = [0.01, 0.1, 0.5, 1.0, 5.0, 10.0]
+
+# Réplicas bootstrap por pregunta. Es una constante de módulo y no un
+# número suelto adentro de entrenar() para poder bajarla desde la línea de
+# comandos y hacer una corrida de humo en segundos: entrenar las cuatro con
+# las 1.000 reales lleva bastante, y descubrir un error de tipeo al final de
+# esa corrida es tirar todo el tiempo a la basura.
+N_REPLICAS = 1000
 
 # Escala nivel_educativo (1-10) del proveedor, colapsada.
 #
@@ -78,13 +93,12 @@ def cargar():
         )
     df = pd.read_csv(DATA_FILE, encoding="utf-8-sig")
     print(f"Base: {DATA_FILE.name} — {len(df)} filas")
-    print(f"Pregunta activa: {PREGUNTA_ACTIVA} → {PREGUNTA['columna']}")
     return df
 
 
-def preparar(df):
+def preparar(df, pregunta):
     """Construye la variable dependiente y las dummies de los predictores."""
-    col = PREGUNTA["columna"]
+    col = pregunta["columna"]
     if col not in df.columns:
         raise SystemExit(f"La columna '{col}' no está en la base.")
 
@@ -451,8 +465,14 @@ def _mcfadden(modelo, X, y, w):
     return 1 - ll / ll0
 
 
-def main():
-    df = preparar(cargar())
+def entrenar(df_crudo, slug, n_replicas=None):
+    """Entrena una pregunta y escribe su JSON. Devuelve la ruta escrita."""
+    n_replicas = N_REPLICAS if n_replicas is None else n_replicas
+    pregunta = PREGUNTAS[slug]
+    print(f"\n{'=' * 64}")
+    print(f"Pregunta: {slug} → {pregunta['columna']}")
+    print("=" * 64)
+    df = preparar(df_crudo, pregunta)
     w_col = PONDERADOR
 
     # --- Modelo principal ---------------------------------------------------
@@ -484,9 +504,8 @@ def main():
 
     print("\nBootstrap estratificado para los intervalos (re-elige C en cada")
     print("réplica, así que tarda unos minutos)...")
-    N_REPLICAS = 1000
-    boot, boot_meta = bootstrap_coeficientes(d, X, y, w, N_REPLICAS)
-    print(f"  {boot_meta['utiles']} réplicas útiles sobre {N_REPLICAS}")
+    boot, boot_meta = bootstrap_coeficientes(d, X, y, w, n_replicas)
+    print(f"  {boot_meta['utiles']} réplicas útiles sobre {n_replicas}")
     print(f"  C elegido por réplica: {boot_meta['c_por_replica']}")
 
     coeficientes = {"intercept": float(modelo.intercept_[0])}
@@ -583,14 +602,15 @@ def main():
             stats[nombre] = None  # n insuficiente para publicar
 
     salida = {
-        "pregunta_slug": PREGUNTA_ACTIVA,
-        "contrato": huella_contrato(),
+        "pregunta_slug": slug,
+        "contrato": huella_contrato(slug),
         "predictores": list(PREDICTORES),
-        "pregunta_columna": PREGUNTA["columna"],
-        "pregunta_titulo": PREGUNTA["titulo"],
-        "pregunta_afirma": PREGUNTA["afirma"],
-        "pregunta_enunciado": PREGUNTA["enunciado"],
-        "pregunta_titulo_corto": PREGUNTA["titulo_corto"],
+        "pregunta_columna": pregunta["columna"],
+        "pregunta_titulo": pregunta["titulo"],
+        "pregunta_afirma": pregunta["afirma"],
+        "pregunta_enunciado": pregunta["enunciado"],
+        "pregunta_titulo_corto": pregunta["titulo_corto"],
+        "pregunta_etiqueta": pregunta["etiqueta"],
         "coefficients": coeficientes,
         "odds_ratios": odds,
         "coefficients_neutral": coef_neutral,
@@ -606,6 +626,17 @@ def main():
         "stats_by_group": stats,
         "referencias": REFERENCIAS,
         "cobertura_perfiles": cobertura,
+        # Cuántos encuestados cayeron en cada tramo ideológico. Va al JSON para
+        # que la metodología pueda nombrar los más chicos sin tenerlos escritos
+        # a mano: así fue como quedó publicando "80 casos" un tiempo después de
+        # que los bordes de los tramos se movieran.
+        "tamanio_tramos_ideologicos": {
+            f"ideol_{nombre}": int(
+                df["var_242 | Autoubicacion izquierda-derecha (0-10)"]
+                .between(desde, hasta).sum()
+            )
+            for nombre, desde, hasta, _ in ESPEC_CRUDA["ideol_tramos"]
+        },
         "model_info": {
             "n": int(len(d)),
             # N efectivo de Kish: la dispersión de los ponderadores hace que
@@ -627,17 +658,57 @@ def main():
             "cv_neg_log_loss": round(float(cv_neu), 4),
             "mcfadden_r2": round(float(r2_n), 4),
         },
-        "fuente": "Encuesta El Observador — Seguridad pública, mayo 2026",
+        # Tomer: "en la fuente, siempre es la encuesta de El
+        # Observador-UMAD-Ferreira". Va textual y en una sola constante para
+        # que los cuatro JSON no puedan quedar con créditos distintos.
+        "fuente": FUENTE,
+        "credito": CREDITO,
         "entrenado": date.today().isoformat(),
     }
 
-    with open(MODEL_COEFFICIENTS_PATH, "w", encoding="utf-8") as f:
+    MODELOS_DIR.mkdir(parents=True, exist_ok=True)
+    ruta = ruta_modelo(slug)
+    with open(ruta, "w", encoding="utf-8") as f:
         json.dump(salida, f, ensure_ascii=False, indent=2)
-    print(f"\nEscrito: {MODEL_COEFFICIENTS_PATH}")
+    print(f"\nEscrito: {ruta}")
 
     print("\nOdds ratios (orden por magnitud del efecto):")
     for nombre, valor in sorted(odds.items(), key=lambda kv: abs(np.log(kv[1])), reverse=True):
         print(f"  {nombre:24s} OR={valor:6.3f}")
+
+    return ruta
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--pregunta", choices=SLUGS, action="append", dest="preguntas",
+        help="entrenar sólo esta pregunta (se puede repetir). Por defecto, las cuatro.",
+    )
+    parser.add_argument(
+        "--replicas", type=int, default=N_REPLICAS,
+        help=f"réplicas bootstrap por pregunta (por defecto {N_REPLICAS}). "
+             "Bajarlo sirve para una corrida de humo, NO para publicar.",
+    )
+    args = parser.parse_args()
+    slugs = args.preguntas or SLUGS
+    if args.replicas != N_REPLICAS:
+        print(f"AVISO: {args.replicas} réplicas en vez de {N_REPLICAS}. "
+              "Los intervalos que salgan de acá no son publicables.")
+
+    # La base se lee UNA vez para las cuatro: son 3.377 filas, pero releerla por
+    # pregunta invita a que alguien entrene la mitad con un archivo y la otra
+    # mitad con otro si la base cambia en el medio.
+    df_crudo = cargar()
+
+    escritas = [entrenar(df_crudo, slug, args.replicas) for slug in slugs]
+
+    print(f"\n{'=' * 64}")
+    print(f"Listo: {len(escritas)} modelo(s)")
+    for ruta in escritas:
+        print(f"  {ruta}")
 
 
 if __name__ == "__main__":
