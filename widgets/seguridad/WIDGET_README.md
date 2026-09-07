@@ -254,6 +254,56 @@ Firmes (≥95% de las réplicas): extrema izquierda → izquierda en mano dura
   así que las dos inversiones internas de edad no se pueden clasificar como "del
   dato" o "del ajuste" sin volver a la base.
 
+## Diagnóstico econométrico (7/9/2026)
+
+Lo corre `scripts/diagnostico_econometrico.py`. Responde tres preguntas que el
+pipeline anterior no respondía: si el modelo discrimina **fuera de muestra**, si
+las probabilidades están **calibradas**, y si hay colinealidad o celdas
+degeneradas.
+
+La distinción entre las dos primeras importa acá más que de costumbre: el widget
+no publica un ranking, publica **un número**. Un modelo puede ordenar bien los
+perfiles y aun así imprimir porcentajes corridos.
+
+| Pregunta | AUC dentro | AUC 5-fold | Caída | Brier | Peor desvío de calibración |
+|---|---:|---:|---:|---:|---:|
+| Mano dura | 0,811 | **0,776** | +0,034 | 0,163 | **11,7 pp** |
+| Cadena perpetua | 0,723 | **0,665** | +0,059 | 0,156 | 9,7 pp |
+| Pena de muerte | 0,805 | **0,782** | +0,023 | 0,180 | 6,7 pp |
+| Humillación | 0,850 | **0,814** | +0,036 | 0,085 | 5,5 pp |
+
+**Dos cosas que hay que tener presentes al publicar.**
+
+1. **Cadena perpetua discrimina poco: AUC fuera de muestra 0,665.** Es
+   coherente con su McFadden de 0,10 y con el Spearman de 0,20 de la validación
+   ordinal. Con 78,6% de apoyo casi todo el mundo está de acuerdo y queda poco
+   que explicar. Las tres señales apuntan a lo mismo desde ángulos distintos:
+   **es la pregunta más débil de las cuatro y la que menos conviene titular con
+   diferencias entre perfiles.**
+2. **Mano dura sobreestima en el extremo bajo.** En el decil de menor apoyo
+   predice 21% y se observa 10%. Los perfiles que salen bajos en esta pregunta
+   salen *menos* bajos de lo que la encuesta muestra. El intervalo publicado
+   cubre esa diferencia, pero la estimación puntual está corrida.
+
+**Lo que salió limpio:** el sobreajuste es leve (la caída del AUC va de 0,02 a
+0,06); no hay colinealidad (el VIF más alto es 3,49, en los tramos de edad, y el
+corte habitual es 5); y no hay separación — las dos celdas por debajo de 50 casos
+(`ideol_izq_extrema` con 37 y `victima_sin_dato` con 37) tienen tasas interiores,
+no 0% ni 100%.
+
+**Efecto de diseño:** deff 4,70. Los 2.710 casos con postura definida rinden como
+576 (N de Kish), con ponderadores entre 0,20 y 12,83. Los intervalos del widget
+salen de bootstrap estratificado, así que ya lo incorporan.
+
+### Lo que sigue sin hacerse
+
+- **Errores estándar design-aware por linealización de Taylor.** El bootstrap
+  estratificado respeta los estratos pero la base no trae conglomerados.
+- **Un conjunto de test separado de verdad.** La validación es cruzada, no
+  out-of-sample sobre datos reservados; con n efectivo 576 reservar un test
+  costaría más de lo que informa.
+- **Bootstrap de la diferencia perfil−promedio nacional**, ya anotado arriba.
+
 ## Decisión de diseño: se actualiza en vivo, sin botón de confirmar
 
 El Figma "Producto UY" dibuja un flujo con botones **"Confirmar"** y **"Volver a
