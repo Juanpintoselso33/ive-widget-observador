@@ -204,6 +204,56 @@ magnitudes.
 - **El N efectivo ronda 600, no 2.700.** La dispersión de los ponderadores hace
   que las respuestas rindan como esa cantidad a efectos de precisión (N de Kish).
 
+## Auditoría exhaustiva de lo publicado (7/9/2026)
+
+Codex barrió los **4.032 resultados** que el widget puede mostrar —4 preguntas x
+1.008 perfiles— con sus 1.000 réplicas bootstrap cada uno, buscando
+inconsistencias. Dos hallazgos reales, los dos ya corregidos:
+
+1. **1.883 de 4.032 resultados afirmaban una diferencia contra el promedio
+   nacional que su propio intervalo no sostenía.** El widget ya tenía esa
+   prudencia para el 50% (`interpretar()` + `banda_decision()`) y le faltaba
+   acá. Ahora la decide `components.brecha_nacional()`, que es pura y está
+   barrida por `tests/test_texto_publicado.py`. Vivía adentro del render, que es
+   por lo que ningún test la alcanzaba.
+2. **65 perfiles se publicaban como «0%»** sobre estimaciones de 0,176% a
+   0,499%, todos en humillación a los presos. «0%» no es un redondeo: afirma que
+   nadie con ese perfil está a favor. Lo resuelve `components.formato_pct()`,
+   que devuelve `<1%` y `>99%` en los dos extremos.
+
+**Qué NO encontró:** ninguna inconsistencia de cableado. Verificó que los cuatro
+contratos coinciden, que los cuatro JSON traen los 17 predictores, que
+`bootstrap.orden` es exactamente `["intercept", *PREDICTORES]` y que la
+inferencia arma las dummies por nombre y no por posición.
+
+### Las inversiones en variables ordenadas son del dato, no del código
+
+Encontró 11 inversiones adyacentes. De las 9 contrastables contra
+`stats_by_group`, **las 9 están también en el dato crudo**. Ninguna aparece sólo
+después de ajustar.
+
+La que motivó la auditoría —en mano dura, **terciaria completa sale más punitiva
+que terciaria incompleta**— es real en crudo (57,0% → 59,8%) pero **sólo
+conserva el signo en el 88,6% de las réplicas**, y el intervalo de la diferencia
+cruza el cero: los dos niveles están empatados y el widget muestra un orden que
+el dato no sostiene. No es publicable como hallazgo.
+
+Firmes (≥95% de las réplicas): extrema izquierda → izquierda en mano dura
+(99,1%) y en pena de muerte (96,0%); centro → centroderecha en pena de muerte
+(100%); 18-29 → 30-44 en cadena perpetua (98,5%). Ruido claro: extrema izquierda
+→ izquierda en humillación, con 53,6%.
+
+### Pendiente
+
+- **El promedio nacional no trae su propia incertidumbre.** `brecha_nacional()`
+  compara el intervalo del perfil contra un promedio tratado como exacto, así
+  que es conservador de un solo lado. Lo limpio es bootstrapear la diferencia
+  perfil−promedio, que necesita serializar la tasa nacional por réplica en
+  `train_model.py`. No está hecho.
+- **`stats_by_group` sólo guarda los tramos de edad extremos** (18-29 y 60+),
+  así que las dos inversiones internas de edad no se pueden clasificar como "del
+  dato" o "del ajuste" sin volver a la base.
+
 ## Decisión de diseño: el color no valora
 
 Este widget **no** usa `shared.config.get_interpretation`, que pinta el apoyo de

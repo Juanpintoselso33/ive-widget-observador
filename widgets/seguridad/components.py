@@ -191,11 +191,56 @@ def render_probability_bar(prob):
         </div>
         <div class="prob-container">
             <div class="prob-indicator" style="left: {prob}%;">
-                <div class="prob-label">{prob:.0f}%</div>
+                <div class="prob-label">{formato_pct(prob)}</div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+
+def brecha_nacional(prob_r, nacional_r, intervalo):
+    """
+    La línea que compara el perfil contra el promedio nacional.
+
+    POR QUÉ ES UNA FUNCIÓN APARTE Y NO TRES LÍNEAS ADENTRO DE LA TARJETA.
+    Vivía adentro de `render_result_card()`, que dibuja, así que ningún test la
+    podía alcanzar — y por eso se publicó mal. Codex barrió los 4.032 resultados
+    (4 preguntas x 1.008 perfiles) el 7/9/2026 y encontró **1.883** en los que el
+    widget afirmaba "este perfil está X pp por encima/debajo" con un intervalo
+    que CONTIENE el promedio. Su ejemplo: mano dura, hombre de 18-29, secundaria
+    o menos, extrema izquierda, no víctima, del interior — mostraba 55%,
+    intervalo 27%-77%, promedio 67%, y afirmaba "12pp por debajo". El punto está
+    12 pp abajo; ese intervalo no sostiene que el perfil lo esté.
+
+    Es exactamente la prudencia que el widget ya tenía para el 50% —ver
+    `interpretar()` y `model.banda_decision()`— y que a esta comparación le
+    faltaba.
+
+    QUÉ SE CORRIGE. La AFIRMACIÓN, no el número: la brecha se sigue mostrando,
+    porque es información, pero atribuida a la estimación puntual y no al
+    perfil. Se compara contra el intervalo REDONDEADO, que es el que ve el
+    lector, y de forma inclusiva.
+
+    QUÉ QUEDA PENDIENTE. Lo estadísticamente limpio sería bootstrapear la
+    diferencia perfil−promedio: el promedio nacional tampoco trae su propia
+    incertidumbre, así que este chequeo es conservador de un solo lado. Necesita
+    la tasa nacional por réplica, que hoy no se serializa. Anotado en el README.
+    """
+    diff = prob_r - nacional_r
+    if not diff:
+        return "= este perfil coincide con el promedio"
+
+    arrow = "↑" if diff > 0 else "↓"
+    posicion = "por encima" if diff > 0 else "por debajo"
+
+    promedio_dentro = (
+        intervalo is not None
+        and round(intervalo[0]) <= nacional_r <= round(intervalo[1])
+    )
+    if promedio_dentro:
+        return (f"{arrow} la estimación puntual queda {abs(diff)}pp {posicion}, "
+                "pero el margen de error no permite afirmar la diferencia")
+    return f"{arrow} este perfil está {abs(diff)}pp {posicion}"
 
 
 def render_result_card(model, prob, colors, intervalo=None, banda=None):
@@ -207,8 +252,6 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
     # vista, que en una pieza periodística se lee como un error.
     prob_r = round(prob)
     nacional_r = round(model["prob_favor_nacional"])
-    diff = prob_r - nacional_r
-    arrow = "↑" if diff > 0 else "↓" if diff < 0 else "="
 
     # La tasa de "no toma posición" se muestra GENERAL, no por perfil. El modelo
     # de neutralidad tiene un pseudo-R² de 0,03: prácticamente no distingue
@@ -231,18 +274,15 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
         bajo, alto = intervalo
         intervalo_html = (
             f'<div class="result-intervalo">Intervalo de confianza del 95%: '
-            f'entre <strong>{bajo:.0f}%</strong> y <strong>{alto:.0f}%</strong></div>'
+            f'entre <strong>{formato_pct(bajo)}</strong> y '
+            f'<strong>{formato_pct(alto)}</strong></div>'
         )
 
-    posicion = "por encima" if diff > 0 else "por debajo" if diff < 0 else "igual"
-    brecha = (
-        f"{arrow} este perfil está {abs(diff)}pp {posicion}"
-        if diff else "= este perfil coincide con el promedio"
-    )
+    brecha = brecha_nacional(prob_r, nacional_r, intervalo)
 
     st.markdown(f"""
     <div class="result-card">
-        <div class="result-number" style="color: {color};">{prob_r}%</div>
+        <div class="result-number" style="color: {color};">{formato_pct(prob)}</div>
         {intervalo_html}
         <div class="result-text">
             El modelo estima que, entre quienes tienen estas características y
@@ -252,7 +292,7 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
         </div>
         <div class="result-nacional">
             Promedio nacional:
-            <span class="result-nacional-value">{nacional_r}%</span>
+            <span class="result-nacional-value">{formato_pct(model["prob_favor_nacional"])}</span>
             <span class="result-nacional-diff" style="color: {colors["text_muted"]};">
                 {brecha}
             </span>
@@ -428,6 +468,29 @@ def _robustez_md(model):
             "Ningún efecto cambia de signo entre las dos formas de estimar."
         )
     return " ".join(partes)
+
+
+def formato_pct(valor):
+    """
+    Porcentaje redondeado a entero, salvo cuando redondear diría algo falso.
+
+    `{:.0f}` convierte 0,18% en «0%», y «0%» no es un redondeo: es la
+    afirmación de que NADIE con ese perfil está a favor, que el dato no dice.
+    Codex encontró 65 perfiles así el 7/9/2026, todos en humillación a los
+    presos —60 años o más, ubicados de centroizquierda hacia la izquierda—, con
+    estimaciones reales entre 0,176% y 0,499% e intervalos que llegaban al 1-3%.
+    El peor mostraba «0%» con intervalo «0% a 1%» sobre un valor de 0,176%.
+
+    Se corrige en los dos extremos por simetría: el mismo redondeo produciría
+    «100%» a partir de 99,7%, y afirmar unanimidad es el mismo error dado
+    vuelta. Con estas cuatro preguntas no se da hoy, pero el widget se
+    re-entrena con otras.
+    """
+    if 0 < valor < 0.5:
+        return "<1%"
+    if 99.5 < valor < 100:
+        return ">99%"
+    return f"{round(valor)}%"
 
 
 def _enumerar(items):
