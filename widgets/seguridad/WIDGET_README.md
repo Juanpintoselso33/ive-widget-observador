@@ -254,6 +254,24 @@ Firmes (≥95% de las réplicas): extrema izquierda → izquierda en mano dura
   así que las dos inversiones internas de edad no se pueden clasificar como "del
   dato" o "del ajuste" sin volver a la base.
 
+## Decisión de diseño: se actualiza en vivo, sin botón de confirmar
+
+El Figma "Producto UY" dibuja un flujo con botones **"Confirmar"** y **"Volver a
+empezar"**: el lector elige sus características y recién entonces pide el
+resultado. **El widget NO lo implementa, y es a propósito.**
+
+Tomer lo decidió el 7/9/2026: *"dejalo actualizando en vivo, sin botón de
+confirmar"*. Cada cambio en un selector recalcula el porcentaje al instante.
+
+No es un pendiente ni un olvido. Si alguien compara la pantalla contra el Figma y
+ve que faltan los botones, la respuesta es ésta; **no hay que agregarlos** sin
+que el cliente cambie de opinión.
+
+Es la única divergencia deliberada respecto del Figma en el comportamiento. Las
+divergencias visuales que quedan están anotadas en `shared/config.py`
+(`OBSERVADOR_COLORS`: colores muestreados de la imagen, no inspeccionados) y en
+`shared/styles.py` (el punto del radio queda azul).
+
 ## Decisión de diseño: el color no valora
 
 Este widget **no** usa `shared.config.get_interpretation`, que pinta el apoyo de
