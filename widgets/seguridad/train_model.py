@@ -52,9 +52,19 @@ C_GRID = [0.01, 0.1, 0.5, 1.0, 5.0, 10.0]
 # Réplicas bootstrap por pregunta. Es una constante de módulo y no un
 # número suelto adentro de entrenar() para poder bajarla desde la línea de
 # comandos y hacer una corrida de humo en segundos: entrenar las cuatro con
-# las 1.000 reales lleva bastante, y descubrir un error de tipeo al final de
-# esa corrida es tirar todo el tiempo a la basura.
-N_REPLICAS = 1000
+# las reales lleva bastante, y descubrir un error de tipeo al final de esa
+# corrida es tirar todo el tiempo a la basura.
+#
+# 10.000 Y NO 1.000 (8/9/2026). Con los niveles calibrados —97 a 99 según la
+# pregunta— el intervalo pide cuantiles muy en la cola: con q=0,005 y 1.000
+# réplicas, el percentil interpola entre la PRIMERA y la SEGUNDA observación.
+# Codex ajustó 10.000 bootstrap independientes y midió el error Monte Carlo por
+# extremo: con 1.000 la mediana era 0,84 pp, el percentil 95 llegaba a 2,23 y el
+# máximo a 4,20. Con 10.000 baja a 0,27 / 0,78 / 1,29.
+#
+# El costo es tiempo de entrenamiento y tamaño del JSON, no de producción: la
+# app lee el archivo una vez y lo cachea.
+N_REPLICAS = 10000
 
 # Escala nivel_educativo (1-10) del proveedor, colapsada.
 #
@@ -481,7 +491,7 @@ def _nodos_calibracion(oof, y, w, k=None):
     return xs, ys
 
 
-def ajustar_calibracion(d, X, y, w):
+def ajustar_calibracion(d, X, y, w, n_replicas=None):
     """
     Mapa de recalibración: spline monótona sobre nodos de igual masa ponderada.
 
@@ -567,8 +577,13 @@ def ajustar_calibracion(d, X, y, w):
     estratos = d["estrato"].values
     indices = [np.where(estratos == e)[0] for e in np.unique(estratos)]
     rng = np.random.default_rng(RANDOM_STATE)
+    # TANTAS RÉPLICAS DE MAPA COMO DE COEFICIENTES. Estaba fijo en N_REPLICAS
+    # mientras los coeficientes seguían a `--replicas`: subir el argumento
+    # rompía el apareamiento a partir de la réplica 1.000, porque model.py
+    # recicla los mapas por módulo. Lo marcó Codex.
+    n_replicas = N_REPLICAS if n_replicas is None else n_replicas
     replicas = []
-    for _ in range(N_REPLICAS):
+    for _ in range(n_replicas):
         i = np.concatenate([rng.choice(ix, size=len(ix), replace=True) for ix in indices])
         xs_b, ys_b = _nodos_calibracion(oof[i], y[i], w[i])
         replicas.append([[round(float(v), 6) for v in xs_b],
@@ -650,7 +665,7 @@ def entrenar(df_crudo, slug, n_replicas=None):
     calibracion = None
     if slug in PREGUNTAS_A_RECALIBRAR:
         print("\nAjustando el mapa de recalibración (fuera de muestra)...")
-        calibracion = ajustar_calibracion(d, X, y, w)
+        calibracion = ajustar_calibracion(d, X, y, w, n_replicas)
         if calibracion is None:
             raise SystemExit(
                 f"[{slug}] está declarada en PREGUNTAS_A_RECALIBRAR pero el mapa "

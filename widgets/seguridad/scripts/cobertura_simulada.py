@@ -128,10 +128,22 @@ def una_simulacion(d, X, w, p_true, Xp, estratos, n_replicas, rng, recalibra):
     # producción. Es lo que hace caro esto y también lo que hay que medir: con C
     # fijo los intervalos se achican y la cobertura medida no sería la del
     # procedimiento que se publica.
+    # EL REMUESTREO DE COEFICIENTES USA SU PROPIO GENERADOR, sembrado igual que
+    # producción, y NO el `rng` de la simulación.
+    #
+    # Por qué importa: en producción, `bootstrap_coeficientes` y
+    # `ajustar_calibracion` arrancan las dos con `default_rng(RANDOM_STATE)` y
+    # recorren los mismos estratos en el mismo orden, así que la réplica i de
+    # coeficientes y la i del mapa salen del MISMO remuestreo. Acá se usaba el
+    # generador de la simulación —ya avanzado por el sorteo de resultados— y esa
+    # correspondencia se rompía: el simulador medía un procedimiento distinto
+    # del publicado. Codex lo midió sobre los mismos resultados simulados: la
+    # cobertura de mano dura al nivel 98 pasaba de 97,00% a 98,01%.
+    rng_boot = np.random.default_rng(tm.RANDOM_STATE)
     indices = [np.where(estratos == e)[0] for e in np.unique(estratos)]
     coefs = []
     for _ in range(n_replicas):
-        idx = np.concatenate([rng.choice(ix, size=len(ix), replace=True)
+        idx = np.concatenate([rng_boot.choice(ix, size=len(ix), replace=True)
                               for ix in indices])
         yb = y[idx]
         if len(np.unique(yb)) < 2:
