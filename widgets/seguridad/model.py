@@ -21,7 +21,7 @@ import json
 import math
 
 from widgets.seguridad.config import (
-    PREDICTORES, ESPEC_CRUDA, SLUGS, ruta_modelo,
+    PREDICTORES, ESPEC_CRUDA, SLUGS, ruta_modelo, PREGUNTAS_A_RECALIBRAR,
 )
 
 
@@ -98,6 +98,49 @@ def _z(coef, features):
 
 def _sigmoid_pct(z):
     return (1 / (1 + math.exp(-z))) * 100
+
+
+def problemas_de_calibracion(slug, model):
+    """
+    Verifica que el mapa de recalibración sea el que corresponde y esté sano.
+
+    POR QUÉ NO ALCANZA LA HUELLA DEL CONTRATO. La huella cubre qué preguntas se
+    declaran recalibradas, pero no el CONTENIDO del JSON: Codex sacó el mapa de
+    una copia en memoria conservando la huella, y pasaba todos los controles de
+    arranque — `_calibrar` devolvía la probabilidad cruda en silencio, o sea el
+    widget publicando sin recalibrar una pregunta que se declaró que lo necesita.
+    Al revés también: un mapa pegado a otra pregunta se habría aplicado igual.
+
+    Devuelve una lista de problemas, vacía si está todo bien.
+    """
+    cal = model.get("calibracion")
+    debe_tener = slug in PREGUNTAS_A_RECALIBRAR
+
+    if debe_tener and not cal:
+        return [f"«{slug}» está declarada en PREGUNTAS_A_RECALIBRAR y su JSON no "
+                "trae mapa: se publicaría sin recalibrar"]
+    if cal and not debe_tener:
+        return [f"«{slug}» trae un mapa de recalibración y no está declarada: se "
+                "aplicaría una corrección que nadie pidió"]
+    if not cal:
+        return []
+
+    fallas = []
+    xs, ys = cal.get("grilla"), cal.get("valores")
+    if not xs or not ys or len(xs) != len(ys):
+        return [f"«{slug}»: la grilla y los valores no tienen el mismo largo"]
+    if len(xs) < 2:
+        fallas.append(f"«{slug}»: la grilla tiene menos de dos puntos")
+    if any(not math.isfinite(v) for v in xs + ys):
+        fallas.append(f"«{slug}»: hay valores no finitos en el mapa")
+    if any(b <= a for a, b in zip(xs, xs[1:])):
+        fallas.append(f"«{slug}»: las abscisas del mapa no son estrictamente crecientes")
+    if any(b < a for a, b in zip(ys, ys[1:])):
+        fallas.append(f"«{slug}»: el mapa NO es monótono, puede dar vuelta el orden "
+                      "de dos perfiles")
+    if any(not (0.0 <= v <= 1.0) for v in ys):
+        fallas.append(f"«{slug}»: el mapa devuelve valores fuera de 0-1")
+    return fallas
 
 
 def _calibrar(model, pct):
