@@ -1,6 +1,7 @@
 {
   "pregunta_slug": "politico_mano_dura",
-  "contrato": "cccca563497bff84",
+  "nivel_calibrado": 98,
+  "contrato": "8c8600c261355d2c",
   "predictores": [
     "edad_30_44",
     "edad_45_59",
@@ -40208,5 +40209,5 @@
   },
   "fuente": "Encuesta El Observador-UMAD-Ferreira sobre seguridad pública, mayo de 2026",
   "credito": "Análisis y desarrollo: Juan Ignacio Pintos Elso",
-  "entrenado": "2026-09-07"
+  "entrenado": "2026-09-08"
 }

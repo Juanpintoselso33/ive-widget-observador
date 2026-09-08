@@ -273,7 +273,7 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
     if intervalo:
         bajo, alto = intervalo
         intervalo_html = (
-            f'<div class="result-intervalo">Intervalo de confianza del 95%: '
+            f'<div class="result-intervalo">Intervalo estimado del modelo: '
             f'entre <strong>{formato_pct(bajo)}</strong> y '
             f'<strong>{formato_pct(alto)}</strong></div>'
         )
@@ -577,6 +577,20 @@ casos o más. El modelo es aditivo y estima las que faltan combinando
 información de perfiles parecidos, no observándolas: cuanto más inusual sea la
 combinación elegida, más extrapolación hay detrás del número y más ancho es
 su intervalo.
+
+**Qué es el intervalo, y por qué ya no dice "de confianza del 95%".** Se midió
+cuánto cubre de verdad: se tomó el modelo como si fuera el mundo, se simularon
+resultados desde él y se rehízo todo el procedimiento doscientas veces por
+pregunta. Pidiendo el 95% clásico, el intervalo contenía el valor verdadero
+entre el 90% y el 93% de las veces, no el 95%. Ahora se pide un percentil más
+ancho, calibrado por esa simulación, y el promedio llega al 95%.
+
+Pero el promedio es sobre todos los perfiles, y **el lector recibe el de su
+perfil**: hay combinaciones poco frecuentes donde la cobertura sigue siendo
+bastante menor. Por eso el rótulo dice "intervalo estimado del modelo" y no
+promete un 95% que no se puede sostener perfil por perfil. Sigue siendo la mejor
+medida disponible de cuánta incertidumbre hay detrás del número, y sigue siendo
+ancha a propósito.
 
 **Por qué a veces el intervalo no llega al 50% y aun así no se afirma de qué
 lado está la mayoría.** El intervalo no se calcula con una fórmula cerrada: se

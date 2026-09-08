@@ -166,6 +166,78 @@ PONDERADOR = "w_norm"
 # puede con esa forma.
 PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 
+
+# ============================================================
+# NIVEL CALIBRADO DEL INTERVALO
+# ============================================================
+# El percentil del bootstrap que hay que pedir para que el intervalo cubra de
+# verdad el 95%. NO es un capricho: el bootstrap percentil SUB-CUBRE, y acá está
+# medido cuánto.
+#
+# CÓMO SE MIDIÓ (scripts/cobertura_simulada.py, 8/9/2026). Se tomó el modelo
+# publicado como verdad, se sortearon resultados desde él, y se corrió el
+# PIPELINE COMPLETO —elección de C, ajuste, bootstrap de 1.000 réplicas con
+# re-elección de C, mapa de calibración— 200 veces por pregunta. Después se
+# contó, para cada uno de los 1.008 perfiles, cuántas veces el intervalo
+# contenía la probabilidad verdadera, que se conoce por construcción.
+#
+# Pidiendo el 95% nominal, la cobertura REAL era:
+#   mano dura 92,1% · cadena perpetua 90,4% · pena de muerte 93,2% ·
+#   humillación 92,6%
+#
+# O sea que el widget decía "95%" y entregaba entre 90 y 93.
+#
+# POR QUÉ SUBIR EL NIVEL Y NO ENSANCHAR POR UN FACTOR. Se probaron las dos. A
+# igualdad de cobertura media, subir el nivel deja muchísimos menos perfiles
+# malos, porque sigue la forma de la distribución bootstrap en vez de estirarla
+# simétricamente — y cerca de 0 y de 100 esa distribución es muy asimétrica.
+# En cadena perpetua: el nivel 99% deja UN perfil por debajo de 90% de
+# cobertura; el factor x1,30, que da la misma cobertura media, deja 35.
+#
+# CADA PREGUNTA NECESITA LO SUYO, así que no hay un número global.
+#
+# TRES COSAS QUE ESTOS NÚMEROS NO RESUELVEN, todas medidas por Codex al revisar
+# el estudio (8/9/2026). Se documentan acá porque son la deuda pendiente, no
+# notas al pie:
+#
+# 1. EL PROMEDIO TAPA LA COLA. Se llega a ~95% promediando los 1.008 perfiles,
+#    pero el lector recibe el intervalo de SU perfil. En mano dura, al nivel 98
+#    quedan 55 perfiles con cobertura bajo 90% y el peor cubre 74%; incluso al
+#    99 el peor llega a 75%. Por eso la UI dice "intervalo estimado del modelo"
+#    y no promete un 95% que no se sostiene perfil por perfil.
+#
+# 2. EL SIMULADOR NO ES FIEL PARA MANO DURA. No reproduce exactamente el
+#    apareamiento entre réplicas de coeficientes y de mapa que usa producción.
+#    Codex midió la diferencia sobre los mismos resultados simulados: la
+#    cobertura al nivel 98 pasa de 97,00% a 98,01%, o sea +1,00 pp. El sesgo va
+#    hacia MÁS cobertura, así que el 98 es conservador y no peligroso, pero el
+#    número que lo eligió no es el del procedimiento publicado. Antes de mover
+#    este nivel hay que arreglar el simulador y recalibrar.
+#
+# 3. MIL RÉPLICAS NO ALCANZAN PARA ESTAS COLAS. Con el percentil 99, el cuantil
+#    0,005 interpola entre la primera y la segunda observación de 1.000. Codex
+#    ajustó 10.000 bootstrap independientes y midió el error Monte Carlo por
+#    extremo: mediana 0,80 pp, percentil 95 de 2,29 y máximo 4,02. Con 10.000
+#    réplicas bajaría a 0,27 / 0,78 / 1,29. Subirlas tiene una trampa: hoy
+#    `--replicas` sube los coeficientes pero los mapas siguen en N_REPLICAS y se
+#    reciclan por módulo, así que subir sólo el argumento rompería el
+#    apareamiento de mano dura después de la réplica 1.000.
+#
+# Y una afirmación mía que quedó sobredicha: dije que subir el nivel gana sobre
+# ensanchar por un factor "a igualdad de cobertura". No era a igualdad: el nivel
+# 99 daba 96,08% y el factor 1,30 daba 95,08%, un punto entero de diferencia. La
+# ventaja del nivel sobre el factor sigue sin demostrarse limpiamente.
+#
+# QUÉ NO ARREGLA TAMPOCO: la verdad simulada es el propio modelo, así que esto
+# corrige la sub-cobertura del PROCEDIMIENTO. El error de especificación —que el
+# mundo no sea aditivo en estas seis variables— se suma encima y no está medido.
+NIVEL_CALIBRADO = {
+    "politico_mano_dura": 98,   # 95% nominal daba 92,1% real
+    "cadena_perpetua": 99,      # daba 90,4%, la peor de las cuatro
+    "pena_muerte": 97,          # daba 93,2%, la mejor
+    "humillacion_presos": 98,   # daba 92,6%
+}
+
 # ============================================================
 # CRÉDITOS
 # ============================================================
@@ -400,6 +472,7 @@ def huella_contrato(slug):
         "neutral": LIKERT_NEUTRAL,
         "ponderador": PONDERADOR,
         "recalibradas": sorted(PREGUNTAS_A_RECALIBRAR),
+        "nivel_calibrado": sorted(NIVEL_CALIBRADO.items()),
         "espec_cruda": _json.dumps(ESPEC_CRUDA, sort_keys=True),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]

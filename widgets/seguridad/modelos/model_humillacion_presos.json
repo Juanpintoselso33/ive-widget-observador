@@ -1,6 +1,7 @@
 {
   "pregunta_slug": "humillacion_presos",
-  "contrato": "bb373be64e68f93c",
+  "nivel_calibrado": 98,
+  "contrato": "c5a3a3d4a6b2c3c8",
   "predictores": [
     "edad_30_44",
     "edad_45_59",
@@ -20184,5 +20185,5 @@
   },
   "fuente": "Encuesta El Observador-UMAD-Ferreira sobre seguridad pública, mayo de 2026",
   "credito": "Análisis y desarrollo: Juan Ignacio Pintos Elso",
-  "entrenado": "2026-09-07"
+  "entrenado": "2026-09-08"
 }

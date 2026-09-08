@@ -252,7 +252,7 @@ def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia
 
 
 def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                           victima, es_montevideo, nivel=95):
+                           victima, es_montevideo, nivel=None):
     """
     Intervalo de confianza percentil para la probabilidad estimada. ES EL QUE SE
     MUESTRA: la decisión editorial sobre el 50% no se toma con éste, sino con
@@ -269,6 +269,13 @@ def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
         es_montevideo)
     if probabilidades is None:
         return None
+    # El percentil que se pide NO es 95: es el CALIBRADO, el que hace que el
+    # intervalo cubra de verdad el 95%. El bootstrap percentil sub-cubre, y
+    # cuánto está medido por simulación —ver config.NIVEL_CALIBRADO—. Pedir 95
+    # a secas entregaba entre 90,4% y 93,2% según la pregunta.
+    # El fallback a 95 es para un JSON viejo, sin el nivel serializado.
+    if nivel is None:
+        nivel = model.get("nivel_calibrado", 95)
     cola = (100 - nivel) / 2 / 100
     return _percentil(probabilidades, cola), _percentil(probabilidades, 1 - cola)
 
@@ -278,7 +285,7 @@ _Z_MC = 1.959964
 
 
 def banda_decision(model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
-                   es_montevideo, nivel=95):
+                   es_montevideo, nivel=None):
     """
     Extremos CONSERVADORES del intervalo, para decidir si se afirma de qué lado
     está la mayoría. No se muestran: sólo gobiernan esa decisión.
@@ -333,6 +340,12 @@ def banda_decision(model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
     if probabilidades is None:
         return None
 
+    # Parte del MISMO nivel calibrado que el intervalo mostrado y no del 95
+    # nominal: si el mostrado se ensanchó por sub-cobertura, la banda que decide
+    # sobre el 50% tiene que partir de ahí, o volvería a ser la más angosta de
+    # las dos justo en la comparación que más importa.
+    if nivel is None:
+        nivel = model.get("nivel_calibrado", 95)
     b = len(probabilidades)
     cola = (100 - nivel) / 2 / 100
     q_bajo, q_alto = cola, 1 - cola

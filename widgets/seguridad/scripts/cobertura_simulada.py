@@ -1,0 +1,291 @@
+"""
+Cobertura REAL de los intervalos, por simulación con verdad conocida.
+
+QUÉ RESPONDE, Y POR QUÉ NINGÚN CHEQUEO ANTERIOR LO RESPONDÍA.
+El widget publica "70%, entre 51% y 86%". Que ese intervalo sea de 95% es una
+afirmación sobre repeticiones: si se repitiera el estudio muchas veces, el
+intervalo contendría el valor verdadero en el 95% de ellas.
+
+Nada de lo que se hizo antes mide eso:
+
+  · Comparar la tasa observada de una celda contra el intervalo mezcla el error
+    del modelo con el ruido binomial de la celda, y no distingue cuál manda.
+  · Ensanchar el intervalo por el error de la celda y contar coincidencias
+    tampoco: no "descuenta" el ruido, y con celdas de cero apoyos la corrección
+    normal se degenera —le asigna error estándar cero, o sea certeza absoluta a
+    no haber observado ningún éxito—.
+  · El bootstrap GENERA los intervalos; no puede validarse a sí mismo.
+
+Lo único que lo responde es esto: fijar una verdad, generar datos desde ella,
+correr el pipeline COMPLETO, y contar.
+
+CÓMO
+1. La verdad es el modelo publicado: para cada encuestado, su probabilidad
+   ajustada y calibrada. Se la toma como P(Y=1) real.
+2. En cada simulación se sortea y_i ~ Bernoulli(p_i) para toda la muestra,
+   conservando X y los ponderadores.
+3. Se corre el pipeline entero sobre esos datos: elección de C por CV ponderada,
+   ajuste, bootstrap estratificado con re-elección de C en cada réplica, mapa de
+   calibración fuera de muestra, y percentiles.
+4. Para cada perfil de la UI se pregunta si el intervalo contiene la
+   probabilidad VERDADERA de ese perfil, que se conoce por construcción.
+
+QUÉ NO MIDE, y hay que decirlo: la verdad es el propio modelo, así que esto mide
+la cobertura del procedimiento SUPONIENDO QUE LA ESPECIFICACIÓN ES CORRECTA. No
+mide el error de especificación —que el mundo no sea aditivo en estas variables—,
+que es la otra mitad del problema y no se puede medir sin conocer el mundo.
+Una cobertura baja acá es una mala noticia inequívoca; una alta no absuelve.
+
+Uso:
+    python widgets/seguridad/scripts/cobertura_simulada.py --cronometrar
+    python widgets/seguridad/scripts/cobertura_simulada.py --sims 200 --replicas 300
+"""
+
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).parent.parent.parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+import argparse
+import itertools
+import json
+import time
+import warnings
+
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+
+from widgets.seguridad import config, train_model as tm
+from widgets.seguridad.model import build_features, _interp, _sigmoid_pct, _z
+
+warnings.filterwarnings("ignore")
+
+NIVEL = 95
+
+# Dos familias de corrección, evaluadas en la MISMA corrida porque lo caro es
+# ajustar, no medir:
+#   · subir el nivel nominal del percentil (95 -> 96, 97...);
+#   · ensanchar el intervalo del 95% por un factor, alrededor de su centro.
+# No son equivalentes: la primera sigue la forma de la distribución bootstrap y
+# la segunda la estira. Se prueban las dos para ver cuál llega a 95% real sin
+# ensanchar de más.
+NIVELES = (95, 96, 97, 98, 99)
+FACTORES = (1.00, 1.05, 1.10, 1.15, 1.20, 1.30)
+
+
+def perfiles_ui():
+    return [
+        dict(tramo_edad=te, es_mujer=mu, nivel_educ=ed, ideologia=id_,
+             victima=vi, es_montevideo=mv)
+        for te, mu, ed, id_, vi, mv in itertools.product(
+            sorted(set(config.EDAD_UI_TO_CODE.values())), (0, 1),
+            sorted(set(config.EDUC_UI_TO_CODE.values())),
+            sorted(set(config.IDEOLOGIA_UI_TO_CODE.values())),
+            sorted(set(config.VICTIMA_UI_TO_CODE.values())),
+            sorted(set(config.REGION_UI_TO_CODE.values())))
+    ]
+
+
+def _percentil(ordenados, q):
+    if not ordenados:
+        return None
+    if len(ordenados) == 1:
+        return ordenados[0]
+    pos = q * (len(ordenados) - 1)
+    lo = int(pos)
+    hi = min(lo + 1, len(ordenados) - 1)
+    t = pos - lo
+    return ordenados[lo] * (1 - t) + ordenados[hi] * t
+
+
+def una_simulacion(d, X, w, p_true, Xp, estratos, n_replicas, rng, recalibra):
+    """
+    Una repetición completa: sortea resultados, corre TODO y devuelve los
+    intervalos de cada perfil.
+    """
+    y = (rng.random(len(p_true)) < p_true).astype(int)
+    if len(np.unique(y)) < 2:
+        return None
+
+    c_ppal, _ = tm.elegir_c(X, y, w)
+    if c_ppal is None:
+        return None
+    modelo = LogisticRegression(C=c_ppal, max_iter=2000,
+                                random_state=tm.RANDOM_STATE)
+    modelo.fit(X, y, sample_weight=w)
+
+    # Mapa de calibración, con la misma receta que producción.
+    mapa = None
+    if recalibra:
+        mapa = tm.ajustar_calibracion(d.assign(a_favor=y), X, y, w)
+        if mapa is None:
+            return None
+
+    # Bootstrap estratificado, re-eligiendo C en cada réplica, igual que
+    # producción. Es lo que hace caro esto y también lo que hay que medir: con C
+    # fijo los intervalos se achican y la cobertura medida no sería la del
+    # procedimiento que se publica.
+    indices = [np.where(estratos == e)[0] for e in np.unique(estratos)]
+    coefs = []
+    for _ in range(n_replicas):
+        idx = np.concatenate([rng.choice(ix, size=len(ix), replace=True)
+                              for ix in indices])
+        yb = y[idx]
+        if len(np.unique(yb)) < 2:
+            continue
+        cb, _ = tm.elegir_c(X[idx], yb, w[idx])
+        if cb is None:
+            continue
+        mb = LogisticRegression(C=cb, max_iter=2000, random_state=tm.RANDOM_STATE)
+        mb.fit(X[idx], yb, sample_weight=w[idx])
+        coefs.append(np.r_[mb.intercept_[0], mb.coef_[0]])
+    if len(coefs) < 30:
+        return None
+    coefs = np.array(coefs)
+
+    # Probabilidades de cada perfil por réplica, ya calibradas.
+    Z = coefs[:, 0][:, None] + coefs[:, 1:] @ Xp.T          # réplicas x perfiles
+    P = 1.0 / (1.0 + np.exp(-Z)) * 100
+    if mapa:
+        reps = mapa.get("replicas") or []
+        for i in range(P.shape[0]):
+            xs, ys = (reps[i % len(reps)] if reps
+                      else (mapa["grilla"], mapa["valores"]))
+            P[i] = [_interp(xs, ys, v / 100.0) * 100 for v in P[i]]
+
+    P.sort(axis=0)
+    cols = [list(P[:, j]) for j in range(P.shape[1])]
+
+    por_nivel = {}
+    for niv in NIVELES:
+        cola = (100 - niv) / 2 / 100
+        por_nivel[niv] = (np.array([_percentil(cc, cola) for cc in cols]),
+                          np.array([_percentil(cc, 1 - cola) for cc in cols]))
+
+    lo95, hi95 = por_nivel[NIVEL]
+    centro = (lo95 + hi95) / 2
+    por_factor = {}
+    for fa in FACTORES:
+        mitad = (hi95 - lo95) / 2 * fa
+        # Se recorta a 0-100: una probabilidad ensanchada no puede salirse.
+        por_factor[fa] = (np.clip(centro - mitad, 0, 100),
+                          np.clip(centro + mitad, 0, 100))
+    return por_nivel, por_factor
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--sims", type=int, default=200)
+    ap.add_argument("--replicas", type=int, default=tm.N_REPLICAS,
+                    help="por defecto, las MISMAS que producción")
+    ap.add_argument("--pregunta", action="append", dest="preguntas")
+    ap.add_argument("--semilla", type=int, default=20260908,
+                    help="para repartir las simulaciones entre procesos")
+    ap.add_argument("--cronometrar", action="store_true",
+                    help="corre UNA simulación y reporta cuánto tarda")
+    args = ap.parse_args()
+    slugs = args.preguntas or config.SLUGS
+
+    df0 = pd.read_csv(config.DATA_FILE, encoding="utf-8-sig")
+    perfiles = perfiles_ui()
+    Xp = np.array([[build_features(**p)[k] for k in config.PREDICTORES]
+                   for p in perfiles], dtype=float)
+
+    for slug in slugs:
+        ruta = config.ruta_modelo(slug)
+        if not ruta.exists():
+            continue
+        with open(ruta, encoding="utf-8") as f:
+            publicado = json.load(f)
+
+        df = tm.preparar(df0, config.PREGUNTAS[slug])
+        d = df[df["a_favor"].notna()].copy()
+        X = d[config.PREDICTORES].values.astype(float)
+        w = d[config.PONDERADOR].values
+        estratos = d["estrato"].values
+        recalibra = slug in config.PREGUNTAS_A_RECALIBRAR
+
+        # LA VERDAD: la probabilidad que el modelo publicado le asigna a cada
+        # encuestado, ya calibrada. Es el mundo que se simula.
+        coef = publicado["coefficients"]
+        cal = publicado.get("calibracion")
+        p_true = np.array([
+            _interp(cal["grilla"], cal["valores"],
+                    _sigmoid_pct(_z(coef, dict(zip(config.PREDICTORES, fila)))) / 100)
+            if cal else
+            _sigmoid_pct(_z(coef, dict(zip(config.PREDICTORES, fila)))) / 100
+            for fila in X
+        ])
+        # Y la verdad de cada PERFIL, que es contra lo que se mide la cobertura.
+        verdad_perfil = np.array([
+            (_interp(cal["grilla"], cal["valores"],
+                     _sigmoid_pct(_z(coef, dict(zip(config.PREDICTORES, fila)))) / 100)
+             if cal else
+             _sigmoid_pct(_z(coef, dict(zip(config.PREDICTORES, fila)))) / 100) * 100
+            for fila in Xp
+        ])
+
+        rng = np.random.default_rng(args.semilla)
+        if args.cronometrar:
+            t0 = time.time()
+            r = una_simulacion(d, X, w, p_true, Xp, estratos,
+                               args.replicas, rng, recalibra)
+            dt = time.time() - t0
+            print(f"{slug}: una simulación con {args.replicas} réplicas = "
+                  f"{dt:.1f}s  ->  {args.sims} sims serían {dt*args.sims/60:.0f} min")
+            continue
+
+        dentro_niv = {n: np.zeros(len(perfiles)) for n in NIVELES}
+        dentro_fac = {f: np.zeros(len(perfiles)) for f in FACTORES}
+        anchos_fac = {f: [] for f in FACTORES}
+        validas = 0
+        t0 = time.time()
+        for s in range(args.sims):
+            r = una_simulacion(d, X, w, p_true, Xp, estratos,
+                               args.replicas, rng, recalibra)
+            if r is None:
+                continue
+            por_nivel, por_factor = r
+            for n, (lo, hi) in por_nivel.items():
+                dentro_niv[n] += (lo <= verdad_perfil) & (verdad_perfil <= hi)
+            for f, (lo, hi) in por_factor.items():
+                dentro_fac[f] += (lo <= verdad_perfil) & (verdad_perfil <= hi)
+                anchos_fac[f].append(float(np.median(hi - lo)))
+            validas += 1
+            if (s + 1) % 20 == 0:
+                cob = dentro_niv[NIVEL].sum() / (validas * len(perfiles))
+                print(f"  [{slug}] {s+1}/{args.sims} sims  cobertura al 95% "
+                      f"{cob*100:.1f}%  ({time.time()-t0:.0f}s)", flush=True)
+
+        print(f"\n{slug}: {validas} simulaciones válidas, {args.replicas} réplicas")
+        print("  subir el NIVEL nominal:")
+        for n in NIVELES:
+            c_ = dentro_niv[n] / max(validas, 1)
+            print(f"    {n}% -> real {c_.mean()*100:5.1f}%   "
+                  f"bajo 90%: {(c_ < 0.90).sum():4d}   peor {c_.min()*100:5.1f}%")
+        print("  ENSANCHAR el intervalo del 95% por un factor:")
+        for f in FACTORES:
+            c_ = dentro_fac[f] / max(validas, 1)
+            print(f"    x{f:.2f} -> real {c_.mean()*100:5.1f}%   "
+                  f"bajo 90%: {(c_ < 0.90).sum():4d}   peor {c_.min()*100:5.1f}%   "
+                  f"ancho {np.median(anchos_fac[f]):5.1f}pp")
+
+        # A un directorio del repo, no a la carpeta temporal de una sesión.
+        destino = Path(__file__).parent / "salidas"
+        destino.mkdir(exist_ok=True)
+        salida = destino / f"cal-{slug}-{args.semilla}.json"
+        salida.write_text(json.dumps({
+            "slug": slug, "sims_validas": validas, "replicas": args.replicas,
+            "semilla": args.semilla,
+            "niveles": {str(n): dentro_niv[n].tolist() for n in NIVELES},
+            "factores": {str(f): dentro_fac[f].tolist() for f in FACTORES},
+            "anchos": {str(f): float(np.median(anchos_fac[f])) for f in FACTORES},
+        }))
+        print(f"  guardado en {salida.name}")
+
+
+if __name__ == "__main__":
+    main()
