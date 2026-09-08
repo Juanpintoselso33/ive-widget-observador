@@ -366,14 +366,26 @@ class TestNivelCalibradoContraLaMedicion:
     de las funciones que definen el pipeline.
     """
 
-    # Las ocho corridas del 8/9/2026, anteriores al sello. Para ellas el vínculo
-    # entre medición y modelo lo sostiene el historial de git, no el archivo.
-    # No agregar nada a esta lista: una salida nueva sin huella tiene que
-    # fallar.
-    SIN_SELLO = {(slug, semilla)
-                 for slug in ("politico_mano_dura", "cadena_perpetua",
-                              "pena_muerte", "humillacion_presos")
-                 for semilla in (401, 402)}
+    # Las ocho corridas del 8/9/2026, anteriores al sello, IDENTIFICADAS POR EL
+    # CONTENIDO DEL ARCHIVO.
+    #
+    # La versión anterior las identificaba por (pregunta, semilla), o sea por
+    # una etiqueta que el archivo se pone solo. Codex copió dos veces la corrida
+    # 402 de cadena perpetua, rotuló una copia como 401, y el test volvió a
+    # aceptar bajarle el nivel a 98. Con el hash del contenido, una copia
+    # rotulada distinto no está en la lista y tiene que traer huella.
+    #
+    # No agregar nada acá: una salida nueva sin huella tiene que fallar.
+    SIN_SELLO = {
+        "e08e75d268463fa17d8c6ec8ba1188fbb55d0b00f1fdc06eea64c5eface13815",
+        "e30ad305d6b9e2b37890bde70b2cddad87a66e3f0ccb4d9e32d03946d5bf8afa",
+        "429b82d7f4048be245f6339144b61614f72015bef99b268ee8b89d1e7a4818bc",
+        "1410965c0c4141d533590dfcc56f28da787825d208a8401de68c03951f946526",
+        "4df0bd5fb3e773cbf5b43b22f411f25d399428c8c3aba4a82f5cb35942ef89d4",
+        "e89ca3a58a688ba289aa0b469bfae2adda7e9f252d6d7d2c7b0ab7f44e91548c",
+        "1cef669bfa22292e22db83f37c45b21df32dc05fcc871f4e107b0e2b25900b3f",
+        "cdcbc07c18c1af837d3c6f25e7b1bd64b6bbe5740d5a7fad3c0581315a1904f3",
+    }
 
     @staticmethod
     def _modulos():
@@ -405,7 +417,15 @@ class TestNivelCalibradoContraLaMedicion:
             )
             return
 
+        import hashlib
         por_slug = agg._cargar()
+        # hash del archivo, indexado por (pregunta, semilla) tal como los rotula
+        hashes = {}
+        for ruta in sorted(salidas.glob("cal-*.json")):
+            crudo = ruta.read_bytes()
+            j = _json.loads(crudo)
+            hashes[(j["slug"], j.get("semilla"))] = \
+                hashlib.sha256(crudo).hexdigest()
 
         faltan = [s for s in config.SLUGS if s not in por_slug]
         assert not faltan, (
@@ -426,7 +446,7 @@ class TestNivelCalibradoContraLaMedicion:
                 clave = (slug, c.get("semilla"))
                 huella = c.get("huella")
                 if huella is None:
-                    if clave not in self.SIN_SELLO:
+                    if hashes.get(clave) not in self.SIN_SELLO:
                         sin_sello.append(clave)
                     continue
                 ruta = config.ruta_modelo(slug)

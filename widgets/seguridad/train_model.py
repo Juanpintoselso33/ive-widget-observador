@@ -69,13 +69,16 @@ C_GRID = [0.01, 0.1, 0.5, 1.0, 5.0, 10.0]
 # diez el tamaño de lo que se publica no puede apoyarse en eso.
 #
 # Lo que mide el script: para los 1.008 perfiles y los dos extremos, el desvío
-# estándar del extremo cuando se lo calcula con B réplicas, remuestreando sin
-# reposición subconjuntos de las serializadas y corrigiendo por población
-# finita. Con B=1.000 la mediana va de 0,34 a 0,82 pp según la pregunta y el
-# peor extremo llega a 4,69; extrapolando por 1/raíz(B) —ley que el script
-# verifica, factor 0,87 a 0,95— con 10.000 la mediana baja a 0,11-0,27 y el peor
-# extremo a 0,81-2,45. La pregunta más ruidosa es cadena perpetua, que es
-# también la que publica el nivel más extremo.
+# estándar del extremo si el bootstrap se hubiera corrido con B réplicas,
+# remuestreando CON reposición las serializadas. No extrapola: mide directo
+# también en B=10.000, que es el que se publica.
+#
+#   B=1.000   mediana 0,35 a 0,83 pp según la pregunta, peor extremo hasta 4,57
+#   B=10.000  mediana 0,11 a 0,27 pp,                   peor extremo hasta 2,51
+#
+# La más ruidosa es cadena perpetua, que es también la que publica el nivel más
+# extremo: son las dos caras del mismo problema. Bajar el peor extremo de 4,6 a
+# 2,5 pp es lo que se compra con las 10.000.
 #
 # EL COSTO SÍ LLEGA A PRODUCCIÓN, aunque sea chico. Los cuatro JSON pasan de
 # 1,67 MB a 16,47 MB en disco y unos 34 MB como objetos Python; calcular el
@@ -519,7 +522,7 @@ def _nodos_calibracion(oof, y, w, k=None):
     return xs, ys
 
 
-def ajustar_calibracion(d, X, y, w, n_replicas=None, sorteos_validos=None):
+def ajustar_calibracion(d, X, y, w, n_replicas, sorteos_validos):
     """
     Mapa de recalibración: spline monótona sobre nodos de igual masa ponderada.
 
@@ -610,6 +613,14 @@ def ajustar_calibracion(d, X, y, w, n_replicas=None, sorteos_validos=None):
     # rompía el apareamiento a partir de la réplica 1.000, porque model.py
     # recicla los mapas por módulo. Lo marcó Codex.
     n_replicas = N_REPLICAS if n_replicas is None else n_replicas
+    # LOS DOS ÚLTIMOS ARGUMENTOS SON OBLIGATORIOS A PROPÓSITO. Tenían default y
+    # Codex mostró el agujero: sacar `sorteos_validos` del llamado en
+    # `entrenar()` dejaba los 148 tests en verde y volvía a desalinear mapas y
+    # coeficientes en cuanto hubiera un descarte. Ningún test cubría ese cable,
+    # y la huella del estudio tampoco mira `entrenar`. Sin default, quitarlo es
+    # un TypeError en el acto. `sorteos_validos=None` sigue queriendo decir "los
+    # aceptó a todos", pero hay que escribirlo.
+    #
     # SE SORTEA SIEMPRE TODO Y SE FILTRA DESPUÉS. `bootstrap_coeficientes`
     # descarta las réplicas sin variación en la dependiente o con un fold
     # degenerado; si acá se sortearan sólo las que sobrevivieron, el generador

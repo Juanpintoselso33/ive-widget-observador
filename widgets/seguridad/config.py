@@ -249,11 +249,12 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #
 # 1. EL NIVEL SE ELIGIÓ CON 1.000 RÉPLICAS Y SE PUBLICA CON 10.000, y el signo
 #    de esa diferencia NO se conoce. El simulador corre el bootstrap interno en
-#    1.000 porque a 10.000 la medición llevaría unas veinte horas por par de
-#    semillas. Ese "veinte" es una extrapolación lineal de lo que tardaron estas
-#    corridas —entre 6.815 y 7.049 segundos cada una, según sus logs— y las ocho
-#    salidas de esa fecha no guardan la duración; el simulador la guarda de acá
-#    en más, en la clave "segundos". Subir las réplicas achica el error Monte Carlo del cuantil
+#    1.000 porque a 10.000 la medición llevaría unas veinte horas por corrida
+#    —o sea otras veinte para el par, porque las dos semillas van en paralelo—.
+#    Ese "veinte" es una extrapolación lineal de lo que tardó cada una de estas
+#    corridas: entre 6.815 y 7.049 segundos según sus logs, o sea 18,9 a 19,6
+#    horas si se multiplica por diez. Las ocho salidas de esa fecha no guardan
+#    la duración; el simulador la guarda de acá en más, en la clave "segundos". Subir las réplicas achica el error Monte Carlo del cuantil
 #    extremo —los números están en `train_model.py`, junto a N_REPLICAS— pero
 #    menos ruido no es más cobertura: si el extremo ruidoso incluía la verdad
 #    por accidente, achicar el ruido la deja afuera. Escribí que producción

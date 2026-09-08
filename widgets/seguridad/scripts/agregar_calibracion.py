@@ -7,15 +7,17 @@ procedimiento escrito y no de mirar los logs. El criterio:
     el nivel más chico cuya cobertura llega al 95% en TODAS las corridas por
     separado, no sólo en el promedio de todas.
 
-QUÉ ES Y QUÉ NO ES ESE CRITERIO. Es un desempate conservador, no un test. Codex
-lo midió al revisar esto (8/9/2026): con la cobertura verdadera justo en 95%,
-dos corridas independientes caen las dos por encima cerca del 25% de las veces,
-así que pasar el criterio no es una garantía al 95%. Y el error Monte Carlo de
-estas corridas es del orden de un punto — los cuatro cortes elegidos tienen al
-95% dentro de su margen. El criterio sirve para no elegir el nivel mirando un
-promedio que se apoya en una sola corrida buena (mano dura promedia 95,10% en
-el nivel 96 con una corrida en 94,53%; cadena perpetua 95,19% en el 98 con una
-en 94,86%), no para afirmar que el nivel elegido cubre.
+QUÉ ES Y QUÉ NO ES ESE CRITERIO. Es un desempate conservador, no un test. Con la
+cobertura verdadera justo en 95%, cada corrida tiene alrededor de un 50% de
+chance de quedar por encima, así que las dos quedan por encima alrededor de una
+de cada cuatro veces — cuenta de servilleta, no un número que salga de estas
+salidas. Y el error Monte Carlo de estas corridas es del orden del punto, así
+que el 95% cae dentro del margen de los cuatro cortes elegidos.
+
+Sirve para no elegir el nivel mirando un promedio que se apoya en una sola
+corrida buena (mano dura promedia 95,10% en el nivel 96 con una corrida en
+94,53%; cadena perpetua 95,19% en el 98 con una en 94,86%). No sirve para
+afirmar que el nivel elegido cubre.
 
 EL FORMATO DE LAS SALIDAS TIENE UNA TRAMPA. `cobertura_simulada.py` guarda en
 `niveles` la CANTIDAD DE ACIERTOS de cada perfil, no un porcentaje. Coinciden

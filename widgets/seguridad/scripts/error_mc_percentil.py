@@ -9,14 +9,25 @@ había con qué comprobarlos. Una constante que gobierna el tamaño de los
 artefactos publicados no puede apoyarse en un número irreproducible.
 
 QUÉ MIDE. Para cada uno de los 1.008 perfiles de la UI y cada extremo del
-intervalo al nivel que la pregunta publica: el desvío estándar del extremo
-cuando se lo calcula con B réplicas en vez de con todas las que trae el
-artefacto. Se estima remuestreando SIN reposición subconjuntos de tamaño B de
-las réplicas serializadas, que es la variabilidad que uno se ahorra al subir B.
+intervalo al nivel que la pregunta publica: el desvío estándar de ese extremo si
+el bootstrap se hubiera corrido con B réplicas.
+
+CÓMO, y esto cambió después de la tercera vuelta de Codex. La primera versión
+remuestreaba SIN reposición y corregía por población finita, lo que la obligaba
+a extrapolar por 1/raíz(B) para llegar a B=10.000 —a B=N el estimador da cero
+por construcción, porque un subconjunto sin reposición del tamaño del total es
+el total—. La extrapolación era el punto débil: la ley 1/raíz(B) es asintótica y
+en la cola del 0,5%, con B=250, hay 1,25 observaciones esperadas.
+
+Ahora se remuestrea CON REPOSICIÓN, que es el bootstrap estándar de la
+variabilidad de un cuantil calculado sobre B sorteos independientes. No necesita
+corrección por población finita, no necesita extrapolar, y sirve igual en B=N.
+Codex hizo esa comprobación a mano antes que el script: para cadena perpetua dio
+0,269 y 2,419 contra los 0,273 y 2,453 que daba la extrapolación.
 
 QUÉ NO MIDE. La variabilidad de haber tomado otra muestra de la población: eso
-es el bootstrap mismo, no su error de simulación. Acá el objeto de estudio es el
-ruido que agrega ESTIMAR el cuantil con pocas réplicas.
+es el bootstrap mismo, no su error de simulación. Tampoco el SESGO del cuantil
+ni su error cuadrático total; sólo la dispersión.
 
 Uso:
     python widgets/seguridad/scripts/error_mc_percentil.py
@@ -92,48 +103,25 @@ def medir(slug, bes):
           f"{len(perfiles)} perfiles, {REPETICIONES} repeticiones)")
     print(f"  {'B':>7} {'mediana':>9} {'p95':>7} {'máx':>7}   "
           f"(desvío estándar del extremo, en pp)")
-    medidos = {}
     for B in bes:
-        # B = total daría cero por construcción: subconjuntos sin reposición del
-        # tamaño del total son siempre el total. Para saber el ruido a B=total
-        # harían falta bootstraps independientes; acá se extrapola.
-        if B >= total:
-            continue
         ext = np.empty((REPETICIONES, P.shape[1], 2))   # reps x perfiles x extremos
         for r in range(REPETICIONES):
-            sub = P[rng.choice(total, size=B, replace=False)]
+            # CON REPOSICIÓN: ver el encabezado. Sin reposición hay que corregir
+            # por población finita y aun así el estimador degenera en B=N.
+            sub = P[rng.integers(0, total, size=B)]
             ext[r, :, 0] = np.percentile(sub, cola, axis=0)
             ext[r, :, 1] = np.percentile(sub, 100 - cola, axis=0)
-        # CORRECCIÓN POR POBLACIÓN FINITA. Los subconjuntos salen sin
-        # reposición de las N réplicas serializadas, así que su dispersión está
-        # achicada por raíz(1 - B/N): a B=5.000 sobre N=10.000 el desvío medido
-        # es un 29% menor que el real. Sin esta corrección la ley 1/raíz(B) se
-        # ve rota justo donde más se la necesita.
-        sd = ext.std(axis=0, ddof=1).ravel() / np.sqrt(1.0 - B / total)
-        medidos[B] = (float(np.median(sd)), float(np.percentile(sd, 95)),
-                      float(sd.max()))
-        print(f"  {B:>7} {medidos[B][0]:>8.3f} {medidos[B][1]:>7.3f} "
-              f"{medidos[B][2]:>7.3f}")
-
-    # ¿Vale la ley 1/raíz(B)? Se comprueba antes de usarla para extrapolar.
-    if len(medidos) >= 2:
-        bs = sorted(medidos)
-        razones = [medidos[bs[0]][0] / medidos[b][0] * np.sqrt(bs[0] / b)
-                   for b in bs[1:]]
-        print(f"  ley 1/raíz(B): la mediana escala con factor "
-              f"{np.mean(razones):.2f} (1,00 sería exacto)")
-        base = bs[-1]
-        f = np.sqrt(base / total)
-        print(f"  {total:>7} {medidos[base][0]*f:>8.3f} "
-              f"{medidos[base][1]*f:>7.3f} {medidos[base][2]*f:>7.3f}"
-              f"   <- extrapolado desde B={base}")
+        sd = ext.std(axis=0, ddof=1).ravel()
+        marca = "   <- el que se publica" if B == total else ""
+        print(f"  {B:>7} {np.median(sd):>8.3f} {np.percentile(sd, 95):>7.3f} "
+              f"{sd.max():>7.3f}{marca}")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--pregunta", action="append", dest="preguntas")
     ap.add_argument("--bes", type=int, nargs="+",
-                    default=[250, 500, 1000, 2500, 5000])
+                    default=[1000, 2500, 5000, 10000])
     args = ap.parse_args()
     for slug in (args.preguntas or config.SLUGS):
         if config.ruta_modelo(slug).exists():

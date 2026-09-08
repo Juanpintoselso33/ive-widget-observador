@@ -76,19 +76,37 @@ def huella_estudio(slug, modelo):
     simulador usa como verdad. Con ese sello, una medición vieja seguía
     respaldando un nivel después de cambiar la receta de entrenamiento.
 
-    Acá entra:
-      · la huella del contrato de codificación (predictores y categorías);
-      · las perillas numéricas del procedimiento (grilla de C, nodos del mapa,
-        semilla, cantidad de niveles y factores evaluados);
-      · el ARTEFACTO usado como verdad —coeficientes y mapa central—, porque la
-        cobertura se mide contra las probabilidades que sale de él;
-      · la ESTRUCTURA de las funciones que definen el procedimiento, vía el AST
-        con los docstrings sacados. Así un cambio de lógica invalida el estudio
-        y un cambio de comentario o de formato no.
+    Y USARLA ENTERA TAMPOCO SIRVE, por el motivo opuesto: `huella_contrato`
+    incluye `NIVEL_CALIBRADO`, que es justamente lo que este estudio decide. Con
+    eso adentro, subir el nivel de una pregunta invalidaba las ocho corridas que
+    lo habían elegido — la conclusión anulaba a sus propios insumos. Lo marcó
+    Codex en la tercera vuelta. Acá se toma sólo la parte del contrato que
+    cambia el SIGNIFICADO de los datos, no la que sale del estudio.
 
-    QUÉ SIGUE SIN CUBRIR: la base de datos de entrada, y cualquier cambio de
-    lógica que ocurra dentro de funciones que no están en esta lista. No es una
-    huella del mundo, es una huella de lo que se puede leer barato.
+    Qué entra:
+      · el contrato de codificación menos el nivel: predictores, mapeos de la
+        UI, referencias, escala Likert, ponderador, especificación cruda y la
+        columna de la pregunta;
+      · las perillas numéricas del procedimiento: la grilla de C EN SU ORDEN
+        —`elegir_c` se queda con el primer empatado, así que invertirla cambia
+        qué C sale—, los nodos del mapa, la semilla, la cantidad de réplicas de
+        producción, el nivel base y los niveles y factores evaluados;
+      · el ARTEFACTO usado como verdad: coeficientes y mapa central, porque la
+        cobertura se mide contra las probabilidades que salen de él;
+      · el CÓDIGO de las funciones que definen el procedimiento, vía el AST
+        reimpreso con `ast.unparse` y sin docstrings. Un cambio de lógica
+        invalida el estudio; uno de comentario, docstring o formato, no.
+
+    QUÉ SIGUE SIN CUBRIR, y conviene tenerlo escrito:
+      · la base de datos de entrada;
+      · la lógica de cualquier función que no esté en la lista de abajo —entre
+        ellas `entrenar`, que es la que cablea el apareamiento;
+      · el reimpreso del AST puede variar entre versiones de Python. Codex
+        verificó que `ast.dump` da hashes distintos en 3.11, 3.12 y 3.13 por
+        campos nuevos como `type_params`; `ast.unparse` es bastante más estable
+        porque no serializa nombres de campos, pero no está garantizado. Por eso
+        la salida guarda aparte la versión de Python con la que se selló, para
+        poder distinguir "cambió el procedimiento" de "cambió el intérprete".
     """
     import ast
     import hashlib
@@ -104,14 +122,34 @@ def huella_estudio(slug, modelo):
                         and isinstance(cuerpo[0].value, ast.Constant)
                         and isinstance(cuerpo[0].value.value, str)):
                     nodo.body = cuerpo[1:] or [ast.Pass()]
-        return ast.dump(arbol)
+        return ast.unparse(arbol)
+
+    contrato = json.dumps({
+        "pregunta": slug,
+        "columna": config.PREGUNTAS[slug]["columna"],
+        "predictores": sorted(config.PREDICTORES),
+        "edad": sorted(config.EDAD_UI_TO_CODE.items()),
+        "educacion": sorted(config.EDUC_UI_TO_CODE.items()),
+        "ideologia": sorted(config.IDEOLOGIA_UI_TO_CODE.items()),
+        "victima": sorted(config.VICTIMA_UI_TO_CODE.items()),
+        "region": sorted(config.REGION_UI_TO_CODE.items()),
+        "referencias": sorted(config.REFERENCIAS.items()),
+        "likert": sorted(config.LIKERT_MAP.items()),
+        "favor": sorted(config.LIKERT_FAVOR),
+        "contra": sorted(config.LIKERT_CONTRA),
+        "neutral": config.LIKERT_NEUTRAL,
+        "ponderador": config.PONDERADOR,
+        "recalibradas": sorted(config.PREGUNTAS_A_RECALIBRAR),
+        "espec_cruda": json.dumps(config.ESPEC_CRUDA, sort_keys=True),
+    }, sort_keys=True, ensure_ascii=False)
 
     piezas = [
-        config.huella_contrato(slug),
-        repr(sorted(tm.C_GRID)),
+        contrato,
+        repr(list(tm.C_GRID)),          # EN SU ORDEN, no ordenada
         repr(tm.NODOS_CALIBRACION),
         repr(tm.RANDOM_STATE),
-        repr(NIVELES), repr(FACTORES),
+        repr(tm.N_REPLICAS),
+        repr(NIVEL), repr(NIVELES), repr(FACTORES),
         json.dumps(modelo.get("coefficients"), sort_keys=True),
         json.dumps((modelo.get("calibracion") or {}).get("grilla")),
         json.dumps((modelo.get("calibracion") or {}).get("valores")),
@@ -368,6 +406,7 @@ def main():
             # marcó Codex el 8/9/2026; las ocho salidas de esa fecha son
             # anteriores al sello y no lo traen.
             "huella": huella_estudio(slug, publicado),
+            "python": "%d.%d" % sys.version_info[:2],
             "segundos": round(time.time() - arranque, 1),
             # OJO: son ACIERTOS por perfil, no porcentajes. Coinciden cuando la
             # corrida tiene 100 simulaciones y no en otro caso; quien los lea

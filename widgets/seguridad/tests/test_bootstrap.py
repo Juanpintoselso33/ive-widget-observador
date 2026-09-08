@@ -143,6 +143,37 @@ def _reconstruir_sorteos(d, n):
                             for ix in indices]) for _ in range(n)]
 
 
+def _nodos_a_mano(oof, y, w, k):
+    """
+    Los nodos (x, y) del mapa, reimplementados a mano para el test.
+
+    NO llama a `tm._nodos_calibracion`: si el esperado sale de la misma función
+    que el observado, los dos se equivocan juntos. Codex lo mostró metiendo
+    `w = np.ones_like(w)` adentro de esa función — los mapas bootstrap perdían
+    la ponderación y los 148 tests seguían en verde.
+
+    Los grupos son de igual MASA PONDERADA, no de igual cantidad de casos, y a
+    los extremos se les pega un 0 y un 1 con la monotonía forzada.
+    """
+    orden = sorted(range(len(oof)), key=lambda i: oof[i])
+    total = sum(w)
+    acum, corriente = {}, 0.0
+    for i in orden:
+        corriente += w[i]
+        acum[i] = min(int(corriente / total * k), k - 1)
+    xs, ys = [], []
+    for grupo in sorted(set(acum.values())):
+        ix = [i for i in range(len(oof)) if acum[i] == grupo]
+        peso = sum(w[i] for i in ix)
+        xs.append(sum(oof[i] * w[i] for i in ix) / peso)
+        ys.append(sum(y[i] * w[i] for i in ix) / peso)
+    xs = [0.0] + xs + [1.0]
+    ys = [min(ys[0], float(min(oof)))] + ys + [max(ys[-1], float(max(oof)))]
+    for i in range(1, len(ys)):
+        ys[i] = max(ys[i], ys[i - 1])
+    return xs, ys
+
+
 def _oof_como_produccion(X, y, w):
     """Las predicciones fuera de fold sobre las que se ajusta el mapa."""
     from sklearn.model_selection import StratifiedKFold
@@ -213,8 +244,7 @@ def test_los_mapas_quedan_apareados_con_los_coeficientes_aunque_se_descarte(
         "los índices válidos son 0..k sin hueco: el descarte no quedó registrado"
     )
 
-    calibracion = tm.ajustar_calibracion(d, X, y, w, n_replicas=n,
-                                         sorteos_validos=validos)
+    calibracion = tm.ajustar_calibracion(d, X, y, w, n, validos)
     assert calibracion is not None
     assert len(calibracion["replicas"]) == len(coefs), (
         "quedan más mapas que coeficientes: el apareamiento se corre"
@@ -235,8 +265,9 @@ def test_los_mapas_quedan_apareados_con_los_coeficientes_aunque_se_descarte(
             f"la réplica {j} de coeficientes no sale del sorteo {k}"
         )
 
-        # Y el mapa j, del MISMO sorteo k.
-        xs_k, ys_k = tm._nodos_calibracion(oof[idx], y[idx], w[idx])
+        # Y el mapa j, del MISMO sorteo k, con los nodos calculados a mano.
+        xs_k, ys_k = _nodos_a_mano(list(oof[idx]), list(y[idx]), list(w[idx]),
+                                   tm.NODOS_CALIBRACION)
         xs_j, ys_j = calibracion["replicas"][j]
         assert np.allclose(xs_j, [round(float(v), 6) for v in xs_k], atol=1e-6), (
             f"el mapa {j} no sale del sorteo {k}"
