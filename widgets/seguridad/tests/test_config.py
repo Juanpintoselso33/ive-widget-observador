@@ -342,33 +342,71 @@ class TestNivelCalibradoContraLaMedicion:
 
     Que quede MÁS ancho sí se permite, y de hecho pasa: mano dura publica 98
     cuando el criterio ya se cumple en 97, a propósito, por su cola.
+
+    LA PRIMERA VERSIÓN DE ESTE TEST SE DEJABA ENGAÑAR de dos maneras que
+    encontró Codex el 8/9/2026, las dos con control negativo:
+
+      - Recorría las preguntas que ENCONTRABA en los JSON, no las que hay que
+        publicar. Borrando las salidas de cadena perpetua se podía bajar su
+        nivel a 95 y el test pasaba. Ahora se exigen las cuatro preguntas y al
+        menos dos corridas de cada una.
+      - Las salidas no traían huella del modelo usado como verdad, así que una
+        medición vieja seguía "respaldando" un nivel después de cambiar la
+        especificación. `cobertura_simulada.py` ahora la sella; el test la
+        compara cuando está. LAS OCHO SALIDAS ACTUALES SON ANTERIORES AL SELLO
+        y no la traen: para ellas el vínculo entre medición y modelo lo sostiene
+        el historial de git, no el archivo.
     """
 
-    def test_ningun_nivel_publicado_queda_por_debajo_del_medido(self):
+    @staticmethod
+    def _agregador():
         import importlib.util
-        from pathlib import Path
+        from pathlib import Path as _P
+        scripts = _P(__file__).parent.parent / "scripts"
+        spec = importlib.util.spec_from_file_location(
+            "agregar_calibracion", scripts / "agregar_calibracion.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod, scripts / "salidas"
 
-        scripts = Path(__file__).parent.parent / "scripts"
-        salidas = scripts / "salidas"
+    def test_ningun_nivel_publicado_queda_por_debajo_del_medido(self):
+        agg, salidas = self._agregador()
         if not list(salidas.glob("cal-*.json")):
             pytest.skip("no hay salidas del estudio de cobertura en scripts/salidas")
 
-        spec = importlib.util.spec_from_file_location(
-            "agregar_calibracion", scripts / "agregar_calibracion.py")
-        agg = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(agg)
-
         por_slug = agg._cargar()
-        flojos = []
-        for slug, corridas in por_slug.items():
+
+        faltan = [s for s in config.SLUGS if s not in por_slug]
+        assert not faltan, (
+            f"hay salidas del estudio pero ninguna de {faltan}: el nivel de esas "
+            f"preguntas no está respaldado por nada"
+        )
+
+        flacas = {s: len(c) for s, c in por_slug.items() if len(c) < 2}
+        assert not flacas, (
+            f"el criterio compara corridas independientes y estas tienen menos "
+            f"de dos: {flacas}"
+        )
+
+        flojos, desfasadas = [], []
+        for slug in config.SLUGS:
+            corridas = por_slug[slug]
+            for c in corridas:
+                huella = c.get("huella")
+                if huella is not None and huella != config.huella_contrato(slug):
+                    desfasadas.append((slug, c.get("semilla")))
             minimo, _ = agg.elegir(corridas)
             assert minimo is not None, (
                 f"«{slug}»: ningún nivel medido llega al 95% en todas las "
                 f"corridas; no hay respaldo para el que se publica"
             )
-            publicado = config.NIVEL_CALIBRADO[slug]
-            if publicado < int(minimo):
-                flojos.append((slug, publicado, minimo))
+            if config.NIVEL_CALIBRADO[slug] < int(minimo):
+                flojos.append((slug, config.NIVEL_CALIBRADO[slug], minimo))
+
+        assert not desfasadas, (
+            "estas salidas se midieron sobre otra especificación que la que se "
+            f"publica; hay que volver a correr el estudio: {desfasadas}"
+        )
         assert not flojos, (
             "estos niveles publicados son más angostos que lo que sostiene la "
             f"simulación (publicado, mínimo medido): {flojos}"

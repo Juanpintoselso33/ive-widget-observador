@@ -180,36 +180,61 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 # de C, mapa de calibración— 200 veces por pregunta (dos corridas de 100 con
 # semillas 401 y 402). Después se contó, para cada uno de los 1.008 perfiles,
 # cuántas veces el intervalo contenía la probabilidad verdadera, que se conoce
-# por construcción. Son ~3.200 pipelines completos, unas dos horas con las ocho
-# corridas en paralelo.
+# por construcción. Son 800 pipelines completos —4 preguntas x 2 corridas x 100
+# simulaciones—, unas dos horas con las ocho corridas en paralelo. (Decía
+# "~3.200"; el número estaba mal y lo corrigió Codex.)
 #
 # Pidiendo el 95% nominal, la cobertura REAL es:
 #   mano dura 94,1% · cadena perpetua 91,3% · pena de muerte 93,4% ·
 #   humillación 91,9%
 #
+# La mejor es mano dura y la peor cadena perpetua. Con el simulador viejo el
+# orden era otro y el comentario decía que la mejor era pena de muerte.
+#
 # O sea que el widget diría "95%" y entregaría entre 91 y 94.
 #
 # POR QUÉ SUBIR EL NIVEL Y NO ENSANCHAR POR UN FACTOR. Se probaron las dos.
-# Subir el nivel deja muchísimos menos perfiles malos, porque sigue la forma de
-# la distribución bootstrap en vez de estirarla simétricamente — y cerca de 0 y
-# de 100 esa distribución es muy asimétrica. En cadena perpetua: el nivel 99%
-# deja UN perfil por debajo de 90% de cobertura; el factor x1,30 deja 35.
+# Subir el nivel deja menos perfiles malos, porque sigue la forma de la
+# distribución bootstrap en vez de estirarla simétricamente — y cerca de 0 y de
+# 100 esa distribución es muy asimétrica. En cadena perpetua, con esta medición:
+# el nivel 99 da 96,75% de cobertura media y deja 11 perfiles por debajo del 90%
+# (el peor, 88,0%); el factor x1,30 da 95,84% y deja 67 (el peor, 86,0%). No es
+# a igualdad de cobertura —el nivel cubre casi un punto más— así que la
+# comparación favorece al nivel por dos motivos a la vez y no aísla la forma.
+# Con el simulador viejo este mismo ejemplo decía "1 contra 35"; eran otros
+# números y no había con qué reproducirlos.
 #
 # CADA PREGUNTA NECESITA LO SUYO, así que no hay un número global. El criterio
 # es el nivel más chico cuya cobertura llega al 95% en LAS DOS semillas por
 # separado, no sólo en el promedio de las dos: en mano dura el nivel 96 promedia
 # 95,10% pero una de las dos corridas da 94,53%, y en cadena perpetua el 98
-# promedia 95,19% con una corrida en 94,86%. Un promedio que se apoya en una
-# corrida buena no es una garantía.
+# promedia 95,19% con una corrida en 94,86%.
 #
-# QUÉ CAMBIÓ AL ARREGLAR EL SIMULADOR: nada en los niveles. El simulador viejo
-# no reproducía el apareamiento entre réplicas de coeficientes y de mapa que usa
-# producción; arreglado eso y remedido de cero, los cuatro niveles caen donde ya
-# estaban. La única lectura que se movió es mano dura, donde ahora el 97 ya
-# alcanzaría (95,65% y 96,62% en las dos semillas). Se deja en 98 A PROPÓSITO:
-# es la pregunta con la peor cola —el perfil peor cubierto llega a 73,5% incluso
-# al 98— y un punto de nominal es seguro barato ahí. Es una decisión editorial
-# declarada, no lo que dice el criterio mecánico.
+# ES UN DESEMPATE CONSERVADOR, NO UN TEST, y conviene no venderlo como más de lo
+# que es. Codex lo midió al revisar esto: con la cobertura verdadera justo en
+# 95%, dos corridas independientes caen las dos por encima cerca del 25% de las
+# veces. Y el error Monte Carlo de estas mediciones es del orden del punto —los
+# 1.008 perfiles comparten cada muestra simulada, así que no son 1.008
+# experimentos independientes y las salidas no guardan la covarianza que haría
+# falta para calcularlo exacto—, de modo que el 95% cae dentro del margen de los
+# cuatro cortes elegidos. Sirve para no elegir el nivel mirando un promedio que
+# se apoya en una sola corrida buena; no para afirmar que el nivel elegido
+# cubre.
+#
+# QUÉ CAMBIÓ AL ARREGLAR EL SIMULADOR: nada en lo que se publica. El simulador
+# viejo no reproducía el apareamiento entre réplicas de coeficientes y de mapa
+# que usa producción; arreglado eso y remedido de cero, el criterio recupera
+# TRES de los cuatro niveles —cadena perpetua 99, pena de muerte 97, humillación
+# 98—. El cuarto no: en mano dura el criterio ahora da 97 (95,65% y 96,62% en
+# las dos semillas) y se publica 98.
+#
+# Se deja en 98 A PROPÓSITO, y es una decisión editorial declarada, no lo que
+# dice el criterio mecánico. Lo que se gana está medido: pasar de 97 a 98 sube
+# la cobertura media de 96,13% a 97,19%, sube el peor perfil de 71,5% a 73,5% y
+# baja de 53 a 22 los perfiles con cobertura bajo 90%. Lo que se paga —cuánto se
+# ensancha el intervalo que ve el lector— NO está medido acá, así que "sale
+# barato" es un juicio, no un número. Y ni el 97 ni el 98 arreglan la cola: es
+# la pregunta con el peor perfil de las cuatro por lejos.
 #
 # LA COLA EN EL NIVEL PUBLICADO, que es lo que recibe el lector de SU perfil:
 #   mano dura 98 → media 97,2%, peor perfil 73,5%, 22 perfiles bajo 90%
@@ -221,26 +246,32 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #
 # DOS COSAS QUE ESTOS NÚMEROS SIGUEN SIN RESOLVER:
 #
-# 1. EL NIVEL SE ELIGIÓ CON 1.000 RÉPLICAS Y SE PUBLICA CON 10.000. El simulador
-#    corre el bootstrap interno en 1.000 porque a 10.000 la medición costaría
-#    unas veinte horas por par de semillas. Subir las réplicas sólo achica el
-#    error Monte Carlo del cuantil extremo (Codex lo midió: mediana 0,80 pp y
-#    máximo 4,02 con 1.000, contra 0,27 y 1,29 con 10.000), así que producción
-#    debería portarse igual o mejor — pero el nivel se eligió bajo el régimen
-#    ruidoso, no bajo el que se publica.
+# 1. EL NIVEL SE ELIGIÓ CON 1.000 RÉPLICAS Y SE PUBLICA CON 10.000, y el signo
+#    de esa diferencia NO se conoce. El simulador corre el bootstrap interno en
+#    1.000 porque a 10.000 la medición llevaría unas veinte horas por par de
+#    semillas (extrapolado del tiempo de estas corridas, que las salidas no
+#    guardan). Subir las réplicas achica el error Monte Carlo del cuantil
+#    extremo —los números están en `train_model.py`, junto a N_REPLICAS— pero
+#    menos ruido no es más cobertura: si el extremo ruidoso incluía la verdad
+#    por accidente, achicar el ruido la deja afuera. Escribí que producción
+#    "debería portarse igual o mejor" y no está justificado; lo marcó Codex, que
+#    además comparó las primeras 1.000 réplicas de mano dura contra las 10.000 y
+#    encontró 263 perfiles donde el intervalo se ANGOSTA, con hasta 4,98 pp de
+#    movimiento en un extremo. Saber el signo exige medir a B=10.000.
 #
 # 2. LA VERDAD SIMULADA ES EL PROPIO MODELO. Esto corrige la sub-cobertura del
 #    PROCEDIMIENTO. El error de especificación —que el mundo no sea aditivo en
 #    estas seis variables— se suma encima y no está medido.
 #
 # Y una afirmación mía que quedó sobredicha: dije que subir el nivel gana sobre
-# ensanchar por un factor "a igualdad de cobertura". No era a igualdad: el nivel
-# 99 daba 96,08% y el factor 1,30 daba 95,08%, un punto entero de diferencia. La
-# ventaja del nivel sobre el factor sigue sin demostrarse limpiamente.
+# ensanchar por un factor "a igualdad de cobertura". No era a igualdad, ni antes
+# ni ahora: en esta medición el nivel 99 da 96,75% y el factor x1,30 da 95,84%,
+# casi un punto de diferencia. La ventaja del nivel sobre el factor sigue sin
+# demostrarse limpiamente.
 NIVEL_CALIBRADO = {
-    "politico_mano_dura": 98,   # 95% nominal da 94,1% real (el 97 ya alcanzaría)
+    "politico_mano_dura": 98,   # 95% nominal da 94,1%; el criterio da 97, va 98
     "cadena_perpetua": 99,      # da 91,3%, la peor de las cuatro
-    "pena_muerte": 97,          # da 93,4%, la mejor
+    "pena_muerte": 97,          # da 93,4%
     "humillacion_presos": 98,   # da 91,9%
 }
 

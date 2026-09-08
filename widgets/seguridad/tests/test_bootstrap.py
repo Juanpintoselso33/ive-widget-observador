@@ -54,7 +54,7 @@ def test_el_bootstrap_reelige_c_en_cada_replica(sintetico):
     único valor y este test falla — que es exactamente lo que no pasaba antes.
     """
     d, X, y, w = sintetico
-    coefs, meta = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=15)
+    coefs, meta, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=15)
 
     assert len(meta["c_por_replica"]) > 1, (
         "todas las réplicas eligieron el mismo C: o la re-selección se rompió, "
@@ -66,7 +66,7 @@ def test_el_bootstrap_reelige_c_en_cada_replica(sintetico):
 
 def test_la_metadata_reconcilia_con_las_replicas(sintetico):
     d, X, y, w = sintetico
-    coefs, meta = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=15)
+    coefs, meta, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=15)
 
     assert meta["solicitadas"] == 15
     assert meta["utiles"] == len(coefs)
@@ -76,7 +76,7 @@ def test_la_metadata_reconcilia_con_las_replicas(sintetico):
 
 def test_cada_replica_trae_intercepto_mas_un_coeficiente_por_predictor(sintetico):
     d, X, y, w = sintetico
-    coefs, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
+    coefs, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
     assert coefs, "no sobrevivió ninguna réplica"
     for fila in coefs:
         assert len(fila) == len(PREDICTORES) + 1
@@ -86,8 +86,8 @@ def test_cada_replica_trae_intercepto_mas_un_coeficiente_por_predictor(sintetico
 def test_es_reproducible(sintetico):
     """Misma semilla, mismos coeficientes: si no, el JSON no es auditable."""
     d, X, y, w = sintetico
-    a, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
-    b, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
+    a, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
+    b, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
     assert a == b
 
 
@@ -126,3 +126,55 @@ def test_el_remuestreo_es_estratificado(sintetico, monkeypatch):
         estrato = d["estrato"].iloc[list(indices)].unique()
         assert len(estrato) == 1, "una llamada mezcló estratos"
         assert size == len(indices) == tamanos[estrato[0]]
+
+
+def test_los_mapas_quedan_apareados_con_los_coeficientes_aunque_se_descarte(
+        sintetico, monkeypatch):
+    """
+    Si una réplica de coeficientes se descarta, el mapa de ESE sorteo también
+    tiene que caer.
+
+    Es el defecto latente que marcó Codex el 8/9/2026: `bootstrap_coeficientes`
+    descarta réplicas —sin variación en la dependiente, o con un fold degenerado
+    en la CV— y compacta su lista, mientras que las réplicas del mapa se
+    generaban todas. A partir del primer descarte, `model.py` pega la réplica i
+    de coeficientes con el mapa del sorteo i+1, y el intervalo publicado sale de
+    dos remuestreos distintos.
+
+    No estaba pasando —las cuatro preguntas tienen 10.000 de 10.000— y por eso
+    hace falta forzarlo: se descarta a mano la tercera réplica.
+    """
+    d, X, y, w = sintetico
+    d = d.assign(a_favor=y)
+
+    real = tm.elegir_c
+    llamadas = {"n": 0}
+
+    def elegir_c_que_falla_en_la_tercera(*a, **k):
+        llamadas["n"] += 1
+        if llamadas["n"] == 4:      # 1 es el ajuste principal si lo hubiera
+            return None, None
+        return real(*a, **k)
+
+    monkeypatch.setattr(tm, "elegir_c", elegir_c_que_falla_en_la_tercera)
+    coefs, meta, validos = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=8)
+    monkeypatch.setattr(tm, "elegir_c", real)
+
+    assert meta["utiles"] < meta["solicitadas"], (
+        "no se descartó ninguna réplica: el test no probó nada"
+    )
+    assert len(validos) == len(coefs)
+    assert sorted(set(validos)) == validos, "los sorteos válidos vienen desordenados"
+
+    todos = tm.ajustar_calibracion(d, X, y, w, n_replicas=8)
+    filtrados = tm.ajustar_calibracion(d, X, y, w, n_replicas=8,
+                                       sorteos_validos=validos)
+    assert todos is not None and filtrados is not None
+
+    assert len(filtrados["replicas"]) == len(coefs), (
+        "quedan más mapas que coeficientes: el apareamiento se corre"
+    )
+    esperado = [todos["replicas"][k] for k in validos]
+    assert filtrados["replicas"] == esperado, (
+        "los mapas que sobrevivieron no son los de los sorteos que sobrevivieron"
+    )

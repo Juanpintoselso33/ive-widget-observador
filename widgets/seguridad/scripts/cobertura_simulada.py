@@ -117,12 +117,10 @@ def una_simulacion(d, X, w, p_true, Xp, estratos, n_replicas, rng, recalibra):
                                 random_state=tm.RANDOM_STATE)
     modelo.fit(X, y, sample_weight=w)
 
-    # Mapa de calibración, con la misma receta que producción.
-    mapa = None
-    if recalibra:
-        mapa = tm.ajustar_calibracion(d.assign(a_favor=y), X, y, w)
-        if mapa is None:
-            return None
+    # EL BOOTSTRAP DE COEFICIENTES VA PRIMERO, aunque en producción el mapa se
+    # ajuste antes: hace falta saber QUÉ SORTEOS SOBREVIVIERON para pedirle al
+    # mapa exactamente esos y no perder el apareamiento. El orden no cambia
+    # nada porque los dos generadores se siembran por separado.
 
     # Bootstrap estratificado, re-eligiendo C en cada réplica, igual que
     # producción. Es lo que hace caro esto y también lo que hay que medir: con C
@@ -142,7 +140,8 @@ def una_simulacion(d, X, w, p_true, Xp, estratos, n_replicas, rng, recalibra):
     rng_boot = np.random.default_rng(tm.RANDOM_STATE)
     indices = [np.where(estratos == e)[0] for e in np.unique(estratos)]
     coefs = []
-    for _ in range(n_replicas):
+    sorteos_validos = []
+    for k in range(n_replicas):
         idx = np.concatenate([rng_boot.choice(ix, size=len(ix), replace=True)
                               for ix in indices])
         yb = y[idx]
@@ -154,9 +153,19 @@ def una_simulacion(d, X, w, p_true, Xp, estratos, n_replicas, rng, recalibra):
         mb = LogisticRegression(C=cb, max_iter=2000, random_state=tm.RANDOM_STATE)
         mb.fit(X[idx], yb, sample_weight=w[idx])
         coefs.append(np.r_[mb.intercept_[0], mb.coef_[0]])
+        sorteos_validos.append(k)
     if len(coefs) < 30:
         return None
     coefs = np.array(coefs)
+
+    # Mapa de calibración, con la misma receta que producción y sobre los mismos
+    # sorteos que sobrevivieron arriba.
+    mapa = None
+    if recalibra:
+        mapa = tm.ajustar_calibracion(d.assign(a_favor=y), X, y, w,
+                                      n_replicas, sorteos_validos)
+        if mapa is None:
+            return None
 
     # Probabilidades de cada perfil por réplica, ya calibradas.
     Z = coefs[:, 0][:, None] + coefs[:, 1:] @ Xp.T          # réplicas x perfiles
@@ -292,6 +301,15 @@ def main():
         salida.write_text(json.dumps({
             "slug": slug, "sims_validas": validas, "replicas": args.replicas,
             "semilla": args.semilla,
+            # Ata la medición al modelo que se usó como verdad. Sin esto, una
+            # salida vieja sigue "respaldando" un nivel después de que cambió
+            # la especificación, y el test que compara ambos pasa igual. Lo
+            # marcó Codex el 8/9/2026; las ocho salidas de esa fecha son
+            # anteriores al sello y no lo traen.
+            "huella": config.huella_contrato(slug),
+            # OJO: son ACIERTOS por perfil, no porcentajes. Coinciden cuando la
+            # corrida tiene 100 simulaciones y no en otro caso; quien los lea
+            # tiene que dividir por "sims_validas".
             "niveles": {str(n): dentro_niv[n].tolist() for n in NIVELES},
             "factores": {str(f): dentro_fac[f].tolist() for f in FACTORES},
             "anchos": {str(f): float(np.median(anchos_fac[f])) for f in FACTORES},
