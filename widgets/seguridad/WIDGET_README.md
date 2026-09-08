@@ -362,9 +362,7 @@ estadístico.
 
 - **Errores estándar design-aware por linealización de Taylor.** El bootstrap
   estratificado respeta los estratos pero la base no trae conglomerados.
-- **Recalibrar mano dura.** Está descalibrada y hoy se publica así. Lo estándar
-  es una recalibración isotónica o de Platt ajustada fuera de muestra, que no
-  toca el ordenamiento y corrige los porcentajes. No está hecha.
+- ~~Recalibrar mano dura.~~ **HECHO** — ver la sección de abajo.
 - **Cobertura real de los intervalos.** El bootstrap los genera pero nadie
   demostró que cubran el 95% frente a error de especificación. Son anchos
   —mediana de 27,5, 24,5, 29,3 y 12,5 pp según la pregunta, y percentil 90 de
@@ -376,6 +374,48 @@ estadístico.
   out-of-sample sobre datos reservados; con n efectivo 576 reservar un test
   costaría más de lo que informa.
 - **Bootstrap de la diferencia perfil−promedio nacional**, ya anotado arriba.
+
+## Mano dura se sirve RECALIBRADA
+
+De las cuatro, es la única. Rechazaba el contraste de Hosmer-Lemeshow ponderado
+(p≈0,002): entre las personas a las que el modelo asignaba ~65%, la frecuencia
+real no rondaba 65%. Para un widget cuya frase es literalmente *"el 65% de la
+gente con este perfil"*, eso no es un detalle técnico — es que el número no
+significaba lo que dice.
+
+**El mapa:** spline monótona PCHIP sobre cinco nodos de igual masa ponderada,
+ajustada **fuera de muestra**, serializada como una grilla de 201 puntos e
+interpolada linealmente en producción (así el runtime no importa scipy, y la
+interpolación lineal de una grilla monótona sigue siendo monótona). Se declara en
+`config.PREGUNTAS_A_RECALIBRAR`, que entra en la huella del contrato.
+
+| Métrica | Sin mapa | Con mapa |
+|---|---:|---:|
+| Hosmer-Lemeshow | 29,95 (p≈0,000) | 12,02 (**p=0,297**) |
+| log-loss | 0,52439 | **0,50415** |
+| Brier | 0,16340 | **0,15982** |
+
+**Qué cambió en pantalla:** el perfil que abre pasó de 65% (IC 53-76) a **71%
+(IC 53-85)**. Los coeficientes y las réplicas son idénticos; el mapa baja un poco
+la cola inferior y sube bastante la superior.
+
+### Dos caminos que se descartaron, y por qué
+
+- **Isotónica libre:** "arreglaba" el HL (p=0,50) pero un contraste **sin bins**
+  la seguía rechazando con p=0,001 — estaba calzando los bins con los que se la
+  evaluaba— y empeoraba el log-loss de 0,524 a 0,566.
+- **Platt:** no alcanza. El defecto no es una pendiente: la curva cambia de signo
+  y los dos tramos superiores hay que agruparlos. Una recta en escala logit no
+  puede con esa forma.
+
+### Lo que NO hace este mapa
+
+- **No se aplica a las otras tres.** No mostraron la misma necesidad, y aplicarlo
+  a ciegas descalibraba pena de muerte (p 0,92 → 0,02).
+- **El intervalo mantiene el mapa FIJO.** Se transforma cada réplica del
+  bootstrap —si sólo se transformara el punto central, el intervalo publicado
+  dejaría de corresponder al número que lo encabeza— pero no se remuestrea la
+  estimación del propio mapa. La incertidumbre de la calibración no está adentro.
 
 ## Decisión de diseño: se actualiza en vivo, sin botón de confirmar
 

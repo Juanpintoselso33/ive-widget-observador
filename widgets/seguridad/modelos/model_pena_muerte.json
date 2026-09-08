@@ -1,6 +1,6 @@
 {
   "pregunta_slug": "pena_muerte",
-  "contrato": "9b456404b58b3c94",
+  "contrato": "bbe4f5c469b7b2b0",
   "predictores": [
     "edad_30_44",
     "edad_45_59",
@@ -20120,6 +20120,7 @@
   },
   "prob_favor_nacional": 36.67,
   "prob_neutral_nacional": 22.93,
+  "calibracion": null,
   "stats_by_group": {
     "hombres": 35.7,
     "mujeres": 37.6,
@@ -20182,28 +20183,5 @@
   },
   "fuente": "Encuesta El Observador-UMAD-Ferreira sobre seguridad pública, mayo de 2026",
   "credito": "Análisis y desarrollo: Juan Ignacio Pintos Elso",
-  "entrenado": "2026-09-07",
-  "robustez": {
-    "n_ordinal": 3343,
-    "n_binario": 2672,
-    "n_predictores": 17,
-    "signos_coincidentes": 12,
-    "spearman_magnitud": 0.703,
-    "sostienen_top": [
-      "ideol_der_extrema",
-      "ideol_izquierda",
-      "ideol_centroizq",
-      "educ_ter_comp",
-      "edad_60_plus"
-    ],
-    "no_sostienen": [
-      "edad_30_44",
-      "es_mujer",
-      "ideol_izq_extrema",
-      "ideol_centroderecha",
-      "es_montevideo"
-    ],
-    "ponderado": false,
-    "validado": "2026-09-07"
-  }
+  "entrenado": "2026-09-07"
 }

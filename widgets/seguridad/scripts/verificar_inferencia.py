@@ -37,7 +37,9 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
 from widgets.seguridad import config, train_model as tm
-from widgets.seguridad.model import build_features, predict_probability
+from widgets.seguridad.model import (
+    build_features, predict_probability, _calibrar, _sigmoid_pct, _z,
+)
 
 # Tolerancia. No es "cero" a secas porque las dos vías hacen las mismas cuentas
 # en distinto orden y el punto flotante no está obligado a coincidir bit a bit;
@@ -93,8 +95,28 @@ def main():
         # usó el entrenamiento.
         Xp = np.array([[build_features(**p)[k] for k in config.PREDICTORES]
                        for p in perfiles])
-        por_sklearn = sk.predict_proba(Xp)[:, 1] * 100
+        # Se comparan LAS DOS ESCALAS, cruda y calibrada, y no sólo la
+        # calibrada. Razón: el mapa tiene mesetas —85% y 89% crudos caen los dos
+        # en 87,58%— así que comparar sólo después del mapa PIERDE información.
+        # Codex lo midió intercambiando dos dummies de edad: el error global se
+        # seguía detectando, pero 78 perfiles con discrepancia cruda quedaban
+        # indistinguibles. La comparación cruda es la que de verdad chequea que
+        # el vector de features y el orden de los coeficientes coincidan.
+        crudo_sklearn = sk.predict_proba(Xp)[:, 1] * 100
+        crudo_produccion = np.array(
+            [_sigmoid_pct(_z(modelo["coefficients"], build_features(**p)))
+             for p in perfiles])
+        por_sklearn = np.array([_calibrar(modelo, v) for v in crudo_sklearn])
         por_produccion = np.array([predict_probability(modelo, **p) for p in perfiles])
+
+        peor_crudo = float(np.abs(crudo_sklearn - crudo_produccion).max())
+        peor_global = max(peor_global, peor_crudo)
+        if peor_crudo > TOLERANCIA_PP:
+            fallo = True
+            print(f"  {slug:22s} EN ESCALA CRUDA discrepa {peor_crudo:.10f} pp")
+        if modelo.get("calibracion"):
+            print(f"  {slug:22s} recalibrada — se comparan las dos escalas; "
+                  f"cruda: {peor_crudo:.10f} pp")
 
         peor = float(np.abs(por_sklearn - por_produccion).max())
         peor_global = max(peor_global, peor)

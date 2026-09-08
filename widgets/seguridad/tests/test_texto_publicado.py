@@ -169,3 +169,72 @@ class TestBarridoDeTodosLosResultados:
                 iv = intervalo_probabilidad(modelo, **perfil)
                 assert iv is not None, f"{slug} no trae bootstrap"
                 assert iv[0] <= prob <= iv[1], (slug, perfil, prob, iv)
+
+
+class TestMapaDeRecalibracion:
+    """
+    El mapa tiene que estar si y sólo si la pregunta lo declara, y estar sano.
+
+    Existen porque la huella del contrato NO cubre esto: cubre la declaración,
+    no el contenido del JSON. Codex sacó el mapa de una copia en memoria
+    conservando la huella y pasaba todos los controles de arranque — el widget
+    habría publicado sin recalibrar una pregunta que se declaró que lo necesita,
+    en silencio.
+    """
+
+    @pytest.mark.parametrize("slug", config.SLUGS)
+    def test_el_json_entrenado_tiene_el_mapa_que_le_corresponde(self, slug):
+        from widgets.seguridad.model import problemas_de_calibracion
+        ruta = config.ruta_modelo(slug)
+        if not ruta.exists():
+            pytest.skip(f"«{slug}» todavía no fue entrenada")
+        with open(ruta, encoding="utf-8") as f:
+            modelo = json.load(f)
+        assert problemas_de_calibracion(slug, modelo) == []
+
+    def test_falta_el_mapa_en_una_pregunta_declarada(self):
+        from widgets.seguridad.model import problemas_de_calibracion
+        slug = config.PREGUNTAS_A_RECALIBRAR[0]
+        problemas = problemas_de_calibracion(slug, {"coefficients": {}})
+        assert problemas and "sin recalibrar" in problemas[0]
+
+    def test_sobra_el_mapa_en_una_pregunta_no_declarada(self):
+        from widgets.seguridad.model import problemas_de_calibracion
+        slug = next(s for s in config.SLUGS if s not in config.PREGUNTAS_A_RECALIBRAR)
+        problemas = problemas_de_calibracion(
+            slug, {"calibracion": {"grilla": [0.0, 1.0], "valores": [0.0, 1.0]}})
+        assert problemas and "nadie pidió" in problemas[0]
+
+    def test_un_mapa_no_monotono_se_rechaza(self):
+        """
+        Es la falla que más importa: un mapa que baja da vuelta el orden de dos
+        perfiles, y el widget publicaría que un grupo apoya menos que otro
+        cuando el modelo dice lo contrario.
+        """
+        from widgets.seguridad.model import problemas_de_calibracion
+        slug = config.PREGUNTAS_A_RECALIBRAR[0]
+        malo = {"calibracion": {"grilla": [0.0, 0.5, 1.0],
+                                "valores": [0.0, 0.8, 0.4]}}
+        problemas = problemas_de_calibracion(slug, malo)
+        assert any("monótono" in p for p in problemas)
+
+    def test_el_mapa_se_aplica_al_punto_y_a_cada_replica(self):
+        """
+        Si se aplicara sólo al número, el intervalo publicado dejaría de
+        corresponder al porcentaje que lo encabeza. Lo marcó Codex.
+        """
+        from widgets.seguridad.model import predict_probability, intervalo_probabilidad
+        slug = config.PREGUNTAS_A_RECALIBRAR[0]
+        ruta = config.ruta_modelo(slug)
+        if not ruta.exists():
+            pytest.skip(f"«{slug}» todavía no fue entrenada")
+        with open(ruta, encoding="utf-8") as f:
+            modelo = json.load(f)
+        perfil = dict(tramo_edad=2, es_mujer=0, nivel_educ=2, ideologia=4,
+                      victima=1, es_montevideo=0)
+        prob = predict_probability(modelo, **perfil)
+        bajo, alto = intervalo_probabilidad(modelo, **perfil)
+        assert bajo <= prob <= alto, (
+            "el punto quedó fuera de su intervalo: señal de que el mapa se "
+            "aplicó a uno y no al otro"
+        )

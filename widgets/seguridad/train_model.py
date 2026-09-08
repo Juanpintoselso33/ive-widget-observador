@@ -40,6 +40,7 @@ from widgets.seguridad.config import (
     DATA_FILE, MODELOS_DIR, ruta_modelo, PREGUNTAS, SLUGS,
     LIKERT_MAP, LIKERT_FAVOR, LIKERT_CONTRA, LIKERT_NEUTRAL,
     PONDERADOR, PREDICTORES, REFERENCIAS, huella_contrato, ESPEC_CRUDA,
+    PREGUNTAS_A_RECALIBRAR,
     FUENTE, CREDITO,
     EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE, VICTIMA_UI_TO_CODE,
     REGION_UI_TO_CODE,
@@ -456,6 +457,77 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
     return coeficientes, meta
 
 
+
+# Nodos del mapa de recalibración y finura de la grilla que se serializa.
+NODOS_CALIBRACION = 5
+PUNTOS_GRILLA = 201
+
+
+def ajustar_calibracion(d, X, y, w):
+    """
+    Mapa de recalibración: spline monótona sobre nodos de igual masa ponderada.
+
+    POR QUÉ EXISTE. `politico_mano_dura` rechaza el contraste de Hosmer-Lemeshow
+    ponderado (p≈0,002): entre las personas a las que el modelo asigna ~65%, la
+    frecuencia real no ronda 65%. Para un widget que publica exactamente esa
+    frase, eso no es un detalle técnico — es que el número no significa lo que
+    dice.
+
+    CÓMO. Se ajusta sobre predicciones OUT-OF-FOLD, nunca sobre las del modelo
+    final: un recalibrador ajustado sobre las predicciones que después corrige
+    aprende el ruido de esos mismos casos y produce una mejora inventada.
+
+    POR QUÉ REGULARIZADA Y NO ISOTÓNICA LIBRE. La libre daba HL p=0,50 pero un
+    contraste sin bins la rechazaba con p=0,001 —estaba calzando los bins con los
+    que se la evaluaba— y empeoraba el log-loss de 0,524 a 0,566. Con cinco nodos
+    mejoran las tres métricas a la vez.
+
+    Se devuelve una GRILLA, no la spline: producción no importa scipy, y la
+    interpolación lineal de una grilla monótona sigue siendo monótona.
+    """
+    from scipy.interpolate import PchipInterpolator
+
+    cv = StratifiedKFold(5, shuffle=True, random_state=RANDOM_STATE)
+    oof = np.zeros(len(y))
+    for tr, te in cv.split(X, y):
+        c_fold, _ = elegir_c(X[tr], y[tr], w[tr])
+        if c_fold is None:
+            return None
+        m = LogisticRegression(C=c_fold, max_iter=2000, random_state=RANDOM_STATE)
+        m.fit(X[tr], y[tr], sample_weight=w[tr])
+        oof[te] = m.predict_proba(X[te])[:, 1]
+
+    # Nodos de igual MASA PONDERADA, no de igual cantidad de casos: con un deff
+    # de 4,7, cinco grupos de igual n representan trozos muy distintos de la
+    # población.
+    orden = np.argsort(oof)
+    acum = np.cumsum(w[orden]) / w.sum()
+    bins = np.zeros(len(oof), dtype=int)
+    bins[orden] = np.minimum((acum * NODOS_CALIBRACION).astype(int),
+                             NODOS_CALIBRACION - 1)
+
+    xs, ys = [], []
+    for j in sorted(set(bins)):
+        m = bins == j
+        xs.append(float(np.average(oof[m], weights=w[m])))
+        ys.append(float(np.average(y[m], weights=w[m])))
+    xs = np.array([0.0] + xs + [1.0])
+    ys = np.array([min(ys[0], float(oof.min()))] + ys + [max(ys[-1], float(oof.max()))])
+    ys = np.maximum.accumulate(ys)          # el mapa no puede invertir el orden
+    ok = np.r_[True, np.diff(xs) > 1e-9]
+    spline = PchipInterpolator(xs[ok], np.maximum.accumulate(ys[ok]))
+
+    grilla = np.linspace(0.0, 1.0, PUNTOS_GRILLA)
+    valores = np.maximum.accumulate(np.clip(spline(grilla), 0.0, 1.0))
+    return {
+        "metodo": "spline monotona PCHIP sobre nodos de igual masa ponderada",
+        "nodos": NODOS_CALIBRACION,
+        "ajustada_fuera_de_muestra": True,
+        "grilla": [round(float(v), 6) for v in grilla],
+        "valores": [round(float(v), 6) for v in valores],
+    }
+
+
 def _mcfadden(modelo, X, y, w):
     """Pseudo-R² con log-likelihood nulo calculado sobre la media ponderada."""
     p = modelo.predict_proba(X)[:, 1]
@@ -507,6 +579,18 @@ def entrenar(df_crudo, slug, n_replicas=None):
     boot, boot_meta = bootstrap_coeficientes(d, X, y, w, n_replicas)
     print(f"  {boot_meta['utiles']} réplicas útiles sobre {n_replicas}")
     print(f"  C elegido por réplica: {boot_meta['c_por_replica']}")
+
+    calibracion = None
+    if slug in PREGUNTAS_A_RECALIBRAR:
+        print("\nAjustando el mapa de recalibración (fuera de muestra)...")
+        calibracion = ajustar_calibracion(d, X, y, w)
+        if calibracion is None:
+            raise SystemExit(
+                f"[{slug}] está declarada en PREGUNTAS_A_RECALIBRAR pero el mapa "
+                "no se pudo ajustar. Mejor abortar que publicar sin recalibrar "
+                "una pregunta que se declaró que la necesita."
+            )
+        print(f"  {calibracion['nodos']} nodos, grilla de {len(calibracion['grilla'])} puntos")
 
     coeficientes = {"intercept": float(modelo.intercept_[0])}
     for nombre, valor in zip(PREDICTORES, modelo.coef_[0]):
@@ -623,6 +707,9 @@ def entrenar(df_crudo, slug, n_replicas=None):
         },
         "prob_favor_nacional": round(prop_pond, 2),
         "prob_neutral_nacional": round(prop_neutral, 2),
+        # None cuando la pregunta no está en PREGUNTAS_A_RECALIBRAR: model.py
+        # trata la ausencia como identidad.
+        "calibracion": calibracion,
         "stats_by_group": stats,
         "referencias": REFERENCIAS,
         "cobertura_perfiles": cobertura,

@@ -21,7 +21,7 @@ import json
 import math
 
 from widgets.seguridad.config import (
-    PREDICTORES, ESPEC_CRUDA, SLUGS, ruta_modelo,
+    PREDICTORES, ESPEC_CRUDA, SLUGS, ruta_modelo, PREGUNTAS_A_RECALIBRAR,
 )
 
 
@@ -100,6 +100,78 @@ def _sigmoid_pct(z):
     return (1 / (1 + math.exp(-z))) * 100
 
 
+def problemas_de_calibracion(slug, model):
+    """
+    Verifica que el mapa de recalibración sea el que corresponde y esté sano.
+
+    POR QUÉ NO ALCANZA LA HUELLA DEL CONTRATO. La huella cubre qué preguntas se
+    declaran recalibradas, pero no el CONTENIDO del JSON: Codex sacó el mapa de
+    una copia en memoria conservando la huella, y pasaba todos los controles de
+    arranque — `_calibrar` devolvía la probabilidad cruda en silencio, o sea el
+    widget publicando sin recalibrar una pregunta que se declaró que lo necesita.
+    Al revés también: un mapa pegado a otra pregunta se habría aplicado igual.
+
+    Devuelve una lista de problemas, vacía si está todo bien.
+    """
+    cal = model.get("calibracion")
+    debe_tener = slug in PREGUNTAS_A_RECALIBRAR
+
+    if debe_tener and not cal:
+        return [f"«{slug}» está declarada en PREGUNTAS_A_RECALIBRAR y su JSON no "
+                "trae mapa: se publicaría sin recalibrar"]
+    if cal and not debe_tener:
+        return [f"«{slug}» trae un mapa de recalibración y no está declarada: se "
+                "aplicaría una corrección que nadie pidió"]
+    if not cal:
+        return []
+
+    fallas = []
+    xs, ys = cal.get("grilla"), cal.get("valores")
+    if not xs or not ys or len(xs) != len(ys):
+        return [f"«{slug}»: la grilla y los valores no tienen el mismo largo"]
+    if len(xs) < 2:
+        fallas.append(f"«{slug}»: la grilla tiene menos de dos puntos")
+    if any(not math.isfinite(v) for v in xs + ys):
+        fallas.append(f"«{slug}»: hay valores no finitos en el mapa")
+    if any(b <= a for a, b in zip(xs, xs[1:])):
+        fallas.append(f"«{slug}»: las abscisas del mapa no son estrictamente crecientes")
+    if any(b < a for a, b in zip(ys, ys[1:])):
+        fallas.append(f"«{slug}»: el mapa NO es monótono, puede dar vuelta el orden "
+                      "de dos perfiles")
+    if any(not (0.0 <= v <= 1.0) for v in ys):
+        fallas.append(f"«{slug}»: el mapa devuelve valores fuera de 0-1")
+    return fallas
+
+
+def _calibrar(model, pct):
+    """
+    Aplica el mapa de recalibración del modelo, si lo trae. Identidad si no.
+
+    El mapa se serializa como una GRILLA de puntos y acá se interpola linealmente
+    — no se evalúa la spline. Dos razones: producción no importa scipy, y la
+    interpolación lineal de una grilla monótona es monótona, así que no puede
+    introducir inversiones que el ajuste no tenía.
+    """
+    cal = model.get("calibracion")
+    if not cal:
+        return pct
+    xs, ys = cal["grilla"], cal["valores"]
+    x = pct / 100.0
+    if x <= xs[0]:
+        return ys[0] * 100
+    if x >= xs[-1]:
+        return ys[-1] * 100
+    lo, hi = 0, len(xs) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if xs[mid] <= x:
+            lo = mid
+        else:
+            hi = mid
+    t = (x - xs[lo]) / (xs[hi] - xs[lo])
+    return (ys[lo] + t * (ys[hi] - ys[lo])) * 100
+
+
 def predict_probability(model, tramo_edad, es_mujer, nivel_educ, ideologia,
                         victima, es_montevideo):
     """
@@ -108,7 +180,7 @@ def predict_probability(model, tramo_edad, es_mujer, nivel_educ, ideologia,
     """
     features = build_features(tramo_edad, es_mujer, nivel_educ, ideologia,
                               victima, es_montevideo)
-    return _sigmoid_pct(_z(model["coefficients"], features))
+    return _calibrar(model, _sigmoid_pct(_z(model["coefficients"], features)))
 
 
 def predict_probability_neutral(model, tramo_edad, es_mujer, nivel_educ, ideologia,
@@ -142,7 +214,11 @@ def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia
         z = fila[0]  # intercept
         for nombre, coef in zip(orden[1:], fila[1:]):
             z += coef * features[nombre]
-        probabilidades.append(_sigmoid_pct(z))
+        # La MISMA recalibración que el punto central. Si se aplicara sólo al
+        # número y no a las réplicas, el intervalo publicado dejaría de
+        # corresponder al porcentaje que lo encabeza. Lo marcó Codex al revisar
+        # la implementación.
+        probabilidades.append(_calibrar(model, _sigmoid_pct(z)))
 
     probabilidades.sort()
     return probabilidades

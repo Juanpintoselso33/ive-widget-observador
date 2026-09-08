@@ -143,6 +143,30 @@ LIKERT_NEUTRAL = 3
 PONDERADOR = "w_norm"
 
 # ============================================================
+# RECALIBRACIÓN
+# ============================================================
+# Preguntas cuyo modelo se sirve RECALIBRADO. Va acá, pre-especificado y dentro
+# de la huella del contrato, y no se decide mirando resultados: elegir a
+# posteriori qué recalibrar sobre los mismos datos con los que se evalúa es otra
+# forma de sobreajuste.
+#
+# Hoy sólo `politico_mano_dura`, y por evidencia: es la única de las cuatro que
+# rechaza el contraste de Hosmer-Lemeshow ponderado (p≈0,002 contra 0,30-0,94 de
+# las otras tres). El mapa es una spline monótona sobre cinco nodos de igual masa
+# ponderada, ajustada FUERA DE MUESTRA.
+#
+# Por qué cinco nodos y no una isotónica libre: la libre "arreglaba" el HL
+# (p=0,50) pero un contraste sin bins la seguía rechazando con p=0,001 — estaba
+# calzando los bins con los que se la evaluaba— y empeoraba el log-loss de 0,524
+# a 0,566. La regularizada mejora las tres métricas a la vez. Lo encontró Codex
+# el 7/9/2026, revisando mi conclusión de que no correspondía recalibrar.
+#
+# Por qué no Platt: el defecto no es una pendiente. La curva cambia de signo y
+# los dos tramos superiores hay que agruparlos; una recta en escala logit no
+# puede con esa forma.
+PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
+
+# ============================================================
 # CRÉDITOS
 # ============================================================
 # Tomer, 7/9/2026: "en la fuente, siempre es la encuesta de El
@@ -375,6 +399,7 @@ def huella_contrato(slug):
         "contra": sorted(LIKERT_CONTRA),
         "neutral": LIKERT_NEUTRAL,
         "ponderador": PONDERADOR,
+        "recalibradas": sorted(PREGUNTAS_A_RECALIBRAR),
         "espec_cruda": _json.dumps(ESPEC_CRUDA, sort_keys=True),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]

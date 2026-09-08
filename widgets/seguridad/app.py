@@ -19,7 +19,7 @@ from shared.styles import get_observador_css
 from shared.config import OBSERVADOR_COLORS
 from widgets.seguridad.model import (
     load_modelos as _load_modelos, predict_probability, intervalo_probabilidad,
-    banda_decision,
+    banda_decision, problemas_de_calibracion,
 )
 from widgets.seguridad.components import (
     render_selector_pregunta, render_header, render_inputs,
@@ -98,6 +98,11 @@ for _slug in SLUGS:
             "— cambió algún mapeo, predictor o categoría"
         )
         continue
+
+    # El mapa de recalibración tiene que estar si y sólo si la pregunta lo
+    # declara, y estar sano. La huella no lo cubre: cubre la declaración, no el
+    # contenido del JSON.
+    _problemas.extend(problemas_de_calibracion(_slug, _modelo))
 
     _esperados = set(PREDICTORES)
     _reales = set(_modelo.get("coefficients", {})) - {"intercept"}
