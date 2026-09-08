@@ -59,10 +59,23 @@ C_GRID = [0.01, 0.1, 0.5, 1.0, 5.0, 10.0]
 # pregunta— el intervalo pide cuantiles muy en la cola: con q=0,005 y 1.000
 # réplicas, la posición del percentil es 0,005x999 = 4,995, o sea que interpola
 # entre la QUINTA y la SEXTA observación ordenada. (Antes decía "primera y
-# segunda"; era falso y lo corrigió Codex.) Codex ajustó 10.000 bootstrap
-# independientes y midió el error Monte Carlo por extremo: con 1.000 la mediana
-# era 0,84 pp, el percentil 95 llegaba a 2,23 y el máximo a 4,20. Con 10.000
-# baja a 0,27 / 0,78 / 1,29.
+# segunda"; era falso y lo corrigió Codex.)
+#
+# EL RUIDO DE ESE EXTREMO ESTÁ MEDIDO, y ahora con un script que se puede correr
+# —`scripts/error_mc_percentil.py`— en vez de con un número que había quedado
+# sin experimento detrás. Al intentar reproducir la medición original de Codex,
+# el propio Codex obtuvo otros valores; no porque los primeros fueran falsos,
+# sino porque no había con qué comprobarlos. Una constante que multiplica por
+# diez el tamaño de lo que se publica no puede apoyarse en eso.
+#
+# Lo que mide el script: para los 1.008 perfiles y los dos extremos, el desvío
+# estándar del extremo cuando se lo calcula con B réplicas, remuestreando sin
+# reposición subconjuntos de las serializadas y corrigiendo por población
+# finita. Con B=1.000 la mediana va de 0,34 a 0,82 pp según la pregunta y el
+# peor extremo llega a 4,69; extrapolando por 1/raíz(B) —ley que el script
+# verifica, factor 0,87 a 0,95— con 10.000 la mediana baja a 0,11-0,27 y el peor
+# extremo a 0,81-2,45. La pregunta más ruidosa es cadena perpetua, que es
+# también la que publica el nivel más extremo.
 #
 # EL COSTO SÍ LLEGA A PRODUCCIÓN, aunque sea chico. Los cuatro JSON pasan de
 # 1,67 MB a 16,47 MB en disco y unos 34 MB como objetos Python; calcular el

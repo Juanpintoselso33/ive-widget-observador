@@ -211,9 +211,10 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 # promedia 95,19% con una corrida en 94,86%.
 #
 # ES UN DESEMPATE CONSERVADOR, NO UN TEST, y conviene no venderlo como más de lo
-# que es. Codex lo midió al revisar esto: con la cobertura verdadera justo en
-# 95%, dos corridas independientes caen las dos por encima cerca del 25% de las
-# veces. Y el error Monte Carlo de estas mediciones es del orden del punto —los
+# que es. Con la cobertura verdadera justo en 95%, cada corrida tiene alrededor
+# de un 50% de chance de quedar por encima, así que las dos quedan por encima
+# alrededor de una de cada cuatro veces — es una cuenta de servilleta, no un
+# número que salga de estas salidas. Y el error Monte Carlo de estas mediciones es del orden del punto —los
 # 1.008 perfiles comparten cada muestra simulada, así que no son 1.008
 # experimentos independientes y las salidas no guardan la covarianza que haría
 # falta para calcularlo exacto—, de modo que el 95% cae dentro del margen de los
@@ -249,8 +250,10 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 # 1. EL NIVEL SE ELIGIÓ CON 1.000 RÉPLICAS Y SE PUBLICA CON 10.000, y el signo
 #    de esa diferencia NO se conoce. El simulador corre el bootstrap interno en
 #    1.000 porque a 10.000 la medición llevaría unas veinte horas por par de
-#    semillas (extrapolado del tiempo de estas corridas, que las salidas no
-#    guardan). Subir las réplicas achica el error Monte Carlo del cuantil
+#    semillas. Ese "veinte" es una extrapolación lineal de lo que tardaron estas
+#    corridas —entre 6.815 y 7.049 segundos cada una, según sus logs— y las ocho
+#    salidas de esa fecha no guardan la duración; el simulador la guarda de acá
+#    en más, en la clave "segundos". Subir las réplicas achica el error Monte Carlo del cuantil
 #    extremo —los números están en `train_model.py`, junto a N_REPLICAS— pero
 #    menos ruido no es más cobertura: si el extremo ruidoso incluía la verdad
 #    por accidente, achicar el ruido la deja afuera. Escribí que producción

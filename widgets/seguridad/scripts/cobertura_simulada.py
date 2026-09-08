@@ -65,6 +65,61 @@ warnings.filterwarnings("ignore")
 
 NIVEL = 95
 
+
+def huella_estudio(slug, modelo):
+    """
+    Sello que ata una salida del estudio al procedimiento Y a la verdad que usó.
+
+    `config.huella_contrato` NO alcanza para esto y usarla fue un error: Codex
+    verificó que sobrevive intacta a cambiar `C_GRID`, `NODOS_CALIBRACION`,
+    `RANDOM_STATE` y `N_REPLICAS`, y que tampoco mira el artefacto que el
+    simulador usa como verdad. Con ese sello, una medición vieja seguía
+    respaldando un nivel después de cambiar la receta de entrenamiento.
+
+    Acá entra:
+      · la huella del contrato de codificación (predictores y categorías);
+      · las perillas numéricas del procedimiento (grilla de C, nodos del mapa,
+        semilla, cantidad de niveles y factores evaluados);
+      · el ARTEFACTO usado como verdad —coeficientes y mapa central—, porque la
+        cobertura se mide contra las probabilidades que sale de él;
+      · la ESTRUCTURA de las funciones que definen el procedimiento, vía el AST
+        con los docstrings sacados. Así un cambio de lógica invalida el estudio
+        y un cambio de comentario o de formato no.
+
+    QUÉ SIGUE SIN CUBRIR: la base de datos de entrada, y cualquier cambio de
+    lógica que ocurra dentro de funciones que no están en esta lista. No es una
+    huella del mundo, es una huella de lo que se puede leer barato.
+    """
+    import ast
+    import hashlib
+    import inspect
+
+    def estructura(fn):
+        arbol = ast.parse(inspect.getsource(fn).lstrip())
+        for nodo in ast.walk(arbol):
+            if isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                 ast.ClassDef, ast.Module)):
+                cuerpo = nodo.body
+                if (cuerpo and isinstance(cuerpo[0], ast.Expr)
+                        and isinstance(cuerpo[0].value, ast.Constant)
+                        and isinstance(cuerpo[0].value.value, str)):
+                    nodo.body = cuerpo[1:] or [ast.Pass()]
+        return ast.dump(arbol)
+
+    piezas = [
+        config.huella_contrato(slug),
+        repr(sorted(tm.C_GRID)),
+        repr(tm.NODOS_CALIBRACION),
+        repr(tm.RANDOM_STATE),
+        repr(NIVELES), repr(FACTORES),
+        json.dumps(modelo.get("coefficients"), sort_keys=True),
+        json.dumps((modelo.get("calibracion") or {}).get("grilla")),
+        json.dumps((modelo.get("calibracion") or {}).get("valores")),
+    ] + [estructura(f) for f in (tm.elegir_c, tm.ajustar_calibracion,
+                                 tm._nodos_calibracion, tm.bootstrap_coeficientes,
+                                 una_simulacion)]
+    return hashlib.sha256("|".join(piezas).encode()).hexdigest()[:16]
+
 # Dos familias de corrección, evaluadas en la MISMA corrida porque lo caro es
 # ajustar, no medir:
 #   · subir el nivel nominal del percentil (95 -> 96, 97...);
@@ -117,10 +172,15 @@ def una_simulacion(d, X, w, p_true, Xp, estratos, n_replicas, rng, recalibra):
                                 random_state=tm.RANDOM_STATE)
     modelo.fit(X, y, sample_weight=w)
 
-    # EL BOOTSTRAP DE COEFICIENTES VA PRIMERO, aunque en producción el mapa se
-    # ajuste antes: hace falta saber QUÉ SORTEOS SOBREVIVIERON para pedirle al
-    # mapa exactamente esos y no perder el apareamiento. El orden no cambia
-    # nada porque los dos generadores se siembran por separado.
+    # EL BOOTSTRAP DE COEFICIENTES VA PRIMERO, igual que en producción
+    # (`entrenar` llama a bootstrap_coeficientes y después a
+    # ajustar_calibracion): hace falta saber QUÉ SORTEOS SOBREVIVIERON para
+    # pedirle al mapa exactamente esos y no perder el apareamiento. Acá el mapa
+    # se ajustaba antes; el orden no cambia ningún resultado porque los dos
+    # remuestreos se siembran por separado con `default_rng(RANDOM_STATE)` y el
+    # sorteo de respuestas usa otro generador, pero conviene que el simulador
+    # tenga el mismo orden que lo que simula. (Escribí que producción lo hacía
+    # al revés; era falso y lo corrigió Codex.)
 
     # Bootstrap estratificado, re-eligiendo C en cada réplica, igual que
     # producción. Es lo que hace caro esto y también lo que hay que medir: con C
@@ -228,6 +288,7 @@ def main():
         w = d[config.PONDERADOR].values
         estratos = d["estrato"].values
         recalibra = slug in config.PREGUNTAS_A_RECALIBRAR
+        arranque = time.time()
 
         # LA VERDAD: la probabilidad que el modelo publicado le asigna a cada
         # encuestado, ya calibrada. Es el mundo que se simula.
@@ -306,7 +367,8 @@ def main():
             # la especificación, y el test que compara ambos pasa igual. Lo
             # marcó Codex el 8/9/2026; las ocho salidas de esa fecha son
             # anteriores al sello y no lo traen.
-            "huella": config.huella_contrato(slug),
+            "huella": huella_estudio(slug, publicado),
+            "segundos": round(time.time() - arranque, 1),
             # OJO: son ACIERTOS por perfil, no porcentajes. Coinciden cuando la
             # corrida tiene 100 simulaciones y no en otro caso; quien los lea
             # tiene que dividir por "sims_validas".

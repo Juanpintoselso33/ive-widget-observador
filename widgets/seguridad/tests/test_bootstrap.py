@@ -128,36 +128,80 @@ def test_el_remuestreo_es_estratificado(sintetico, monkeypatch):
         assert size == len(indices) == tamanos[estrato[0]]
 
 
+def _reconstruir_sorteos(d, n):
+    """
+    Los n remuestreos estratificados que produce `default_rng(RANDOM_STATE)`.
+
+    Se rehace acá a propósito, sin llamar a ninguna función de train_model: un
+    test que verifica el apareamiento no puede pedirle los índices al código que
+    está verificando.
+    """
+    estratos = d["estrato"].values
+    indices = [np.where(estratos == e)[0] for e in np.unique(estratos)]
+    rng = np.random.default_rng(tm.RANDOM_STATE)
+    return [np.concatenate([rng.choice(ix, size=len(ix), replace=True)
+                            for ix in indices]) for _ in range(n)]
+
+
+def _oof_como_produccion(X, y, w):
+    """Las predicciones fuera de fold sobre las que se ajusta el mapa."""
+    from sklearn.model_selection import StratifiedKFold
+    from sklearn.linear_model import LogisticRegression
+    cv = StratifiedKFold(5, shuffle=True, random_state=tm.RANDOM_STATE)
+    oof = np.zeros(len(y))
+    for tr, te in cv.split(X, y):
+        c_fold, _ = tm.elegir_c(X[tr], y[tr], w[tr])
+        m = LogisticRegression(C=c_fold, max_iter=2000,
+                               random_state=tm.RANDOM_STATE)
+        m.fit(X[tr], y[tr], sample_weight=w[tr])
+        oof[te] = m.predict_proba(X[te])[:, 1]
+    return oof
+
+
 def test_los_mapas_quedan_apareados_con_los_coeficientes_aunque_se_descarte(
         sintetico, monkeypatch):
     """
-    Si una réplica de coeficientes se descarta, el mapa de ESE sorteo también
-    tiene que caer.
+    La réplica j de coeficientes y la j del mapa tienen que salir del MISMO
+    remuestreo, incluso cuando alguna réplica se descarta.
 
     Es el defecto latente que marcó Codex el 8/9/2026: `bootstrap_coeficientes`
     descarta réplicas —sin variación en la dependiente, o con un fold degenerado
     en la CV— y compacta su lista, mientras que las réplicas del mapa se
-    generaban todas. A partir del primer descarte, `model.py` pega la réplica i
-    de coeficientes con el mapa del sorteo i+1, y el intervalo publicado sale de
+    generaban todas. A partir del primer descarte, `model.py` pega la réplica j
+    de coeficientes con el mapa del sorteo j+1, y el intervalo publicado sale de
     dos remuestreos distintos.
 
-    No estaba pasando —las cuatro preguntas tienen 10.000 de 10.000— y por eso
-    hace falta forzarlo: se descarta a mano la tercera réplica.
+    LA PRIMERA VERSIÓN DE ESTE TEST NO PROBABA ESO. Comparaba el mapa filtrado
+    contra `[mapa_completo[k] for k in validos]`, o sea que usaba como esperado
+    la misma lista de índices que quería verificar: pasaba igual si
+    `bootstrap_coeficientes` devolvía `range(len(coefs))` —perdiendo el hueco—
+    y también si el calibrador cambiaba de semilla. Lo mostró Codex con los dos
+    controles negativos.
+
+    Ahora los sorteos se reconstruyen acá, con `default_rng(RANDOM_STATE)` y los
+    mismos estratos, sin preguntarle nada a train_model; y se comprueba que el
+    coeficiente j y el mapa j salen del sorteo reconstruido que les toca.
+
+    No estaba pasando en producción —las cuatro preguntas tienen 10.000 de
+    10.000— así que hay que forzar el descarte a mano.
     """
+    from sklearn.linear_model import LogisticRegression
+
     d, X, y, w = sintetico
     d = d.assign(a_favor=y)
+    n = 8
 
     real = tm.elegir_c
     llamadas = {"n": 0}
 
-    def elegir_c_que_falla_en_la_tercera(*a, **k):
+    def elegir_c_que_falla_en_una(*a, **k):
         llamadas["n"] += 1
-        if llamadas["n"] == 4:      # 1 es el ajuste principal si lo hubiera
+        if llamadas["n"] == 4:
             return None, None
         return real(*a, **k)
 
-    monkeypatch.setattr(tm, "elegir_c", elegir_c_que_falla_en_la_tercera)
-    coefs, meta, validos = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=8)
+    monkeypatch.setattr(tm, "elegir_c", elegir_c_que_falla_en_una)
+    coefs, meta, validos = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=n)
     monkeypatch.setattr(tm, "elegir_c", real)
 
     assert meta["utiles"] < meta["solicitadas"], (
@@ -165,16 +209,38 @@ def test_los_mapas_quedan_apareados_con_los_coeficientes_aunque_se_descarte(
     )
     assert len(validos) == len(coefs)
     assert sorted(set(validos)) == validos, "los sorteos válidos vienen desordenados"
+    assert set(range(len(coefs))) != set(validos), (
+        "los índices válidos son 0..k sin hueco: el descarte no quedó registrado"
+    )
 
-    todos = tm.ajustar_calibracion(d, X, y, w, n_replicas=8)
-    filtrados = tm.ajustar_calibracion(d, X, y, w, n_replicas=8,
-                                       sorteos_validos=validos)
-    assert todos is not None and filtrados is not None
-
-    assert len(filtrados["replicas"]) == len(coefs), (
+    calibracion = tm.ajustar_calibracion(d, X, y, w, n_replicas=n,
+                                         sorteos_validos=validos)
+    assert calibracion is not None
+    assert len(calibracion["replicas"]) == len(coefs), (
         "quedan más mapas que coeficientes: el apareamiento se corre"
     )
-    esperado = [todos["replicas"][k] for k in validos]
-    assert filtrados["replicas"] == esperado, (
-        "los mapas que sobrevivieron no son los de los sorteos que sobrevivieron"
-    )
+
+    sorteos = _reconstruir_sorteos(d, n)
+    oof = _oof_como_produccion(X, y, w)
+
+    for j, k in enumerate(validos):
+        idx = sorteos[k]
+
+        # El coeficiente j tiene que ser el del sorteo k.
+        c_k, _ = tm.elegir_c(X[idx], y[idx], w[idx])
+        m = LogisticRegression(C=c_k, max_iter=2000, random_state=tm.RANDOM_STATE)
+        m.fit(X[idx], y[idx], sample_weight=w[idx])
+        esperado = [float(m.intercept_[0])] + [float(v) for v in m.coef_[0]]
+        assert np.allclose(coefs[j], esperado, atol=1e-8), (
+            f"la réplica {j} de coeficientes no sale del sorteo {k}"
+        )
+
+        # Y el mapa j, del MISMO sorteo k.
+        xs_k, ys_k = tm._nodos_calibracion(oof[idx], y[idx], w[idx])
+        xs_j, ys_j = calibracion["replicas"][j]
+        assert np.allclose(xs_j, [round(float(v), 6) for v in xs_k], atol=1e-6), (
+            f"el mapa {j} no sale del sorteo {k}"
+        )
+        assert np.allclose(ys_j, [round(float(v), 6) for v in ys_k], atol=1e-6), (
+            f"el mapa {j} no sale del sorteo {k}"
+        )
