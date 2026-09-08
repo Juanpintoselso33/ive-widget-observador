@@ -37,7 +37,7 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
 from widgets.seguridad import config, train_model as tm
-from widgets.seguridad.model import build_features, predict_probability
+from widgets.seguridad.model import build_features, predict_probability, _calibrar
 
 # Tolerancia. No es "cero" a secas porque las dos vías hacen las mismas cuentas
 # en distinto orden y el punto flotante no está obligado a coincidir bit a bit;
@@ -93,8 +93,17 @@ def main():
         # usó el entrenamiento.
         Xp = np.array([[build_features(**p)[k] for k in config.PREDICTORES]
                        for p in perfiles])
-        por_sklearn = sk.predict_proba(Xp)[:, 1] * 100
+        # Al crudo de sklearn se le aplica EL MISMO mapa de recalibración que
+        # usa producción. Sin esto, una pregunta recalibrada da una discrepancia
+        # enorme —9,6 pp cuando se implementó— y el script la reporta como
+        # desalineación de dummies, que es justo el error que viene a detectar.
+        # Lo que se compara sigue siendo lo que importa: que el vector de
+        # features y el orden de los coeficientes coincidan.
+        crudo = sk.predict_proba(Xp)[:, 1] * 100
+        por_sklearn = np.array([_calibrar(modelo, v) for v in crudo])
         por_produccion = np.array([predict_probability(modelo, **p) for p in perfiles])
+        if modelo.get("calibracion"):
+            print(f"  {slug:22s} (recalibrada: se compara contra sklearn + el mapa)")
 
         peor = float(np.abs(por_sklearn - por_produccion).max())
         peor_global = max(peor_global, peor)

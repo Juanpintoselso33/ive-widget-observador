@@ -1,6 +1,6 @@
 {
   "pregunta_slug": "humillacion_presos",
-  "contrato": "237f8d50d626395b",
+  "contrato": "bb373be64e68f93c",
   "predictores": [
     "edad_30_44",
     "edad_45_59",
@@ -20121,6 +20121,7 @@
   },
   "prob_favor_nacional": 10.99,
   "prob_neutral_nacional": 17.66,
+  "calibracion": null,
   "stats_by_group": {
     "hombres": 10.9,
     "mujeres": 11.0,
@@ -20183,27 +20184,5 @@
   },
   "fuente": "Encuesta El Observador-UMAD-Ferreira sobre seguridad pública, mayo de 2026",
   "credito": "Análisis y desarrollo: Juan Ignacio Pintos Elso",
-  "entrenado": "2026-09-07",
-  "robustez": {
-    "n_ordinal": 3353,
-    "n_binario": 2969,
-    "n_predictores": 17,
-    "signos_coincidentes": 13,
-    "spearman_magnitud": 0.517,
-    "sostienen_top": [
-      "edad_60_plus",
-      "ideol_der_extrema",
-      "ideol_no_ubica",
-      "ideol_izquierda",
-      "ideol_izq_extrema"
-    ],
-    "no_sostienen": [
-      "ideol_centroderecha",
-      "victima_sin_violencia",
-      "victima_con_violencia",
-      "es_montevideo"
-    ],
-    "ponderado": false,
-    "validado": "2026-09-07"
-  }
+  "entrenado": "2026-09-07"
 }

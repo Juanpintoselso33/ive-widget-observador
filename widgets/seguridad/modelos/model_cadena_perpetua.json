@@ -1,6 +1,6 @@
 {
   "pregunta_slug": "cadena_perpetua",
-  "contrato": "2838af7375b79ca1",
+  "contrato": "f8111e9956ffd19a",
   "predictores": [
     "edad_30_44",
     "edad_45_59",
@@ -20120,6 +20120,7 @@
   },
   "prob_favor_nacional": 78.57,
   "prob_neutral_nacional": 12.4,
+  "calibracion": null,
   "stats_by_group": {
     "hombres": 75.3,
     "mujeres": 81.8,
@@ -20182,28 +20183,5 @@
   },
   "fuente": "Encuesta El Observador-UMAD-Ferreira sobre seguridad pública, mayo de 2026",
   "credito": "Análisis y desarrollo: Juan Ignacio Pintos Elso",
-  "entrenado": "2026-09-07",
-  "robustez": {
-    "n_ordinal": 3360,
-    "n_binario": 2950,
-    "n_predictores": 17,
-    "signos_coincidentes": 12,
-    "spearman_magnitud": 0.203,
-    "sostienen_top": [
-      "ideol_izquierda",
-      "ideol_centroizq",
-      "ideol_derecha",
-      "ideol_izq_extrema",
-      "educ_ter_comp"
-    ],
-    "no_sostienen": [
-      "edad_30_44",
-      "edad_45_59",
-      "es_mujer",
-      "ideol_no_ubica",
-      "victima_sin_dato"
-    ],
-    "ponderado": false,
-    "validado": "2026-09-07"
-  }
+  "entrenado": "2026-09-07"
 }
