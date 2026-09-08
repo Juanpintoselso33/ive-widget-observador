@@ -329,3 +329,47 @@ class TestHuellaContrato:
             f"el JSON de «{slug}» no corresponde a la configuración actual: "
             "hay que volver a correr train_model.py"
         )
+
+
+class TestNivelCalibradoContraLaMedicion:
+    """
+    El nivel publicado no puede ser MÁS angosto que lo que sostiene el estudio
+    de cobertura.
+
+    Existe porque el nivel es un número suelto en un dict: nada impedía bajarlo
+    "porque el intervalo se ve muy ancho". Acá el criterio queda atado a las
+    salidas de `cobertura_simulada.py` que viven en `scripts/salidas/`.
+
+    Que quede MÁS ancho sí se permite, y de hecho pasa: mano dura publica 98
+    cuando el criterio ya se cumple en 97, a propósito, por su cola.
+    """
+
+    def test_ningun_nivel_publicado_queda_por_debajo_del_medido(self):
+        import importlib.util
+        from pathlib import Path
+
+        scripts = Path(__file__).parent.parent / "scripts"
+        salidas = scripts / "salidas"
+        if not list(salidas.glob("cal-*.json")):
+            pytest.skip("no hay salidas del estudio de cobertura en scripts/salidas")
+
+        spec = importlib.util.spec_from_file_location(
+            "agregar_calibracion", scripts / "agregar_calibracion.py")
+        agg = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(agg)
+
+        por_slug = agg._cargar()
+        flojos = []
+        for slug, corridas in por_slug.items():
+            minimo, _ = agg.elegir(corridas)
+            assert minimo is not None, (
+                f"«{slug}»: ningún nivel medido llega al 95% en todas las "
+                f"corridas; no hay respaldo para el que se publica"
+            )
+            publicado = config.NIVEL_CALIBRADO[slug]
+            if publicado < int(minimo):
+                flojos.append((slug, publicado, minimo))
+        assert not flojos, (
+            "estos niveles publicados son más angostos que lo que sostiene la "
+            f"simulación (publicado, mínimo medido): {flojos}"
+        )
