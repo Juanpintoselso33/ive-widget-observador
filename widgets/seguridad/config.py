@@ -166,6 +166,46 @@ PONDERADOR = "w_norm"
 # puede con esa forma.
 PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 
+
+# ============================================================
+# NIVEL CALIBRADO DEL INTERVALO
+# ============================================================
+# El percentil del bootstrap que hay que pedir para que el intervalo cubra de
+# verdad el 95%. NO es un capricho: el bootstrap percentil SUB-CUBRE, y acá está
+# medido cuánto.
+#
+# CÓMO SE MIDIÓ (scripts/cobertura_simulada.py, 8/9/2026). Se tomó el modelo
+# publicado como verdad, se sortearon resultados desde él, y se corrió el
+# PIPELINE COMPLETO —elección de C, ajuste, bootstrap de 1.000 réplicas con
+# re-elección de C, mapa de calibración— 200 veces por pregunta. Después se
+# contó, para cada uno de los 1.008 perfiles, cuántas veces el intervalo
+# contenía la probabilidad verdadera, que se conoce por construcción.
+#
+# Pidiendo el 95% nominal, la cobertura REAL era:
+#   mano dura 92,1% · cadena perpetua 90,4% · pena de muerte 93,2% ·
+#   humillación 92,6%
+#
+# O sea que el widget decía "95%" y entregaba entre 90 y 93.
+#
+# POR QUÉ SUBIR EL NIVEL Y NO ENSANCHAR POR UN FACTOR. Se probaron las dos. A
+# igualdad de cobertura media, subir el nivel deja muchísimos menos perfiles
+# malos, porque sigue la forma de la distribución bootstrap en vez de estirarla
+# simétricamente — y cerca de 0 y de 100 esa distribución es muy asimétrica.
+# En cadena perpetua: el nivel 99% deja UN perfil por debajo de 90% de
+# cobertura; el factor x1,30, que da la misma cobertura media, deja 35.
+#
+# CADA PREGUNTA NECESITA LO SUYO, así que no hay un número global.
+#
+# QUÉ NO ARREGLA: la verdad simulada es el propio modelo, así que esto corrige
+# la sub-cobertura del PROCEDIMIENTO. El error de especificación —que el mundo
+# no sea aditivo en estas seis variables— se suma encima y no está medido.
+NIVEL_CALIBRADO = {
+    "politico_mano_dura": 98,   # 95% nominal daba 92,1% real
+    "cadena_perpetua": 99,      # daba 90,4%, la peor de las cuatro
+    "pena_muerte": 97,          # daba 93,2%, la mejor
+    "humillacion_presos": 98,   # daba 92,6%
+}
+
 # ============================================================
 # CRÉDITOS
 # ============================================================
@@ -400,6 +440,7 @@ def huella_contrato(slug):
         "neutral": LIKERT_NEUTRAL,
         "ponderador": PONDERADOR,
         "recalibradas": sorted(PREGUNTAS_A_RECALIBRAR),
+        "nivel_calibrado": sorted(NIVEL_CALIBRADO.items()),
         "espec_cruda": _json.dumps(ESPEC_CRUDA, sort_keys=True),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]

@@ -41,7 +41,7 @@ from widgets.seguridad.config import (
     LIKERT_MAP, LIKERT_FAVOR, LIKERT_CONTRA, LIKERT_NEUTRAL,
     PONDERADOR, PREDICTORES, REFERENCIAS, huella_contrato, ESPEC_CRUDA,
     PREGUNTAS_A_RECALIBRAR,
-    FUENTE, CREDITO,
+    FUENTE, CREDITO, NIVEL_CALIBRADO,
     EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE, VICTIMA_UI_TO_CODE,
     REGION_UI_TO_CODE,
 )
@@ -754,6 +754,9 @@ def entrenar(df_crudo, slug, n_replicas=None):
 
     salida = {
         "pregunta_slug": slug,
+        # El percentil que hay que pedirle al bootstrap para que el
+        # intervalo cubra de verdad el 95%. Ver config.NIVEL_CALIBRADO.
+        "nivel_calibrado": NIVEL_CALIBRADO[slug],
         "contrato": huella_contrato(slug),
         "predictores": list(PREDICTORES),
         "pregunta_columna": pregunta["columna"],
