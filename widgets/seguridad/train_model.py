@@ -463,6 +463,24 @@ NODOS_CALIBRACION = 5
 PUNTOS_GRILLA = 201
 
 
+def _nodos_calibracion(oof, y, w, k=None):
+    """Nodos (x, y) del mapa: media predicha y observada en cada grupo de igual masa."""
+    k = k or NODOS_CALIBRACION
+    orden = np.argsort(oof)
+    acum = np.cumsum(w[orden]) / w.sum()
+    bins = np.zeros(len(oof), dtype=int)
+    bins[orden] = np.minimum((acum * k).astype(int), k - 1)
+    xs, ys = [], []
+    for j in sorted(set(bins)):
+        m = bins == j
+        xs.append(float(np.average(oof[m], weights=w[m])))
+        ys.append(float(np.average(y[m], weights=w[m])))
+    xs = [0.0] + xs + [1.0]
+    ys = [min(ys[0], float(oof.min()))] + ys + [max(ys[-1], float(oof.max()))]
+    ys = list(np.maximum.accumulate(ys))
+    return xs, ys
+
+
 def ajustar_calibracion(d, X, y, w):
     """
     Mapa de recalibración: spline monótona sobre nodos de igual masa ponderada.
@@ -485,8 +503,6 @@ def ajustar_calibracion(d, X, y, w):
     Se devuelve una GRILLA, no la spline: producción no importa scipy, y la
     interpolación lineal de una grilla monótona sigue siendo monótona.
     """
-    from scipy.interpolate import PchipInterpolator
-
     cv = StratifiedKFold(5, shuffle=True, random_state=RANDOM_STATE)
     oof = np.zeros(len(y))
     for tr, te in cv.split(X, y):
@@ -515,12 +531,63 @@ def ajustar_calibracion(d, X, y, w):
     ys = np.array([min(ys[0], float(oof.min()))] + ys + [max(ys[-1], float(oof.max()))])
     ys = np.maximum.accumulate(ys)          # el mapa no puede invertir el orden
     ok = np.r_[True, np.diff(xs) > 1e-9]
-    spline = PchipInterpolator(xs[ok], np.maximum.accumulate(ys[ok]))
+    ys_c = np.maximum.accumulate(ys[ok])
 
-    grilla = np.linspace(0.0, 1.0, PUNTOS_GRILLA)
-    valores = np.maximum.accumulate(np.clip(spline(grilla), 0.0, 1.0))
+    # RÉPLICAS DEL MAPA, para que el intervalo incluya la incertidumbre de haber
+    # ESTIMADO la calibración y no sólo la de los coeficientes.
+    #
+    # Sin esto, el intervalo trata el mapa como si fuera un dato conocido. Medido
+    # sobre mano dura: los intervalos salían 2,5 pp más angostos de lo que
+    # corresponde, y hasta 6,9 en el peor perfil.
+    #
+    # Se remuestrean los pares (predicción OOF, resultado) DENTRO de cada estrato
+    # y se reajusta el mapa.
+    #
+    # APAREAMIENTO, y acá me equivoqué al documentarlo la primera vez. Escribí
+    # que los dos remuestreos eran independientes y que por eso el intervalo
+    # ensanchaba de más, o sea conservador. Codex lo verificó y es falso en las
+    # dos mitades: esta función y bootstrap_coeficientes arrancan las dos con
+    # `default_rng(RANDOM_STATE)` y recorren los mismos estratos en el mismo
+    # orden, así que la réplica i de coeficientes y la i del mapa salen del MISMO
+    # remuestreo. Reconstruyó las tres primeras y coinciden hasta el redondeo.
+    #
+    # Que estén apareadas es lo correcto —es la variación conjunta, no dos
+    # ruidos sumados—, pero no había garantía de conservadurismo en ninguno de
+    # los dos casos: quitar una covarianza positiva achica la varianza y quitar
+    # una negativa la agranda. La afirmación era una racionalización.
+    #
+    # QUÉ SIGUE FALTANDO: las predicciones OOF están congeladas, vienen del
+    # modelo estimado sobre la muestra original. Remuestrearlas no captura cómo
+    # cambiarían al reestimar el pipeline entero. El efecto neto sobre el
+    # intervalo no tiene signo garantizado.
+    #
+    # Se serializan los NODOS y no la grilla: 201 puntos por réplica serían
+    # megabytes, siete pares no. La interpolación lineal entre nodos monótonos
+    # sigue siendo monótona.
+    estratos = d["estrato"].values
+    indices = [np.where(estratos == e)[0] for e in np.unique(estratos)]
+    rng = np.random.default_rng(RANDOM_STATE)
+    replicas = []
+    for _ in range(N_REPLICAS):
+        i = np.concatenate([rng.choice(ix, size=len(ix), replace=True) for ix in indices])
+        xs_b, ys_b = _nodos_calibracion(oof[i], y[i], w[i])
+        replicas.append([[round(float(v), 6) for v in xs_b],
+                         [round(float(v), 6) for v in ys_b]])
+
+    # El mapa CENTRAL se serializa con la misma forma que las réplicas —nodos e
+    # interpolación lineal— y no como una grilla PCHIP.
+    #
+    # Antes eran dos interpoladores distintos: PCHIP en el centro, rectas entre
+    # nodos en las réplicas. Codex midió la consecuencia: hasta 4,00 pp de
+    # diferencia en un extremo del intervalo entre los 1.008 perfiles, y en el
+    # perfil por defecto cambiaba incluso si el intervalo cruzaba el 50%, que es
+    # la regla con la que el widget decide si afirma de qué lado está la mayoría.
+    # Un número y su intervalo no pueden salir de dos curvas distintas.
+    grilla = list(xs[ok])
+    valores = list(np.maximum.accumulate(np.clip(np.array(ys_c), 0.0, 1.0)))
     return {
-        "metodo": "spline monotona PCHIP sobre nodos de igual masa ponderada",
+        "replicas": replicas,
+        "metodo": "interpolacion lineal monotona sobre nodos de igual masa ponderada",
         "nodos": NODOS_CALIBRACION,
         "ajustada_fuera_de_muestra": True,
         "grilla": [round(float(v), 6) for v in grilla],

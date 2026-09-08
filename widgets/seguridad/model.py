@@ -194,6 +194,23 @@ def predict_probability_neutral(model, tramo_edad, es_mujer, nivel_educ, ideolog
     return _sigmoid_pct(_z(model["coefficients_neutral"], features))
 
 
+def _interp(xs, ys, x):
+    """Interpolación lineal en una grilla o lista de nodos monótona."""
+    if x <= xs[0]:
+        return ys[0]
+    if x >= xs[-1]:
+        return ys[-1]
+    lo, hi = 0, len(xs) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if xs[mid] <= x:
+            lo = mid
+        else:
+            hi = mid
+    t = (x - xs[lo]) / (xs[hi] - xs[lo])
+    return ys[lo] + t * (ys[hi] - ys[lo])
+
+
 def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia,
                               victima, es_montevideo):
     """
@@ -209,16 +226,26 @@ def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia
                               victima, es_montevideo)
     orden = boot["orden"]
 
+    cal = model.get("calibracion") or {}
+    reps_mapa = cal.get("replicas") or []
+
     probabilidades = []
-    for fila in boot["replicas"]:
+    for i, fila in enumerate(boot["replicas"]):
         z = fila[0]  # intercept
         for nombre, coef in zip(orden[1:], fila[1:]):
             z += coef * features[nombre]
-        # La MISMA recalibración que el punto central. Si se aplicara sólo al
-        # número y no a las réplicas, el intervalo publicado dejaría de
-        # corresponder al porcentaje que lo encabeza. Lo marcó Codex al revisar
-        # la implementación.
-        probabilidades.append(_calibrar(model, _sigmoid_pct(z)))
+        # Cada réplica de coeficientes lleva SU PROPIA réplica del mapa, no el
+        # mapa central. Así el intervalo incluye también la incertidumbre de
+        # haber estimado la calibración; con el mapa fijo salía 2,5 pp más
+        # angosto de lo que corresponde. Si no hay réplicas del mapa —modelo sin
+        # recalibrar, o un JSON viejo— se cae al mapa central, que es el
+        # comportamiento anterior.
+        pct = _sigmoid_pct(z)
+        if reps_mapa:
+            xs_b, ys_b = reps_mapa[i % len(reps_mapa)]
+            probabilidades.append(_interp(xs_b, ys_b, pct / 100.0) * 100)
+        else:
+            probabilidades.append(_calibrar(model, pct))
 
     probabilidades.sort()
     return probabilidades
