@@ -53,6 +53,7 @@ import warnings
 import numpy as np
 import numpy.linalg as la
 import pandas as pd
+from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
@@ -261,7 +262,62 @@ def buscar_especificacion(semillas=(1, 2, 3, 4, 5)):
               f"{np.mean(dl):+10.5f}  {gana}/{len(semillas)}")
 
 
+def probar_recalibracion(rng=None):
+    """
+    ¿Arregla la descalibración de mano dura una recalibración? Medido bien.
+
+    Platt (logística sobre el logit) e isotónica, las dos ajustadas EN UN SEGUNDO
+    NIVEL DE FOLDS sobre las predicciones out-of-fold. Ajustarlas sobre las
+    mismas predicciones que después evalúan daría una mejora inventada: una
+    isotónica con suficientes nodos calza cualquier cosa dentro de muestra.
+    """
+    rng = rng or np.random.default_rng(11)
+    df0 = pd.read_csv(config.DATA_FILE, encoding="utf-8-sig")
+
+    def pval(y, p, w):
+        b = bins_de_igual_masa(p, w)
+        obs = hosmer_lemeshow(y, p, w, b)
+        nul = np.array([hosmer_lemeshow((rng.random(len(p)) < p).astype(int), p, w, b)
+                        for _ in range(600)])
+        return obs, float((nul >= obs).mean())
+
+    print(f"{'pregunta':22s} {'variante':>10s} {'HL':>7s} {'p':>6s} "
+          f"{'logloss':>9s} {'Brier':>9s}")
+    for slug in config.SLUGS:
+        if not config.ruta_modelo(slug).exists():
+            continue
+        df = tm.preparar(df0, config.PREGUNTAS[slug])
+        d = df[df["a_favor"].notna()]
+        y, p, w = oof_anidado(d, list(config.PREDICTORES))
+        variantes = {"cruda": p}
+        for nombre in ("platt", "isotonica"):
+            q = np.zeros(len(y))
+            for tr, te in StratifiedKFold(FOLDS, shuffle=True, random_state=99).split(
+                    p.reshape(-1, 1), y):
+                if nombre == "platt":
+                    clip = np.clip(p, 1e-6, 1 - 1e-6)
+                    lp = np.log(clip / (1 - clip))
+                    m = LogisticRegression(C=1e6, max_iter=3000).fit(
+                        lp[tr].reshape(-1, 1), y[tr], sample_weight=w[tr])
+                    q[te] = m.predict_proba(lp[te].reshape(-1, 1))[:, 1]
+                else:
+                    m = IsotonicRegression(out_of_bounds="clip", y_min=0, y_max=1).fit(
+                        p[tr], y[tr], sample_weight=w[tr])
+                    q[te] = np.clip(m.predict(p[te]), 1e-6, 1 - 1e-6)
+            variantes[nombre] = q
+        for nombre, q in variantes.items():
+            hl, pv = pval(y, q, w)
+            m = _metricas(y, q, w)
+            print(f"{slug:22s} {nombre:>10s} {hl:7.2f} {pv:6.3f} "
+                  f"{m['logloss']:9.4f} {m['brier']:9.5f}")
+
+
 if __name__ == "__main__":
     main()
     print()
     buscar_especificacion()
+    print()
+    print("=" * 74)
+    print("¿ARREGLA UNA RECALIBRACIÓN? (ajustada fuera de muestra)")
+    print("=" * 74)
+    probar_recalibracion()
