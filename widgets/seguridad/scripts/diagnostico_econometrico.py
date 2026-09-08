@@ -85,13 +85,19 @@ def oof_anidado(d, cols, semilla=42):
         mejor_c, mejor_score = None, -np.inf
         interno = StratifiedKFold(FOLDS, shuffle=True, random_state=semilla)
         for C in tm.C_GRID:
-            scores = []
+            scores, masas = [], []
             for i2, t2 in interno.split(X[tr], y[tr]):
                 m = LogisticRegression(C=C, max_iter=3000, random_state=tm.RANDOM_STATE)
                 m.fit(X[tr][i2], y[tr][i2], sample_weight=w[tr][i2])
                 scores.append(-log_loss(y[tr][t2], m.predict_proba(X[tr][t2])[:, 1],
                                         sample_weight=w[tr][t2], labels=[0, 1]))
-            s = float(np.mean(scores))
+                masas.append(w[tr][t2].sum())
+            # Promedio PONDERADO POR LA MASA de cada fold, igual que
+            # train_model.elegir_c(). Acá se promediaban por igual, así que el
+            # diagnóstico podía elegir un C distinto del que usa producción y
+            # medir otro modelo. Lo marcó Codex: con el criterio de producción,
+            # cadena perpetua da AUC 0,655 y no 0,665.
+            s = float(np.average(scores, weights=masas))
             if s > mejor_score:
                 mejor_c, mejor_score = C, s
         m = LogisticRegression(C=mejor_c, max_iter=3000, random_state=tm.RANDOM_STATE)

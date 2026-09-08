@@ -353,10 +353,22 @@ Comparar muchas especificaciones sobre los mismos folds y quedarse con la mejor
 es en sí una forma de sobreajuste: estos números sirven para descartar palancas,
 no para probar que no hay ninguna.
 
-Y una vía que no es del modelo: **cadena perpetua tiene 78,6% de apoyo**. Con esa
-concentración no hay mucho que explicar por más variables que se agreguen. Si esa
-pregunta tiene que discriminar mejor, el camino es editorial —elegir otra— no
-estadístico.
+### Cadena perpetua: lo que se puede decir y lo que era una excusa
+
+Yo había escrito que su AUC bajo *"no tiene arreglo estadístico porque con 78,6%
+de apoyo queda poco que explicar"*. **Es una racionalización y Codex la
+desarmó:** el AUC es invariante al balance de clases —cambiar la proporción
+manteniendo las distribuciones de puntaje conserva el ordenamiento— y la propia
+base da el contraejemplo: **humillación tiene 11,0% de apoyo y AUC 0,813**.
+
+Lo medible: con la selección de `C` de producción, cadena perpetua da AUC 0,655,
+Brier 0,15790 contra 0,16874 del predictor constante (**6,4% mejor**) y log-loss
+0,49540 contra 0,52068 (**4,9% mejor**). Y hay 712 respuestas contrarias sobre
+2.950, o sea que casos negativos hay de sobra.
+
+La frase defendible es: **estos predictores y esta especificación aportan una
+mejora predictiva modesta para cadena perpetua.** No se midió un límite
+irreparable ni se demostró que lo cause el apoyo mayoritario.
 
 ### Lo que sigue sin hacerse
 
@@ -383,20 +395,28 @@ real no rondaba 65%. Para un widget cuya frase es literalmente *"el 65% de la
 gente con este perfil"*, eso no es un detalle técnico — es que el número no
 significaba lo que dice.
 
-**El mapa:** spline monótona PCHIP sobre cinco nodos de igual masa ponderada,
-ajustada **fuera de muestra**, serializada como una grilla de 201 puntos e
-interpolada linealmente en producción (así el runtime no importa scipy, y la
-interpolación lineal de una grilla monótona sigue siendo monótona). Se declara en
+**El mapa:** siete nodos de igual masa ponderada, ajustados **fuera de muestra**,
+con interpolación lineal monótona. Se declara en
 `config.PREGUNTAS_A_RECALIBRAR`, que entra en la huella del contrato.
+
+*Una versión anterior ajustaba una spline PCHIP para el centro y rectas entre
+nodos para las réplicas del bootstrap. Codex midió el costo de esa
+inconsistencia: hasta **4,00 pp** de diferencia en un extremo del intervalo entre
+los 1.008 perfiles, y en el perfil por defecto llegaba a cambiar si el intervalo
+cruzaba el 50% — que es la regla con la que el widget decide si afirma de qué
+lado está la mayoría. Un número y su intervalo no pueden salir de dos curvas
+distintas, así que ahora es una sola.*
 
 | Métrica | Sin mapa | Con mapa |
 |---|---:|---:|
-| Hosmer-Lemeshow | 29,95 (p≈0,000) | 12,02 (**p=0,297**) |
+| Hosmer-Lemeshow | 29,95 (p=0,002) | 12,02 (**p=0,280**) |
+| Contraste sin bins | p=0,024 | **p=0,844** |
 | log-loss | 0,52439 | **0,50415** |
 | Brier | 0,16340 | **0,15982** |
 
-**Qué cambió en pantalla:** el perfil que abre pasó de 65% (IC 53-76) a **71%
-(IC 53-85)**. Los coeficientes y las réplicas son idénticos; el mapa baja un poco
+**Qué cambió en pantalla:** el perfil que abre pasó de 65% (IC 53-76) a **70%
+(IC 51-86)**. El intervalo se ensancha por dos motivos distintos: el mapa sube la
+cola superior, y ahora incluye la incertidumbre de haber estimado el mapa. Los coeficientes y las réplicas son idénticos; el mapa baja un poco
 la cola inferior y sube bastante la superior.
 
 ### Dos caminos que se descartaron, y por qué
@@ -408,14 +428,38 @@ la cola inferior y sube bastante la superior.
   y los dos tramos superiores hay que agruparlos. Una recta en escala logit no
   puede con esa forma.
 
+### Qué se puede afirmar de la calibración, y qué no
+
+**No se puede decir "quedó calibrada".** Se puede decir que **dos contrastes con
+puntos ciegos distintos no la rechazan**:
+
+| | Mano dura cruda | Mano dura publicada |
+|---|---:|---:|
+| Hosmer-Lemeshow ponderado | p=0,002 · **rechaza** | p=0,280 |
+| Contraste sin bins (kernel sobre el logit) | p=0,024 · **rechaza** | p=0,844 |
+
+El segundo se construyó acá y **su primera versión no servía**: usaba el máximo
+del desvío suavizado y el control negativo mostró que era ciega a la forma en S,
+que es justo el defecto de mano dura. Con la integral del desvío al cuadrado, el
+control da tamaño 7% bajo la nula y potencia 62% contra un cambio de pendiente,
+67% contra un corrimiento y 78% contra una S marcada.
+
+**Pero 30% contra una S suave.** O sea que deja pasar siete de cada diez
+descalibraciones de ese tipo. "No rechazó" no es "está calibrada", y la
+diferencia importa porque el widget publica el número, no un ranking.
+
 ### Lo que NO hace este mapa
 
 - **No se aplica a las otras tres.** No mostraron la misma necesidad, y aplicarlo
   a ciegas descalibraba pena de muerte (p 0,92 → 0,02).
-- **El intervalo mantiene el mapa FIJO.** Se transforma cada réplica del
-  bootstrap —si sólo se transformara el punto central, el intervalo publicado
-  dejaría de corresponder al número que lo encabeza— pero no se remuestrea la
-  estimación del propio mapa. La incertidumbre de la calibración no está adentro.
+- **El intervalo YA incluye la incertidumbre de estimar el mapa.** Cada réplica
+  de coeficientes lleva su propia réplica del mapa, del mismo remuestreo. Sin
+  eso el intervalo salía 2,5 pp más angosto de lo que corresponde (hasta 6,9 en
+  el peor perfil).
+  Lo que **sigue faltando**: las predicciones fuera de muestra sobre las que se
+  ajusta el mapa están congeladas —vienen del modelo estimado sobre la muestra
+  original—, así que no se captura cómo cambiarían al reestimar el pipeline
+  entero. El efecto neto sobre el intervalo no tiene signo garantizado.
 
 ## Decisión de diseño: se actualiza en vivo, sin botón de confirmar
 

@@ -139,10 +139,6 @@ def main():
     print("La inferencia de producción coincide con sklearn.")
 
 
-if __name__ == "__main__":
-    main()
-    print("\nCORRESPONDENCIA DE CATEGORÍAS (referencia independiente)")
-    verificar_correspondencia_categorias()
 
 
 # ============================================================
@@ -206,3 +202,9 @@ def verificar_correspondencia_categorias():
             "entrenamiento: el widget aplicaría coeficientes de otra categoría."
         )
     print("  la UI y el entrenamiento entienden lo mismo por cada categoría.")
+
+
+if __name__ == "__main__":
+    main()
+    print("\nCORRESPONDENCIA DE CATEGORÍAS")
+    verificar_correspondencia_categorias()
