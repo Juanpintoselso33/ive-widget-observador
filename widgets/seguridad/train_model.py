@@ -463,6 +463,24 @@ NODOS_CALIBRACION = 5
 PUNTOS_GRILLA = 201
 
 
+def _nodos_calibracion(oof, y, w, k=None):
+    """Nodos (x, y) del mapa: media predicha y observada en cada grupo de igual masa."""
+    k = k or NODOS_CALIBRACION
+    orden = np.argsort(oof)
+    acum = np.cumsum(w[orden]) / w.sum()
+    bins = np.zeros(len(oof), dtype=int)
+    bins[orden] = np.minimum((acum * k).astype(int), k - 1)
+    xs, ys = [], []
+    for j in sorted(set(bins)):
+        m = bins == j
+        xs.append(float(np.average(oof[m], weights=w[m])))
+        ys.append(float(np.average(y[m], weights=w[m])))
+    xs = [0.0] + xs + [1.0]
+    ys = [min(ys[0], float(oof.min()))] + ys + [max(ys[-1], float(oof.max()))]
+    ys = list(np.maximum.accumulate(ys))
+    return xs, ys
+
+
 def ajustar_calibracion(d, X, y, w):
     """
     Mapa de recalibración: spline monótona sobre nodos de igual masa ponderada.
@@ -517,9 +535,36 @@ def ajustar_calibracion(d, X, y, w):
     ok = np.r_[True, np.diff(xs) > 1e-9]
     spline = PchipInterpolator(xs[ok], np.maximum.accumulate(ys[ok]))
 
+    # RÉPLICAS DEL MAPA, para que el intervalo incluya la incertidumbre de haber
+    # ESTIMADO la calibración y no sólo la de los coeficientes.
+    #
+    # Sin esto, el intervalo trata el mapa como si fuera un dato conocido. Medido
+    # sobre mano dura: los intervalos salían 2,5 pp más angostos de lo que
+    # corresponde, y hasta 6,9 en el peor perfil.
+    #
+    # Se remuestrean los pares (predicción OOF, resultado) DENTRO de cada estrato
+    # y se reajusta el mapa. El remuestreo es independiente del de los
+    # coeficientes, así que las dos fuentes se combinan como si no estuvieran
+    # correlacionadas: eso ENSANCHA un poco de más, que es el lado correcto para
+    # errar en un intervalo.
+    #
+    # Se serializan los NODOS y no la grilla: 201 puntos por réplica serían
+    # megabytes, siete pares no. La interpolación lineal entre nodos monótonos
+    # sigue siendo monótona.
+    estratos = d["estrato"].values
+    indices = [np.where(estratos == e)[0] for e in np.unique(estratos)]
+    rng = np.random.default_rng(RANDOM_STATE)
+    replicas = []
+    for _ in range(N_REPLICAS):
+        i = np.concatenate([rng.choice(ix, size=len(ix), replace=True) for ix in indices])
+        xs_b, ys_b = _nodos_calibracion(oof[i], y[i], w[i])
+        replicas.append([[round(float(v), 6) for v in xs_b],
+                         [round(float(v), 6) for v in ys_b]])
+
     grilla = np.linspace(0.0, 1.0, PUNTOS_GRILLA)
     valores = np.maximum.accumulate(np.clip(spline(grilla), 0.0, 1.0))
     return {
+        "replicas": replicas,
         "metodo": "spline monotona PCHIP sobre nodos de igual masa ponderada",
         "nodos": NODOS_CALIBRACION,
         "ajustada_fuera_de_muestra": True,

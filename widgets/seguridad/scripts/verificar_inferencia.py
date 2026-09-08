@@ -141,3 +141,68 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("\nCORRESPONDENCIA DE CATEGORÍAS (referencia independiente)")
+    verificar_correspondencia_categorias()
+
+
+# ============================================================
+# REFERENCIA INDEPENDIENTE: ¿las categorías de la UI son las del entrenamiento?
+# ============================================================
+def verificar_correspondencia_categorias():
+    """
+    Comprueba que un perfil elegido en la UI produzca EL MISMO vector de dummies
+    que produce el pipeline de entrenamiento para un encuestado con esos mismos
+    atributos crudos.
+
+    POR QUÉ HACE FALTA, y es el agujero que marcó Codex: `main()` compara dos
+    caminos que AMBOS llaman a `build_features`. Le invirtió a mano las dummies
+    de edad en los dos lados y el script terminó conforme. Detecta que los
+    coeficientes estén desalineados; NO detecta que "30-44 años" en el selector
+    se traduzca a la dummy de otro tramo.
+
+    Acá la referencia es independiente: sale de `train_model.preparar()`, que es
+    la que construyó la matriz con la que se estimaron los coeficientes. Si la UI
+    y el entrenamiento discrepan en qué significa una categoría, salta.
+    """
+    df = tm.preparar(pd.read_csv(config.DATA_FILE, encoding="utf-8-sig"),
+                     config.PREGUNTAS[config.PREGUNTA_DEFECTO])
+    # Sólo encuestados que corresponden a un perfil REALMENTE elegible: los que
+    # tienen alguna dummy oculta encendida no se pueden expresar desde la UI.
+    d = df[(df["victima_sin_dato"] == 0) & (df["ideol_no_ubica"] == 0)
+           & df["tramo_edad"].notna()]
+
+    ideol_de = {}
+    for i, (nombre, desde, hasta, _) in enumerate(config.ESPEC_CRUDA["ideol_tramos"], start=1):
+        for v in range(desde, hasta + 1):
+            ideol_de[v] = i
+    educ = config.ESPEC_CRUDA["educ_colapso"]
+    col_ideol = "var_242 | Autoubicacion izquierda-derecha (0-10)"
+
+    fallas = 0
+    for _, fila in d.iterrows():
+        # Del dato CRUDO a los códigos que produciría la UI.
+        entrada = dict(
+            tramo_edad=int(fila["tramo_edad"]),
+            es_mujer=int(fila["es_mujer"]),
+            nivel_educ=educ[int(fila["nivel_educativo"])],
+            ideologia=ideol_de[int(fila[col_ideol])],
+            victima=(3 if fila["victima_con_violencia"] else
+                     2 if fila["victima_sin_violencia"] else 1),
+            es_montevideo=int(fila["es_montevideo"]),
+        )
+        desde_ui = build_features(**entrada)
+        for nombre in config.PREDICTORES:
+            if desde_ui[nombre] != int(fila[nombre]):
+                fallas += 1
+                if fallas <= 3:
+                    print(f"  DISCREPA en '{nombre}': la UI dice {desde_ui[nombre]} "
+                          f"y el entrenamiento {int(fila[nombre])} — {entrada}")
+                break
+
+    print(f"  encuestados comprobados: {len(d)}   con discrepancia: {fallas}")
+    if fallas:
+        raise SystemExit(
+            "La traducción de categorías de la UI NO coincide con la del "
+            "entrenamiento: el widget aplicaría coeficientes de otra categoría."
+        )
+    print("  la UI y el entrenamiento entienden lo mismo por cada categoría.")
