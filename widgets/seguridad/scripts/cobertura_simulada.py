@@ -65,6 +65,99 @@ warnings.filterwarnings("ignore")
 
 NIVEL = 95
 
+
+def huella_estudio(slug, modelo):
+    """
+    Sello que ata una salida del estudio al procedimiento Y a la verdad que usó.
+
+    `config.huella_contrato` NO alcanza para esto y usarla fue un error: Codex
+    verificó que sobrevive intacta a cambiar `C_GRID`, `NODOS_CALIBRACION`,
+    `RANDOM_STATE` y `N_REPLICAS`, y que tampoco mira el artefacto que el
+    simulador usa como verdad. Con ese sello, una medición vieja seguía
+    respaldando un nivel después de cambiar la receta de entrenamiento.
+
+    Y USARLA ENTERA TAMPOCO SIRVE, por el motivo opuesto: `huella_contrato`
+    incluye `NIVEL_CALIBRADO`, que es justamente lo que este estudio decide. Con
+    eso adentro, subir el nivel de una pregunta invalidaba las ocho corridas que
+    lo habían elegido — la conclusión anulaba a sus propios insumos. Lo marcó
+    Codex en la tercera vuelta. Acá se toma sólo la parte del contrato que
+    cambia el SIGNIFICADO de los datos, no la que sale del estudio.
+
+    Qué entra:
+      · el contrato de codificación menos el nivel: predictores, mapeos de la
+        UI, referencias, escala Likert, ponderador, especificación cruda y la
+        columna de la pregunta;
+      · las perillas numéricas del procedimiento: la grilla de C EN SU ORDEN
+        —`elegir_c` se queda con el primer empatado, así que invertirla cambia
+        qué C sale—, los nodos del mapa, la semilla, la cantidad de réplicas de
+        producción, el nivel base y los niveles y factores evaluados;
+      · el ARTEFACTO usado como verdad: coeficientes y mapa central, porque la
+        cobertura se mide contra las probabilidades que salen de él;
+      · el CÓDIGO de las funciones que definen el procedimiento, vía el AST
+        reimpreso con `ast.unparse` y sin docstrings. Un cambio de lógica
+        invalida el estudio; uno de comentario, docstring o formato, no.
+
+    QUÉ SIGUE SIN CUBRIR, y conviene tenerlo escrito:
+      · la base de datos de entrada;
+      · la lógica de cualquier función que no esté en la lista de abajo —entre
+        ellas `entrenar`, que es la que cablea el apareamiento;
+      · el reimpreso del AST puede variar entre versiones de Python. Codex
+        verificó que `ast.dump` da hashes distintos en 3.11, 3.12 y 3.13 por
+        campos nuevos como `type_params`; `ast.unparse` es bastante más estable
+        porque no serializa nombres de campos, pero no está garantizado. Por eso
+        la salida guarda aparte la versión de Python con la que se selló, para
+        poder distinguir "cambió el procedimiento" de "cambió el intérprete".
+    """
+    import ast
+    import hashlib
+    import inspect
+
+    def estructura(fn):
+        arbol = ast.parse(inspect.getsource(fn).lstrip())
+        for nodo in ast.walk(arbol):
+            if isinstance(nodo, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                 ast.ClassDef, ast.Module)):
+                cuerpo = nodo.body
+                if (cuerpo and isinstance(cuerpo[0], ast.Expr)
+                        and isinstance(cuerpo[0].value, ast.Constant)
+                        and isinstance(cuerpo[0].value.value, str)):
+                    nodo.body = cuerpo[1:] or [ast.Pass()]
+        return ast.unparse(arbol)
+
+    contrato = json.dumps({
+        "pregunta": slug,
+        "columna": config.PREGUNTAS[slug]["columna"],
+        "predictores": sorted(config.PREDICTORES),
+        "edad": sorted(config.EDAD_UI_TO_CODE.items()),
+        "educacion": sorted(config.EDUC_UI_TO_CODE.items()),
+        "ideologia": sorted(config.IDEOLOGIA_UI_TO_CODE.items()),
+        "victima": sorted(config.VICTIMA_UI_TO_CODE.items()),
+        "region": sorted(config.REGION_UI_TO_CODE.items()),
+        "referencias": sorted(config.REFERENCIAS.items()),
+        "likert": sorted(config.LIKERT_MAP.items()),
+        "favor": sorted(config.LIKERT_FAVOR),
+        "contra": sorted(config.LIKERT_CONTRA),
+        "neutral": config.LIKERT_NEUTRAL,
+        "ponderador": config.PONDERADOR,
+        "recalibradas": sorted(config.PREGUNTAS_A_RECALIBRAR),
+        "espec_cruda": json.dumps(config.ESPEC_CRUDA, sort_keys=True),
+    }, sort_keys=True, ensure_ascii=False)
+
+    piezas = [
+        contrato,
+        repr(list(tm.C_GRID)),          # EN SU ORDEN, no ordenada
+        repr(tm.NODOS_CALIBRACION),
+        repr(tm.RANDOM_STATE),
+        repr(tm.N_REPLICAS),
+        repr(NIVEL), repr(NIVELES), repr(FACTORES),
+        json.dumps(modelo.get("coefficients"), sort_keys=True),
+        json.dumps((modelo.get("calibracion") or {}).get("grilla")),
+        json.dumps((modelo.get("calibracion") or {}).get("valores")),
+    ] + [estructura(f) for f in (tm.elegir_c, tm.ajustar_calibracion,
+                                 tm._nodos_calibracion, tm.bootstrap_coeficientes,
+                                 una_simulacion)]
+    return hashlib.sha256("|".join(piezas).encode()).hexdigest()[:16]
+
 # Dos familias de corrección, evaluadas en la MISMA corrida porque lo caro es
 # ajustar, no medir:
 #   · subir el nivel nominal del percentil (95 -> 96, 97...);
@@ -117,21 +210,37 @@ def una_simulacion(d, X, w, p_true, Xp, estratos, n_replicas, rng, recalibra):
                                 random_state=tm.RANDOM_STATE)
     modelo.fit(X, y, sample_weight=w)
 
-    # Mapa de calibración, con la misma receta que producción.
-    mapa = None
-    if recalibra:
-        mapa = tm.ajustar_calibracion(d.assign(a_favor=y), X, y, w)
-        if mapa is None:
-            return None
+    # EL BOOTSTRAP DE COEFICIENTES VA PRIMERO, igual que en producción
+    # (`entrenar` llama a bootstrap_coeficientes y después a
+    # ajustar_calibracion): hace falta saber QUÉ SORTEOS SOBREVIVIERON para
+    # pedirle al mapa exactamente esos y no perder el apareamiento. Acá el mapa
+    # se ajustaba antes; el orden no cambia ningún resultado porque los dos
+    # remuestreos se siembran por separado con `default_rng(RANDOM_STATE)` y el
+    # sorteo de respuestas usa otro generador, pero conviene que el simulador
+    # tenga el mismo orden que lo que simula. (Escribí que producción lo hacía
+    # al revés; era falso y lo corrigió Codex.)
 
     # Bootstrap estratificado, re-eligiendo C en cada réplica, igual que
     # producción. Es lo que hace caro esto y también lo que hay que medir: con C
     # fijo los intervalos se achican y la cobertura medida no sería la del
     # procedimiento que se publica.
+    # EL REMUESTREO DE COEFICIENTES USA SU PROPIO GENERADOR, sembrado igual que
+    # producción, y NO el `rng` de la simulación.
+    #
+    # Por qué importa: en producción, `bootstrap_coeficientes` y
+    # `ajustar_calibracion` arrancan las dos con `default_rng(RANDOM_STATE)` y
+    # recorren los mismos estratos en el mismo orden, así que la réplica i de
+    # coeficientes y la i del mapa salen del MISMO remuestreo. Acá se usaba el
+    # generador de la simulación —ya avanzado por el sorteo de resultados— y esa
+    # correspondencia se rompía: el simulador medía un procedimiento distinto
+    # del publicado. Codex lo midió sobre los mismos resultados simulados: la
+    # cobertura de mano dura al nivel 98 pasaba de 97,00% a 98,01%.
+    rng_boot = np.random.default_rng(tm.RANDOM_STATE)
     indices = [np.where(estratos == e)[0] for e in np.unique(estratos)]
     coefs = []
-    for _ in range(n_replicas):
-        idx = np.concatenate([rng.choice(ix, size=len(ix), replace=True)
+    sorteos_validos = []
+    for k in range(n_replicas):
+        idx = np.concatenate([rng_boot.choice(ix, size=len(ix), replace=True)
                               for ix in indices])
         yb = y[idx]
         if len(np.unique(yb)) < 2:
@@ -142,9 +251,19 @@ def una_simulacion(d, X, w, p_true, Xp, estratos, n_replicas, rng, recalibra):
         mb = LogisticRegression(C=cb, max_iter=2000, random_state=tm.RANDOM_STATE)
         mb.fit(X[idx], yb, sample_weight=w[idx])
         coefs.append(np.r_[mb.intercept_[0], mb.coef_[0]])
+        sorteos_validos.append(k)
     if len(coefs) < 30:
         return None
     coefs = np.array(coefs)
+
+    # Mapa de calibración, con la misma receta que producción y sobre los mismos
+    # sorteos que sobrevivieron arriba.
+    mapa = None
+    if recalibra:
+        mapa = tm.ajustar_calibracion(d.assign(a_favor=y), X, y, w,
+                                      n_replicas, sorteos_validos)
+        if mapa is None:
+            return None
 
     # Probabilidades de cada perfil por réplica, ya calibradas.
     Z = coefs[:, 0][:, None] + coefs[:, 1:] @ Xp.T          # réplicas x perfiles
@@ -207,6 +326,7 @@ def main():
         w = d[config.PONDERADOR].values
         estratos = d["estrato"].values
         recalibra = slug in config.PREGUNTAS_A_RECALIBRAR
+        arranque = time.time()
 
         # LA VERDAD: la probabilidad que el modelo publicado le asigna a cada
         # encuestado, ya calibrada. Es el mundo que se simula.
@@ -280,6 +400,17 @@ def main():
         salida.write_text(json.dumps({
             "slug": slug, "sims_validas": validas, "replicas": args.replicas,
             "semilla": args.semilla,
+            # Ata la medición al modelo que se usó como verdad. Sin esto, una
+            # salida vieja sigue "respaldando" un nivel después de que cambió
+            # la especificación, y el test que compara ambos pasa igual. Lo
+            # marcó Codex el 8/9/2026; las ocho salidas de esa fecha son
+            # anteriores al sello y no lo traen.
+            "huella": huella_estudio(slug, publicado),
+            "python": "%d.%d" % sys.version_info[:2],
+            "segundos": round(time.time() - arranque, 1),
+            # OJO: son ACIERTOS por perfil, no porcentajes. Coinciden cuando la
+            # corrida tiene 100 simulaciones y no en otro caso; quien los lea
+            # tiene que dividir por "sims_validas".
             "niveles": {str(n): dentro_niv[n].tolist() for n in NIVELES},
             "factores": {str(f): dentro_fac[f].tolist() for f in FACTORES},
             "anchos": {str(f): float(np.median(anchos_fac[f])) for f in FACTORES},

@@ -329,3 +329,161 @@ class TestHuellaContrato:
             f"el JSON de «{slug}» no corresponde a la configuración actual: "
             "hay que volver a correr train_model.py"
         )
+
+
+class TestNivelCalibradoContraLaMedicion:
+    """
+    El nivel publicado no puede ser MÁS angosto que lo que sostiene el estudio
+    de cobertura.
+
+    Existe porque el nivel es un número suelto en un dict: nada impedía bajarlo
+    "porque el intervalo se ve muy ancho". Acá el criterio queda atado a las
+    salidas de `cobertura_simulada.py` que viven en `scripts/salidas/`.
+
+    Que quede MÁS ancho sí se permite, y de hecho pasa: mano dura publica 98
+    cuando el criterio ya se cumple en 97, a propósito, por su cola.
+
+    ESTE TEST SE DEJÓ ENGAÑAR DOS VECES, las dos encontradas por Codex con
+    control negativo, y cada versión pasaba los 148 tests:
+
+      · v1: recorría las preguntas que ENCONTRABA en los JSON, no las que hay
+        que publicar. Borrando las salidas de cadena perpetua se podía bajar su
+        nivel a 95.
+      · v2: contaba ARCHIVOS, no corridas independientes. Reemplazando las dos
+        corridas de cadena perpetua por dos copias de la semilla 402 se podía
+        bajar su nivel a 98. Y aceptaba mezclar corridas con B distinto, y
+        aceptaba que una salida nueva omitiera la huella.
+
+    Ahora se exige: las cuatro preguntas, al menos dos SEMILLAS distintas por
+    pregunta, el mismo B en todas las corridas de una pregunta, y huella en toda
+    salida que no esté en la lista de las ocho históricas.
+
+    Y LA HUELLA CAMBIÓ DE DEFINICIÓN. Era `huella_contrato`, que es el contrato
+    de codificación: Codex verificó que sobrevive intacta a cambiar `C_GRID`,
+    `NODOS_CALIBRACION` y `RANDOM_STATE`, y que no mira el artefacto usado como
+    verdad. Ahora es `cobertura_simulada.huella_estudio`, que suma las perillas
+    del procedimiento, el modelo que hace de verdad y el AST —sin docstrings—
+    de las funciones que definen el pipeline.
+    """
+
+    # Las ocho corridas del 8/9/2026, anteriores al sello, IDENTIFICADAS POR EL
+    # CONTENIDO DEL ARCHIVO.
+    #
+    # La versión anterior las identificaba por (pregunta, semilla), o sea por
+    # una etiqueta que el archivo se pone solo. Codex copió dos veces la corrida
+    # 402 de cadena perpetua, rotuló una copia como 401, y el test volvió a
+    # aceptar bajarle el nivel a 98. Con el hash del contenido, una copia
+    # rotulada distinto no está en la lista y tiene que traer huella.
+    #
+    # No agregar nada acá: una salida nueva sin huella tiene que fallar.
+    SIN_SELLO = {
+        "e08e75d268463fa17d8c6ec8ba1188fbb55d0b00f1fdc06eea64c5eface13815",
+        "e30ad305d6b9e2b37890bde70b2cddad87a66e3f0ccb4d9e32d03946d5bf8afa",
+        "429b82d7f4048be245f6339144b61614f72015bef99b268ee8b89d1e7a4818bc",
+        "1410965c0c4141d533590dfcc56f28da787825d208a8401de68c03951f946526",
+        "4df0bd5fb3e773cbf5b43b22f411f25d399428c8c3aba4a82f5cb35942ef89d4",
+        "e89ca3a58a688ba289aa0b469bfae2adda7e9f252d6d7d2c7b0ab7f44e91548c",
+        "1cef669bfa22292e22db83f37c45b21df32dc05fcc871f4e107b0e2b25900b3f",
+        "cdcbc07c18c1af837d3c6f25e7b1bd64b6bbe5740d5a7fad3c0581315a1904f3",
+    }
+
+    @staticmethod
+    def _modulos():
+        import importlib
+        import importlib.util
+        from pathlib import Path as _P
+        scripts = _P(__file__).parent.parent / "scripts"
+        spec = importlib.util.spec_from_file_location(
+            "agregar_calibracion", scripts / "agregar_calibracion.py")
+        agg = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(agg)
+        sim = importlib.import_module(
+            "widgets.seguridad.scripts.cobertura_simulada")
+        return agg, sim, scripts / "salidas"
+
+    def test_ningun_nivel_publicado_queda_por_debajo_del_medido(self):
+        import json as _json
+        agg, sim, salidas = self._modulos()
+        # NO se saltea si no hay salidas. Un nivel por encima de 95 es una
+        # afirmación de que el bootstrap percentil sub-cubre y de cuánto; sin el
+        # estudio no hay nada que la sostenga, y borrar la carpeta no puede ser
+        # la forma de aprobar el test. Lo marcó Codex: la versión anterior hacía
+        # skip y dejaba pasar cualquier nivel.
+        if not list(salidas.glob("cal-*.json")):
+            sin_respaldo = {s: n for s, n in config.NIVEL_CALIBRADO.items() if n > 95}
+            assert not sin_respaldo, (
+                f"no hay salidas en {salidas} y estas preguntas publican un "
+                f"nivel por encima de 95: {sin_respaldo}"
+            )
+            return
+
+        import hashlib
+        por_slug = agg._cargar()
+        # hash del archivo, indexado por (pregunta, semilla) tal como los rotula
+        hashes = {}
+        for ruta in sorted(salidas.glob("cal-*.json")):
+            crudo = ruta.read_bytes()
+            j = _json.loads(crudo)
+            hashes[(j["slug"], j.get("semilla"))] = \
+                hashlib.sha256(crudo).hexdigest()
+
+        faltan = [s for s in config.SLUGS if s not in por_slug]
+        assert not faltan, (
+            f"hay salidas del estudio pero ninguna de {faltan}: el nivel de esas "
+            f"preguntas no está respaldado por nada"
+        )
+
+        flacas, mezcladas, sin_sello, desfasadas = {}, {}, [], []
+        for slug in config.SLUGS:
+            corridas = por_slug[slug]
+            semillas = {c.get("semilla") for c in corridas}
+            if len(semillas) < 2:
+                flacas[slug] = sorted(semillas)
+            bes = {c.get("replicas") for c in corridas}
+            if len(bes) > 1:
+                mezcladas[slug] = sorted(bes)
+            for c in corridas:
+                clave = (slug, c.get("semilla"))
+                huella = c.get("huella")
+                if huella is None:
+                    if hashes.get(clave) not in self.SIN_SELLO:
+                        sin_sello.append(clave)
+                    continue
+                ruta = config.ruta_modelo(slug)
+                if not ruta.exists():
+                    continue
+                with open(ruta, encoding="utf-8") as f:
+                    modelo = _json.load(f)
+                if huella != sim.huella_estudio(slug, modelo):
+                    desfasadas.append(clave)
+
+        assert not flacas, (
+            f"el criterio compara corridas con semillas distintas y estas no "
+            f"las tienen: {flacas}"
+        )
+        assert not mezcladas, (
+            f"estas preguntas mezclan corridas con distinto B, así que su "
+            f"promedio no es de un solo procedimiento: {mezcladas}"
+        )
+        assert not sin_sello, (
+            f"estas salidas no traen huella del estudio y no son de las ocho "
+            f"históricas: {sin_sello}"
+        )
+        assert not desfasadas, (
+            "estas salidas se midieron con otro procedimiento o contra otra "
+            f"verdad que la que se publica: {desfasadas}"
+        )
+
+        flojos = []
+        for slug in config.SLUGS:
+            minimo, _ = agg.elegir(por_slug[slug])
+            assert minimo is not None, (
+                f"«{slug}»: ningún nivel medido llega al 95% en todas las "
+                f"corridas; no hay respaldo para el que se publica"
+            )
+            if config.NIVEL_CALIBRADO[slug] < int(minimo):
+                flojos.append((slug, config.NIVEL_CALIBRADO[slug], minimo))
+        assert not flojos, (
+            "estos niveles publicados son más angostos que lo que sostiene la "
+            f"simulación (publicado, mínimo medido): {flojos}"
+        )

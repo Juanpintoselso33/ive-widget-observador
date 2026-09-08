@@ -174,68 +174,109 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 # verdad el 95%. NO es un capricho: el bootstrap percentil SUB-CUBRE, y acá está
 # medido cuánto.
 #
-# CÓMO SE MIDIÓ (scripts/cobertura_simulada.py, 8/9/2026). Se tomó el modelo
-# publicado como verdad, se sortearon resultados desde él, y se corrió el
-# PIPELINE COMPLETO —elección de C, ajuste, bootstrap de 1.000 réplicas con
-# re-elección de C, mapa de calibración— 200 veces por pregunta. Después se
-# contó, para cada uno de los 1.008 perfiles, cuántas veces el intervalo
-# contenía la probabilidad verdadera, que se conoce por construcción.
+# CÓMO SE MIDIÓ (scripts/cobertura_simulada.py, recalibrado el 8/9/2026). Se
+# tomó el modelo publicado como verdad, se sortearon resultados desde él, y se
+# corrió el PIPELINE COMPLETO —elección de C, ajuste, bootstrap con re-elección
+# de C, mapa de calibración— 200 veces por pregunta (dos corridas de 100 con
+# semillas 401 y 402). Después se contó, para cada uno de los 1.008 perfiles,
+# cuántas veces el intervalo contenía la probabilidad verdadera, que se conoce
+# por construcción. Son 800 pipelines completos —4 preguntas x 2 corridas x 100
+# simulaciones—, unas dos horas con las ocho corridas en paralelo. (Decía
+# "~3.200"; el número estaba mal y lo corrigió Codex.)
 #
-# Pidiendo el 95% nominal, la cobertura REAL era:
-#   mano dura 92,1% · cadena perpetua 90,4% · pena de muerte 93,2% ·
-#   humillación 92,6%
+# Pidiendo el 95% nominal, la cobertura REAL es:
+#   mano dura 94,1% · cadena perpetua 91,3% · pena de muerte 93,4% ·
+#   humillación 91,9%
 #
-# O sea que el widget decía "95%" y entregaba entre 90 y 93.
+# La mejor es mano dura y la peor cadena perpetua. Con el simulador viejo el
+# orden era otro y el comentario decía que la mejor era pena de muerte.
 #
-# POR QUÉ SUBIR EL NIVEL Y NO ENSANCHAR POR UN FACTOR. Se probaron las dos. A
-# igualdad de cobertura media, subir el nivel deja muchísimos menos perfiles
-# malos, porque sigue la forma de la distribución bootstrap en vez de estirarla
-# simétricamente — y cerca de 0 y de 100 esa distribución es muy asimétrica.
-# En cadena perpetua: el nivel 99% deja UN perfil por debajo de 90% de
-# cobertura; el factor x1,30, que da la misma cobertura media, deja 35.
+# O sea que el widget diría "95%" y entregaría entre 91 y 94.
 #
-# CADA PREGUNTA NECESITA LO SUYO, así que no hay un número global.
+# POR QUÉ SUBIR EL NIVEL Y NO ENSANCHAR POR UN FACTOR. Se probaron las dos.
+# Subir el nivel deja menos perfiles malos, porque sigue la forma de la
+# distribución bootstrap en vez de estirarla simétricamente — y cerca de 0 y de
+# 100 esa distribución es muy asimétrica. En cadena perpetua, con esta medición:
+# el nivel 99 da 96,75% de cobertura media y deja 11 perfiles por debajo del 90%
+# (el peor, 88,0%); el factor x1,30 da 95,84% y deja 67 (el peor, 86,0%). No es
+# a igualdad de cobertura —el nivel cubre casi un punto más— así que la
+# comparación favorece al nivel por dos motivos a la vez y no aísla la forma.
+# Con el simulador viejo este mismo ejemplo decía "1 contra 35"; eran otros
+# números y no había con qué reproducirlos.
 #
-# TRES COSAS QUE ESTOS NÚMEROS NO RESUELVEN, todas medidas por Codex al revisar
-# el estudio (8/9/2026). Se documentan acá porque son la deuda pendiente, no
-# notas al pie:
+# CADA PREGUNTA NECESITA LO SUYO, así que no hay un número global. El criterio
+# es el nivel más chico cuya cobertura llega al 95% en LAS DOS semillas por
+# separado, no sólo en el promedio de las dos: en mano dura el nivel 96 promedia
+# 95,10% pero una de las dos corridas da 94,53%, y en cadena perpetua el 98
+# promedia 95,19% con una corrida en 94,86%.
 #
-# 1. EL PROMEDIO TAPA LA COLA. Se llega a ~95% promediando los 1.008 perfiles,
-#    pero el lector recibe el intervalo de SU perfil. En mano dura, al nivel 98
-#    quedan 55 perfiles con cobertura bajo 90% y el peor cubre 74%; incluso al
-#    99 el peor llega a 75%. Por eso la UI dice "intervalo estimado del modelo"
-#    y no promete un 95% que no se sostiene perfil por perfil.
+# ES UN DESEMPATE CONSERVADOR, NO UN TEST, y conviene no venderlo como más de lo
+# que es. Con la cobertura verdadera justo en 95%, cada corrida tiene alrededor
+# de un 50% de chance de quedar por encima, así que las dos quedan por encima
+# alrededor de una de cada cuatro veces — es una cuenta de servilleta, no un
+# número que salga de estas salidas. Y el error Monte Carlo de estas mediciones es del orden del punto —los
+# 1.008 perfiles comparten cada muestra simulada, así que no son 1.008
+# experimentos independientes y las salidas no guardan la covarianza que haría
+# falta para calcularlo exacto—, de modo que el 95% cae dentro del margen de los
+# cuatro cortes elegidos. Sirve para no elegir el nivel mirando un promedio que
+# se apoya en una sola corrida buena; no para afirmar que el nivel elegido
+# cubre.
 #
-# 2. EL SIMULADOR NO ES FIEL PARA MANO DURA. No reproduce exactamente el
-#    apareamiento entre réplicas de coeficientes y de mapa que usa producción.
-#    Codex midió la diferencia sobre los mismos resultados simulados: la
-#    cobertura al nivel 98 pasa de 97,00% a 98,01%, o sea +1,00 pp. El sesgo va
-#    hacia MÁS cobertura, así que el 98 es conservador y no peligroso, pero el
-#    número que lo eligió no es el del procedimiento publicado. Antes de mover
-#    este nivel hay que arreglar el simulador y recalibrar.
+# QUÉ CAMBIÓ AL ARREGLAR EL SIMULADOR: nada en lo que se publica. El simulador
+# viejo no reproducía el apareamiento entre réplicas de coeficientes y de mapa
+# que usa producción; arreglado eso y remedido de cero, el criterio recupera
+# TRES de los cuatro niveles —cadena perpetua 99, pena de muerte 97, humillación
+# 98—. El cuarto no: en mano dura el criterio ahora da 97 (95,65% y 96,62% en
+# las dos semillas) y se publica 98.
 #
-# 3. MIL RÉPLICAS NO ALCANZAN PARA ESTAS COLAS. Con el percentil 99, el cuantil
-#    0,005 interpola entre la primera y la segunda observación de 1.000. Codex
-#    ajustó 10.000 bootstrap independientes y midió el error Monte Carlo por
-#    extremo: mediana 0,80 pp, percentil 95 de 2,29 y máximo 4,02. Con 10.000
-#    réplicas bajaría a 0,27 / 0,78 / 1,29. Subirlas tiene una trampa: hoy
-#    `--replicas` sube los coeficientes pero los mapas siguen en N_REPLICAS y se
-#    reciclan por módulo, así que subir sólo el argumento rompería el
-#    apareamiento de mano dura después de la réplica 1.000.
+# Se deja en 98 A PROPÓSITO, y es una decisión editorial declarada, no lo que
+# dice el criterio mecánico. Lo que se gana está medido: pasar de 97 a 98 sube
+# la cobertura media de 96,13% a 97,19%, sube el peor perfil de 71,5% a 73,5% y
+# baja de 53 a 22 los perfiles con cobertura bajo 90%. Lo que se paga —cuánto se
+# ensancha el intervalo que ve el lector— NO está medido acá, así que "sale
+# barato" es un juicio, no un número. Y ni el 97 ni el 98 arreglan la cola: es
+# la pregunta con el peor perfil de las cuatro por lejos.
+#
+# LA COLA EN EL NIVEL PUBLICADO, que es lo que recibe el lector de SU perfil:
+#   mano dura 98 → media 97,2%, peor perfil 73,5%, 22 perfiles bajo 90%
+#   cadena perpetua 99 → media 96,8%, peor perfil 88,0%, 11 bajo 90%
+#   pena de muerte 97 → media 95,7%, peor perfil 91,5%, ninguno bajo 90%
+#   humillación 98 → media 95,8%, peor perfil 89,0%, 5 bajo 90%
+# El promedio tapa la cola, y por eso la UI dice "intervalo estimado del modelo"
+# y no promete un 95% que no se sostiene perfil por perfil.
+#
+# DOS COSAS QUE ESTOS NÚMEROS SIGUEN SIN RESOLVER:
+#
+# 1. EL NIVEL SE ELIGIÓ CON 1.000 RÉPLICAS Y SE PUBLICA CON 10.000, y el signo
+#    de esa diferencia NO se conoce. El simulador corre el bootstrap interno en
+#    1.000 porque a 10.000 la medición llevaría unas veinte horas por corrida
+#    —o sea otras veinte para el par, porque las dos semillas van en paralelo—.
+#    Ese "veinte" es una extrapolación lineal de lo que tardó cada una de estas
+#    corridas: entre 6.815 y 7.049 segundos según sus logs, o sea 18,9 a 19,6
+#    horas si se multiplica por diez. Las ocho salidas de esa fecha no guardan
+#    la duración; el simulador la guarda de acá en más, en la clave "segundos". Subir las réplicas achica el error Monte Carlo del cuantil
+#    extremo —los números están en `train_model.py`, junto a N_REPLICAS— pero
+#    menos ruido no es más cobertura: si el extremo ruidoso incluía la verdad
+#    por accidente, achicar el ruido la deja afuera. Escribí que producción
+#    "debería portarse igual o mejor" y no está justificado; lo marcó Codex, que
+#    además comparó las primeras 1.000 réplicas de mano dura contra las 10.000 y
+#    encontró 263 perfiles donde el intervalo se ANGOSTA, con hasta 4,98 pp de
+#    movimiento en un extremo. Saber el signo exige medir a B=10.000.
+#
+# 2. LA VERDAD SIMULADA ES EL PROPIO MODELO. Esto corrige la sub-cobertura del
+#    PROCEDIMIENTO. El error de especificación —que el mundo no sea aditivo en
+#    estas seis variables— se suma encima y no está medido.
 #
 # Y una afirmación mía que quedó sobredicha: dije que subir el nivel gana sobre
-# ensanchar por un factor "a igualdad de cobertura". No era a igualdad: el nivel
-# 99 daba 96,08% y el factor 1,30 daba 95,08%, un punto entero de diferencia. La
-# ventaja del nivel sobre el factor sigue sin demostrarse limpiamente.
-#
-# QUÉ NO ARREGLA TAMPOCO: la verdad simulada es el propio modelo, así que esto
-# corrige la sub-cobertura del PROCEDIMIENTO. El error de especificación —que el
-# mundo no sea aditivo en estas seis variables— se suma encima y no está medido.
+# ensanchar por un factor "a igualdad de cobertura". No era a igualdad, ni antes
+# ni ahora: en esta medición el nivel 99 da 96,75% y el factor x1,30 da 95,84%,
+# casi un punto de diferencia. La ventaja del nivel sobre el factor sigue sin
+# demostrarse limpiamente.
 NIVEL_CALIBRADO = {
-    "politico_mano_dura": 98,   # 95% nominal daba 92,1% real
-    "cadena_perpetua": 99,      # daba 90,4%, la peor de las cuatro
-    "pena_muerte": 97,          # daba 93,2%, la mejor
-    "humillacion_presos": 98,   # daba 92,6%
+    "politico_mano_dura": 98,   # 95% nominal da 94,1%; el criterio da 97, va 98
+    "cadena_perpetua": 99,      # da 91,3%, la peor de las cuatro
+    "pena_muerte": 97,          # da 93,4%
+    "humillacion_presos": 98,   # da 91,9%
 }
 
 # ============================================================

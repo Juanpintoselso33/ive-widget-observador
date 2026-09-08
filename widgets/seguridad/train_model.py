@@ -52,9 +52,42 @@ C_GRID = [0.01, 0.1, 0.5, 1.0, 5.0, 10.0]
 # Réplicas bootstrap por pregunta. Es una constante de módulo y no un
 # número suelto adentro de entrenar() para poder bajarla desde la línea de
 # comandos y hacer una corrida de humo en segundos: entrenar las cuatro con
-# las 1.000 reales lleva bastante, y descubrir un error de tipeo al final de
-# esa corrida es tirar todo el tiempo a la basura.
-N_REPLICAS = 1000
+# las reales lleva bastante, y descubrir un error de tipeo al final de esa
+# corrida es tirar todo el tiempo a la basura.
+#
+# 10.000 Y NO 1.000 (8/9/2026). Con los niveles calibrados —97 a 99 según la
+# pregunta— el intervalo pide cuantiles muy en la cola: con q=0,005 y 1.000
+# réplicas, la posición del percentil es 0,005x999 = 4,995, o sea que interpola
+# entre la QUINTA y la SEXTA observación ordenada. (Antes decía "primera y
+# segunda"; era falso y lo corrigió Codex.)
+#
+# EL RUIDO DE ESE EXTREMO ESTÁ MEDIDO, y ahora con un script que se puede correr
+# —`scripts/error_mc_percentil.py`— en vez de con un número que había quedado
+# sin experimento detrás. Al intentar reproducir la medición original de Codex,
+# el propio Codex obtuvo otros valores; no porque los primeros fueran falsos,
+# sino porque no había con qué comprobarlos. Una constante que multiplica por
+# diez el tamaño de lo que se publica no puede apoyarse en eso.
+#
+# Lo que mide el script: para los 1.008 perfiles y los dos extremos, el desvío
+# estándar del extremo si el bootstrap se hubiera corrido con B réplicas,
+# remuestreando CON reposición las serializadas. No extrapola: mide directo
+# también en B=10.000, que es el que se publica.
+#
+#   B=1.000   mediana 0,35 a 0,83 pp según la pregunta, peor extremo hasta 4,57
+#   B=10.000  mediana 0,11 a 0,27 pp,                   peor extremo hasta 2,51
+#
+# La más ruidosa es cadena perpetua, que es también la que publica el nivel más
+# extremo: son las dos caras del mismo problema. Bajar el peor extremo de 4,6 a
+# 2,5 pp es lo que se compra con las 10.000.
+#
+# EL COSTO SÍ LLEGA A PRODUCCIÓN, aunque sea chico. Los cuatro JSON pasan de
+# 1,67 MB a 16,47 MB en disco y unos 34 MB como objetos Python; calcular el
+# intervalo y la banda de un perfil pasa de 1-2 ms a 14-18 ms, y `st.cache_data`
+# devuelve copias deserializadas, así que cachear no borra ese costo. Sigue
+# siendo imperceptible para el lector —la interacción es de decenas de
+# milisegundos— pero no es cero, y decir que "no es de producción" era falso.
+# Lo midió Codex. Lo que no está medido es cómo se comporta con concurrencia.
+N_REPLICAS = 10000
 
 # Escala nivel_educativo (1-10) del proveedor, colapsada.
 #
@@ -422,6 +455,13 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
     rng = np.random.default_rng(RANDOM_STATE)
     coeficientes = []
     c_elegidos = []
+    # QUÉ SORTEOS SOBREVIVIERON. Sin esto, descartar una réplica desplaza el
+    # apareamiento con los mapas: `coeficientes` se compacta y la lista de mapas
+    # no, así que a partir del descarte la réplica i de coeficientes queda
+    # pegada al mapa del sorteo i+1. Compartir semilla no alcanza. Hoy no pasa
+    # —las cuatro preguntas tienen 10.000 de 10.000— pero el defecto estaba
+    # latente y lo marcó Codex el 8/9/2026.
+    sorteos_validos = []
 
     for i in range(n_replicas):
         idx = np.concatenate([
@@ -444,6 +484,7 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
         m.fit(Xb, yb, sample_weight=wb)
         coeficientes.append([float(m.intercept_[0])] + [float(v) for v in m.coef_[0]])
         c_elegidos.append(float(mejor_c))
+        sorteos_validos.append(i)
 
         if (i + 1) % 200 == 0:
             print(f"    {i + 1}/{n_replicas} réplicas")
@@ -454,7 +495,7 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
         "semilla": int(RANDOM_STATE),
         "c_por_replica": {str(c): c_elegidos.count(c) for c in sorted(set(c_elegidos))},
     }
-    return coeficientes, meta
+    return coeficientes, meta, sorteos_validos
 
 
 
@@ -481,7 +522,7 @@ def _nodos_calibracion(oof, y, w, k=None):
     return xs, ys
 
 
-def ajustar_calibracion(d, X, y, w):
+def ajustar_calibracion(d, X, y, w, n_replicas, sorteos_validos):
     """
     Mapa de recalibración: spline monótona sobre nodos de igual masa ponderada.
 
@@ -567,9 +608,31 @@ def ajustar_calibracion(d, X, y, w):
     estratos = d["estrato"].values
     indices = [np.where(estratos == e)[0] for e in np.unique(estratos)]
     rng = np.random.default_rng(RANDOM_STATE)
+    # TANTAS RÉPLICAS DE MAPA COMO DE COEFICIENTES. Estaba fijo en N_REPLICAS
+    # mientras los coeficientes seguían a `--replicas`: subir el argumento
+    # rompía el apareamiento a partir de la réplica 1.000, porque model.py
+    # recicla los mapas por módulo. Lo marcó Codex.
+    n_replicas = N_REPLICAS if n_replicas is None else n_replicas
+    # LOS DOS ÚLTIMOS ARGUMENTOS SON OBLIGATORIOS A PROPÓSITO. Tenían default y
+    # Codex mostró el agujero: sacar `sorteos_validos` del llamado en
+    # `entrenar()` dejaba los 148 tests en verde y volvía a desalinear mapas y
+    # coeficientes en cuanto hubiera un descarte. Ningún test cubría ese cable,
+    # y la huella del estudio tampoco mira `entrenar`. Sin default, quitarlo es
+    # un TypeError en el acto. `sorteos_validos=None` sigue queriendo decir "los
+    # aceptó a todos", pero hay que escribirlo.
+    #
+    # SE SORTEA SIEMPRE TODO Y SE FILTRA DESPUÉS. `bootstrap_coeficientes`
+    # descarta las réplicas sin variación en la dependiente o con un fold
+    # degenerado; si acá se sortearan sólo las que sobrevivieron, el generador
+    # avanzaría distinto y los remuestreos dejarían de ser los mismos. Hay que
+    # generar los n sorteos en el mismo orden y quedarse con los que la otra
+    # función aceptó. `sorteos_validos=None` significa "los aceptó a todos".
+    quedarse = None if sorteos_validos is None else set(sorteos_validos)
     replicas = []
-    for _ in range(N_REPLICAS):
+    for k in range(n_replicas):
         i = np.concatenate([rng.choice(ix, size=len(ix), replace=True) for ix in indices])
+        if quedarse is not None and k not in quedarse:
+            continue
         xs_b, ys_b = _nodos_calibracion(oof[i], y[i], w[i])
         replicas.append([[round(float(v), 6) for v in xs_b],
                          [round(float(v), 6) for v in ys_b]])
@@ -643,14 +706,14 @@ def entrenar(df_crudo, slug, n_replicas=None):
 
     print("\nBootstrap estratificado para los intervalos (re-elige C en cada")
     print("réplica, así que tarda unos minutos)...")
-    boot, boot_meta = bootstrap_coeficientes(d, X, y, w, n_replicas)
+    boot, boot_meta, sorteos_validos = bootstrap_coeficientes(d, X, y, w, n_replicas)
     print(f"  {boot_meta['utiles']} réplicas útiles sobre {n_replicas}")
     print(f"  C elegido por réplica: {boot_meta['c_por_replica']}")
 
     calibracion = None
     if slug in PREGUNTAS_A_RECALIBRAR:
         print("\nAjustando el mapa de recalibración (fuera de muestra)...")
-        calibracion = ajustar_calibracion(d, X, y, w)
+        calibracion = ajustar_calibracion(d, X, y, w, n_replicas, sorteos_validos)
         if calibracion is None:
             raise SystemExit(
                 f"[{slug}] está declarada en PREGUNTAS_A_RECALIBRAR pero el mapa "
