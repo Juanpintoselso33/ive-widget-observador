@@ -179,7 +179,8 @@ def una_simulacion(d, X, w, p_true, Xp, estratos, n_replicas, rng, recalibra):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--sims", type=int, default=200)
-    ap.add_argument("--replicas", type=int, default=300)
+    ap.add_argument("--replicas", type=int, default=tm.N_REPLICAS,
+                    help="por defecto, las MISMAS que producción")
     ap.add_argument("--pregunta", action="append", dest="preguntas")
     ap.add_argument("--semilla", type=int, default=20260908,
                     help="para repartir las simulaciones entre procesos")
@@ -272,9 +273,10 @@ def main():
                   f"bajo 90%: {(c_ < 0.90).sum():4d}   peor {c_.min()*100:5.1f}%   "
                   f"ancho {np.median(anchos_fac[f]):5.1f}pp")
 
-        salida = Path(f"/private/tmp/claude-501/-Users-juan/"
-                      f"e6f4e0c9-034a-4608-92b0-1629d25aee8d/scratchpad/"
-                      f"cal-{slug}-{args.semilla}.json")
+        # A un directorio del repo, no a la carpeta temporal de una sesión.
+        destino = Path(__file__).parent / "salidas"
+        destino.mkdir(exist_ok=True)
+        salida = destino / f"cal-{slug}-{args.semilla}.json"
         salida.write_text(json.dumps({
             "slug": slug, "sims_validas": validas, "replicas": args.replicas,
             "semilla": args.semilla,

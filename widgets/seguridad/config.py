@@ -196,9 +196,41 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #
 # CADA PREGUNTA NECESITA LO SUYO, así que no hay un número global.
 #
-# QUÉ NO ARREGLA: la verdad simulada es el propio modelo, así que esto corrige
-# la sub-cobertura del PROCEDIMIENTO. El error de especificación —que el mundo
-# no sea aditivo en estas seis variables— se suma encima y no está medido.
+# TRES COSAS QUE ESTOS NÚMEROS NO RESUELVEN, todas medidas por Codex al revisar
+# el estudio (8/9/2026). Se documentan acá porque son la deuda pendiente, no
+# notas al pie:
+#
+# 1. EL PROMEDIO TAPA LA COLA. Se llega a ~95% promediando los 1.008 perfiles,
+#    pero el lector recibe el intervalo de SU perfil. En mano dura, al nivel 98
+#    quedan 55 perfiles con cobertura bajo 90% y el peor cubre 74%; incluso al
+#    99 el peor llega a 75%. Por eso la UI dice "intervalo estimado del modelo"
+#    y no promete un 95% que no se sostiene perfil por perfil.
+#
+# 2. EL SIMULADOR NO ES FIEL PARA MANO DURA. No reproduce exactamente el
+#    apareamiento entre réplicas de coeficientes y de mapa que usa producción.
+#    Codex midió la diferencia sobre los mismos resultados simulados: la
+#    cobertura al nivel 98 pasa de 97,00% a 98,01%, o sea +1,00 pp. El sesgo va
+#    hacia MÁS cobertura, así que el 98 es conservador y no peligroso, pero el
+#    número que lo eligió no es el del procedimiento publicado. Antes de mover
+#    este nivel hay que arreglar el simulador y recalibrar.
+#
+# 3. MIL RÉPLICAS NO ALCANZAN PARA ESTAS COLAS. Con el percentil 99, el cuantil
+#    0,005 interpola entre la primera y la segunda observación de 1.000. Codex
+#    ajustó 10.000 bootstrap independientes y midió el error Monte Carlo por
+#    extremo: mediana 0,80 pp, percentil 95 de 2,29 y máximo 4,02. Con 10.000
+#    réplicas bajaría a 0,27 / 0,78 / 1,29. Subirlas tiene una trampa: hoy
+#    `--replicas` sube los coeficientes pero los mapas siguen en N_REPLICAS y se
+#    reciclan por módulo, así que subir sólo el argumento rompería el
+#    apareamiento de mano dura después de la réplica 1.000.
+#
+# Y una afirmación mía que quedó sobredicha: dije que subir el nivel gana sobre
+# ensanchar por un factor "a igualdad de cobertura". No era a igualdad: el nivel
+# 99 daba 96,08% y el factor 1,30 daba 95,08%, un punto entero de diferencia. La
+# ventaja del nivel sobre el factor sigue sin demostrarse limpiamente.
+#
+# QUÉ NO ARREGLA TAMPOCO: la verdad simulada es el propio modelo, así que esto
+# corrige la sub-cobertura del PROCEDIMIENTO. El error de especificación —que el
+# mundo no sea aditivo en estas seis variables— se suma encima y no está medido.
 NIVEL_CALIBRADO = {
     "politico_mano_dura": 98,   # 95% nominal daba 92,1% real
     "cadena_perpetua": 99,      # daba 90,4%, la peor de las cuatro
