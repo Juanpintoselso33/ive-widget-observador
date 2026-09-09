@@ -456,104 +456,183 @@ CUSTOM_CSS = get_custom_css("light")
 
 def get_observador_css():
     """
-    Hoja de estilos del Figma "Producto UY".
+    Hoja de estilos del Figma "Producto UY", página **Widget IVE**.
 
     SEPARADA de get_custom_css() a propósito. Esa la comparten el widget IVE
     —que está publicado y sirviendo— y el de seguridad; cambiarla habría
     re-diseñado de rebote una app en producción que nadie pidió tocar. Esta es
     opt-in: la usa el widget que la importe.
 
-    Diferencias con la hoja editorial anterior, todas del Figma:
-      · Una sola variante, CLARA. El Figma no trae modo oscuro, así que el
-        widget deja de seguir el tema del sistema del lector.
-      · El gradiente va de naranja a azul lavanda, no de rojo a azul.
-      · El valor sobre el gradiente va en una pastilla negra.
-      · El titular y el número grande van en verde profundo, no en negro/azul.
-      · Los grupos se comparan con solapas por dimensión y una fila de números
-        grandes, en vez de una lista larga de barras.
+    LOS VALORES SALEN DEL PANEL DE INSPECCIÓN, uno por uno, no de muestrear una
+    captura. Están escritos en `docs/diseno/figma-producto-uy.md` junto a los
+    dos frames exportados a 2x, que son la evidencia.
 
-    Las tipografías son las que ya estaban (IBM Plex Serif/Sans): el Figma usa
-    otras, pero sin acceso de inspección no se puede saber cuáles, y adivinar
-    una familia de marca es peor que usar uno cercano y decirlo.
+    TODOS LOS SELECTORES DE ACÁ SE VERIFICARON CONTRA EL DOM REAL de Streamlit
+    1.63.0, con el widget corriendo. Hacía falta: la versión anterior tenía
+    CINCO reglas que no matcheaban nada y que por eso nunca se habían notado.
+    Quedan anotadas una por una donde corresponde, porque el patrón se repite y
+    conviene no volver a caer:
+
+      · `.main > div` no existe; el contenedor es `stMainBlockContainer`.
+      · `.main` tampoco existe, así que sobraba en la regla de fondo.
+      · `[data-baseweb="select"]` murió cuando el Selectbox pasó a React Aria;
+        el control es `[data-testid="stSelectbox"] [role="group"]`.
+      · `[data-baseweb="tab-highlight"]` y `"tab-border"` murieron por lo mismo;
+        la línea de selección la dibuja `.react-aria-SelectionIndicator`.
+      · `stHeaderActionElement` va en PLURAL, `stHeaderActionElements`.
+
+    Y dos trampas de anidamiento, que no son selectores muertos sino reglas que
+    aciertan en el nodo equivocado:
+
+      · El texto del titular no vive en el `h1` sino en un `span` que Streamlit
+        mete adentro con su propia clase. Hay que estilar los dos, en escritorio
+        y también en la consulta de móvil.
+      · Las etiquetas y las solapas envuelven su texto en un contenedor de
+        markdown con `font-size` propio (0,875rem). Fijar el tamaño en el
+        `label` o en el `stTab` no llega al texto: hay que ir al `p`.
+
+    SOBRE LOS INTERLINEADOS DEL FIGMA. Se aplican donde el texto del diseño
+    ocupa varias líneas —titular 30/42 y bajada 23/23— y no donde es de una sola
+    línea, aunque el panel diga 35px o 68px. En Figma esos textos están con
+    "vertical trim: cap height", que recorta el interlineado: la caja de la
+    etiqueta "Religiosidad" mide 14px de alto, no 35. Copiar el número a CSS no
+    reproduciría el diseño, lo rompería.
     """
     c = OBSERVADOR_COLORS
 
     return f"""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap');
+    /* Instrument Sans es variable y trae eje de ANCHO: la bajada del Figma usa
+       la variante Condensed, que sale de la misma familia con `wdth: 75`. Por
+       eso el rango 75..100 en la URL. */
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Libre+Baskerville:wght@400;700&display=swap');
 
-    html, body, [class*="css"] {{
-        font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* Sin `[class*="css"]`: las clases de Streamlit son `st-emotion-cache-…` y
+       ese selector sólo acertaría por casualidad si el hash llevara "css". */
+    html, body {{
+        font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 19px;
     }}
 
-    /* El Figma es claro. Se fija el fondo en vez de heredar el tema del
-       lector, porque con la paleta oscura de Streamlit el verde profundo del
-       titular queda ilegible. */
-    .stApp, .main, body {{
+    /* FIJAR LA FAMILIA EN body NO ALCANZA. Streamlit pone su propia Source Sans
+       en los contenedores de markdown y de los widgets, así que todo lo que
+       escribe el widget la hereda de ahí y no de body: medido, la mitad de los
+       nodos con texto seguía en Source Sans después de cambiar body; ahora son
+       cero de 301. Va ANTES que las de Libre Baskerville, y eso importa:
+       `.main-title span` gana por especificidad, pero `.section-header` EMPATA
+       con `[data-testid="stMarkdownContainer"] *` y gana sólo por venir
+       después. Mover este bloque más abajo le cambiaría la tipografía al título
+       de sección. (Decía que las dos ganaban por especificidad; era falso y lo
+       marcó Codex.) */
+    [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] *,
+    [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
+    [data-testid="stSelectbox"], [data-testid="stSelectbox"] *,
+    [data-testid="stTab"], [data-testid="stTab"] * {{
+        font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }}
+
+    /* El Figma es claro. Se fija el fondo en vez de heredar el tema del lector,
+       porque con la paleta oscura de Streamlit el verde del titular queda
+       ilegible. (Iba también contra `.main`, que en esta versión no existe.) */
+    .stApp, body {{
         background: {c['background']} !important;
         color: {c['text']} !important;
     }}
 
-    #MainMenu, footer, header {{visibility: hidden;}}
+    /* Sin `footer`: esta app no tiene ese elemento. El pie es un `p`. */
+    #MainMenu, header {{visibility: hidden;}}
 
-    .main > div {{
-        max-width: 720px;
+    /* El marco: 698px de ancho, filete superior de 2px y sombra. */
+    [data-testid="stMainBlockContainer"] {{
+        max-width: 698px !important;
         margin: 0 auto;
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
+        border-top: 2px solid {c['primary']};
+        box-shadow: 0 5px 6px {c['card_shadow']};
+        padding: 1.5rem 0.8rem 2rem 0.8rem !important;
     }}
 
     /* ---------- Titulares ---------- */
-    .main-title {{
-        font-family: 'IBM Plex Serif', Georgia, serif;
-        font-size: 2.1rem;
-        font-weight: 700;
+    .main-title, .main-title span {{
+        font-family: 'Libre Baskerville', Georgia, serif !important;
+        font-size: 30px !important;
+        font-weight: 700 !important;
         color: {c['primary']} !important;
-        margin: 0.5rem 0 0.6rem 0;
-        line-height: 1.15;
-        letter-spacing: -0.015em;
+        line-height: 42px !important;
+        letter-spacing: 0 !important;
+    }}
+
+    .main-title {{ margin: 0.5rem 0 0.6rem 0; }}
+
+    /* El botoncito de ancla que Streamlit cuelga del encabezado no tiene que
+       heredar los 30px. El testid va en PLURAL. */
+    .main-title [data-testid="stHeaderActionElements"] {{
+        font-size: 14px !important;
     }}
 
     .subtitle {{
-        font-size: 0.95rem;
-        color: {c['text_muted']} !important;
+        font-family: 'Instrument Sans', sans-serif !important;
+        font-size: 23px !important;
+        font-stretch: 75% !important;
+        color: {c['text']} !important;
         margin-bottom: 1rem;
-        line-height: 1.55;
+        line-height: 23px !important;
+    }}
+
+    .section-header, .section-header span {{
+        font-family: 'Libre Baskerville', Georgia, serif !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        color: {c['text']} !important;
+        text-transform: uppercase;
+        letter-spacing: 0 !important;
     }}
 
     .section-header {{
-        font-family: 'IBM Plex Serif', Georgia, serif;
-        font-size: 1.05rem;
-        font-weight: 600;
-        color: {c['text']} !important;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
         margin: 0 0 0.75rem 0;
         padding-bottom: 0.5rem;
-        border-bottom: 1px solid {c['border']};
+        border-bottom: 1px solid {c['text']};
     }}
 
     /* ---------- Controles ---------- */
-    /* El relleno de los desplegables. El COLOR del texto no se toca acá: lo
-       gobierna el tema base de Streamlit, que este widget fija en claro desde
-       `.streamlit/config.toml`. Intentar forzarlo con CSS contra los nodos
-       internos de baseweb fue un callejón: los data-testid cambian entre
-       versiones y quedaban radios negros y valores ilegibles. */
-    [data-testid="stSelectbox"] [data-baseweb="select"] > div {{
+    /* El control es un `div[role=group]` dentro del stSelectbox. El selector de
+       baseweb que había acá no matcheaba nada desde que Streamlit pasó el
+       Selectbox a React Aria, así que el borde, el radio y el alto del diseño
+       no llegaban nunca; el relleno coincidía de casualidad porque el tema
+       compartido ya usaba el mismo gris. */
+    /* El alto va con `height`, no sólo con `min-height`: el control trae
+       `height: 2.5rem` y con el mínimo solo quedaba en 47,5px en vez de los 37
+       del diseño. Lo marcó Codex. */
+    [data-testid="stSelectbox"] [role="group"] {{
         background: {c['input_bg']} !important;
-        border: none !important;
-        border-radius: 8px !important;
+        border: 1px solid {c['border']} !important;
+        border-radius: 9px !important;
+        height: 37px !important;
+        min-height: 37px !important;
     }}
 
-    .stSelectbox label, .stRadio label {{
-        font-size: 0.9rem !important;
-        font-weight: 500 !important;
+    /* El valor elegido va en gris, no en el negro de la etiqueta, y a 19px: el
+       input conserva `font-size: 0.875rem` y quedaba en 16,6. */
+    [data-testid="stSelectbox"] [role="group"] * {{
+        color: {c['input_text']} !important;
+        font-size: 19px !important;
+    }}
+
+    /* Y HAY QUE DEVOLVERLE LA SEÑAL DE FOCO. Streamlit la da cambiando el color
+       del borde con `[data-focus-within]`, y el borde de arriba, con su
+       `!important`, dejaba el mismo color enfocado y sin enfocar: al llegar con
+       Tab al campo cerrado no pasaba nada visible. Lo marcó Codex. */
+    [data-testid="stSelectbox"] [role="group"][data-focus-within] {{
+        border-color: {c['primary']} !important;
+    }}
+
+    /* EL TAMAÑO VA EN EL `p`, no en el `label`: Streamlit mete el texto de la
+       etiqueta en un contenedor de markdown con font-size propio. */
+    [data-testid="stWidgetLabel"] p {{
+        font-size: 19px !important;
+        font-weight: 400 !important;
         color: {c['text']} !important;
     }}
 
-    /* El punto del radio elegido toma `primaryColor` del config compartido,
-       que es el azul del widget IVE — el único que lo usa. Acá se pisa con el
-       verde del Figma, sin tocar el config y sin afectar al otro widget. */
     /* EL PUNTO DEL RADIO QUEDA AZUL, no verde, y es a propósito.
        Streamlit lo dibuja en un div anidado sin testid, sin role y sin
        aria-checked, y a la misma profundidad que la caja del texto de la
@@ -564,8 +643,34 @@ def get_observador_css():
        Si alguna vez hace falta, la vía limpia es un componente propio, no CSS.
        Toma `primaryColor` de .streamlit/config.toml. */
 
+    /* ---------- La banda gris ---------- */
+    /* Del gradiente al pie, el Figma va sobre gris y no sobre blanco: un tercio
+       del área. `app.py` envuelve esa parte en un `st.container(key=...)` y
+       Streamlit le pone `st-key-<key>`, que es la vía soportada para
+       engancharle CSS. Los márgenes negativos la sacan a sangre hasta los
+       bordes del marco, que es como está en el diseño. */
+    .st-key-banda_resultado {{
+        background: {c['secondary_bg']};
+        /* El ancho VA EXPLÍCITO. Con sólo los márgenes negativos, la banda se
+           corría a la izquierda pero no se ensanchaba: medido, quedaba en 668px
+           dentro de un marco de 698. Es un item de un contenedor flex en
+           columna y el margen negativo derecho no le agrega ancho.
+           Y va con `!important` porque la clase de emotion que Streamlit le
+           pone al mismo nodo declara `width: 100%`, con la misma
+           especificidad. */
+        margin-left: -0.8rem !important;
+        margin-right: -0.8rem !important;
+        margin-bottom: -2rem !important;
+        width: calc(100% + 1.6rem) !important;
+        /* Y hay que soltar el `max-width: 100%` que Streamlit le pone al mismo
+           nodo: con él puesto, el ancho pedido se recorta al del envoltorio y
+           la banda se quedaba 30px corta. Medido: 667,6 contra 698. */
+        max-width: none !important;
+        padding: 1.25rem 0.8rem 2rem 0.8rem;
+    }}
+
     /* ---------- Barra de probabilidad ---------- */
-    .prob-bar-wrapper {{ margin: 1.25rem 0 3.25rem 0; }}
+    .prob-bar-wrapper {{ margin: 0.5rem 0 1.25rem 0; }}
 
     .prob-endpoints {{
         display: flex;
@@ -574,18 +679,19 @@ def get_observador_css():
     }}
 
     .prob-endpoint {{
-        font-size: 0.85rem;
-        font-weight: 500;
+        font-size: 19px;
+        font-weight: 400;
         color: {c['text']};
-        text-transform: none;
-        letter-spacing: 0;
     }}
 
+    /* Gradiente de DOS paradas, naranja a azul. La versión anterior metía un
+       gris cálido en el medio que no existe en el diseño. */
     .prob-container {{
-        background: linear-gradient(90deg, {c['accent']} 0%, #C9C6C0 50%, #A8B4E0 100%);
+        background: linear-gradient(90deg, {c['accent']} 0%, {c['azul']} 100%);
         border-radius: 6px;
-        height: 30px;
+        height: 31px;
         position: relative;
+        margin-top: 2.2rem;
     }}
 
     .prob-indicator {{
@@ -597,84 +703,86 @@ def get_observador_css():
         transform: translateX(-1px);
     }}
 
-    /* La pastilla negra del Figma, debajo de la marca. */
+    /* LA PASTILLA VA ARRIBA DE LA BARRA. Estaba abajo, y en los dos frames del
+       Figma está arriba: medido sobre los PNG exportados, 65 filas de pastilla
+       por encima de la barra y ninguna por debajo. */
     .prob-label {{
         position: absolute;
-        top: 100%;
+        bottom: 100%;
         left: 50%;
         transform: translateX(-50%);
-        margin-top: 6px;
+        margin-bottom: 6px;
         background: {c['text']};
         color: #FFFFFF;
-        font-size: 0.85rem;
-        font-weight: 600;
+        font-size: 19px;
+        font-weight: 400;
         padding: 3px 10px;
-        border-radius: 999px;
+        border-radius: 7px;
         white-space: nowrap;
     }}
 
     /* ---------- Tarjeta de resultado ---------- */
+    /* Sin borde: en el Figma se separa sólo por la sombra. */
     .result-card {{
         background: {c['card_bg']};
-        border: 1px solid {c['border']};
-        border-radius: 12px;
+        border: none;
+        border-radius: 10px;
         padding: 1.5rem 1.5rem 1.25rem 1.5rem;
-        box-shadow: 0 2px 10px {c['card_shadow']};
+        box-shadow: 0 5px 6px {c['card_shadow']};
         margin-bottom: 1rem;
     }}
 
+    /* El número grande NO va en el verde del titular: va en el sólido. */
     .result-number {{
-        font-family: 'IBM Plex Serif', Georgia, serif;
-        font-size: 3.25rem;
-        font-weight: 700;
-        line-height: 1;
-        color: {c['primary']} !important;
+        font-family: 'Instrument Sans', sans-serif !important;
+        font-size: 50px !important;
+        font-weight: 600 !important;
+        line-height: 1 !important;
+        color: {c['solid']} !important;
         margin-bottom: 0.35rem;
     }}
 
     .result-intervalo {{
-        font-size: 0.85rem;
+        font-size: 17px;
         color: {c['text_muted']};
         margin-bottom: 0.75rem;
     }}
 
     .result-text {{
-        font-size: 0.95rem;
+        font-size: 19px;
         color: {c['text']};
         line-height: 1.6;
     }}
 
-    .result-text strong {{ color: {c['primary']} !important; }}
+    .result-text strong {{ color: {c['solid']} !important; }}
 
     .result-nacional {{
         margin-top: 1rem;
         padding-top: 0.85rem;
         border-top: 1px solid {c['border']};
-        font-size: 0.9rem;
+        font-size: 17px;
         color: {c['text']};
     }}
 
     .result-nacional-value {{ font-weight: 700; }}
 
-    /* El Figma pinta la diferencia contra el promedio en naranja. */
+    /* SIN COLOR ACÁ. El color lo pone la clase de signo que agrega
+       `components.py` —`--sube` o `--baja`—, igual que en las diferencias por
+       grupo. Esta regla lo forzaba en naranja con `!important`, así que una
+       diferencia positiva salía del color de las negativas. */
     .result-nacional-diff {{
-        color: {c['accent']} !important;
-        font-weight: 500;
+        font-weight: 400;
     }}
 
     .result-neutral {{
         margin-top: 0.75rem;
-        font-size: 0.85rem;
+        font-size: 17px;
         color: {c['text_muted']};
     }}
 
     /* ---------- Comparación por grupos: solapas + números grandes ---------- */
-    /* Las píldoras del Figma. Van contra `data-testid="stTab"`, que es lo que
-       expone esta versión de Streamlit; los selectores `data-baseweb` no
-       matcheaban y las solapas salían como rectángulos apretados con el texto
-       desbordado. */
     [data-testid="stTabs"] [role="tablist"] {{
-        gap: 0.4rem;
+        gap: 10px;
         border-bottom: none !important;
         margin-bottom: 1.1rem;
         flex-wrap: wrap;
@@ -683,33 +791,69 @@ def get_observador_css():
     [data-testid="stTab"] {{
         background: {c['background']};
         border: 1px solid {c['border']};
-        border-radius: 6px;
-        padding: 0.4rem 0.85rem !important;
-        font-size: 0.85rem;
+        border-radius: 7px;
+        padding: 9px !important;
         color: {c['text']} !important;
         height: auto !important;
         white-space: nowrap;
     }}
 
+    /* El tamaño va en el `p`, por lo mismo que las etiquetas. Y el
+       INTERLINEADO también, porque es lo que decide el alto de la pastilla: el
+       Figma la tiene en 30px con 9px de padding arriba y abajo, o sea 12px de
+       caja de texto. Con el interlineado que trae el contenedor de markdown la
+       pastilla salía bastante más alta y el padding no alcanzaba para
+       corregirlo. Quedan en 32px medidos, no 30: son los 30 del diseño más el
+       borde de 1px de cada lado, que el Figma no tiene. */
+    [data-testid="stTab"] p {{
+        font-size: 16px !important;
+        line-height: 12px !important;
+    }}
+
     [data-testid="stTab"][aria-selected="true"] {{
-        background: {c['primary']} !important;
-        border-color: {c['primary']} !important;
-        color: #FFFFFF !important;
+        background: {c['solid']} !important;
+        border-color: {c['solid']} !important;
     }}
 
     [data-testid="stTab"][aria-selected="true"] p {{ color: #FFFFFF !important; }}
 
-    [data-testid="stTabs"] [data-baseweb="tab-highlight"],
-    [data-testid="stTabs"] [data-baseweb="tab-border"] {{
+    /* Dos cosas distintas y hay que apagar las dos: el indicador de selección,
+       que dibuja React Aria en su propio nodo, y la línea de base del tablist,
+       que NO es un `border-bottom` sino un `::after` absoluto. Apagar sólo el
+       primero dejaba la raya, y los dos selectores `data-baseweb` que había
+       antes no matcheaban ninguna de las dos. Lo marcó Codex. */
+    [data-testid="stTabs"] .react-aria-SelectionIndicator,
+    [data-testid="stTabs"] [role="tablist"]::after {{
         display: none !important;
+    }}
+
+    /* EL ANILLO DE FOCO SE RECOLOREA, NO SE SACA. La versión anterior ponía
+       `box-shadow: none`, que es lo que Streamlit usa para dibujarlo: al
+       recorrer las solapas con el teclado desaparecía la señal de foco. */
+    /* El anillo nativo es un `box-shadow` con el color primario del tema, así
+       que hay que apagarlo Y poner el verde; si no, quedan los dos. Y el
+       `outline-offset` va NEGATIVO porque el tablist tiene `overflow-x: auto` y
+       recortaba el anillo que sobresalía. Lo marcó Codex. */
+    [data-testid="stTab"]:focus-visible,
+    [data-testid="stTab"][data-focus-visible] {{
+        box-shadow: none !important;
+        outline: 2px solid {c['primary']} !important;
+        outline-offset: -2px !important;
     }}
 
     /* Grid y no flex: con flex, los grupos que pasan a una segunda fila se
        estiran para llenarla y quedan desalineados respecto de la primera. Con
-       siete tramos ideológicos eso pasa siempre. */
+       siete tramos ideológicos eso pasa siempre.
+       CUATRO COLUMNAS FIJAS, no `auto-fit`, y por dos motivos. Es lo que hace
+       el Figma —cuatro en escritorio, dos en móvil— y además es lo único que
+       permite sacarle el borde izquierdo a la primera celda DE CADA FILA: con
+       `auto-fit` el CSS no sabe cuántas columnas entraron, así que `nth-child`
+       no puede apuntarlas y las filas de abajo arrancaban con una raya suelta.
+       Con cuatro columnas de 698px de ancho entra "CENTROIZQUIERDA" a 13px sin
+       partirse, que es la etiqueta más larga que puede tocar. */
     .grupo-cifras {{
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+        grid-template-columns: repeat(4, 1fr);
         gap: 1rem 0;
     }}
 
@@ -719,17 +863,18 @@ def get_observador_css():
         text-align: left;
     }}
 
-    /* El borde separador se saca en la primera columna de CADA fila, no sólo
-       en la primera celda: si no, las filas de abajo arrancan con una línea
-       suelta a la izquierda. */
-    .grupo-celda:first-child {{ border-left: none; padding-left: 0; }}
+    /* La primera celda DE CADA FILA, ahora sí: con la grilla en cuatro columnas
+       fijas, son la 1, la 5, la 9... */
+    .grupo-celda:nth-child(4n + 1) {{ border-left: none; padding-left: 0; }}
 
+    /* Del panel: 13px, peso 400. Con 14px y 600 las etiquetas de siete tramos
+       ideológicos se pisaban entre columnas. */
     .grupo-celda-label {{
-        font-size: 0.7rem;
-        font-weight: 600;
+        font-size: 13px;
+        font-weight: 400;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: {c['text_muted']};
+        color: {c['text']};
         margin-bottom: 0.4rem;
         line-height: 1.35;
         min-height: 2.7em;
@@ -740,16 +885,16 @@ def get_observador_css():
     }}
 
     .grupo-celda-valor {{
-        font-family: 'IBM Plex Serif', Georgia, serif;
-        font-size: 1.7rem;
-        font-weight: 700;
+        font-family: 'Instrument Sans', sans-serif !important;
+        font-size: 25px !important;
+        font-weight: 500 !important;
         color: {c['text']} !important;
-        line-height: 1;
+        line-height: 1 !important;
     }}
 
     .grupo-celda-delta {{
-        font-size: 0.85rem;
-        font-weight: 600;
+        font-size: 17px;
+        font-weight: 700;
         margin-top: 0.2rem;
     }}
 
@@ -758,7 +903,7 @@ def get_observador_css():
 
     .grupo-nota-ref {{
         margin-top: 1rem;
-        font-size: 0.8rem;
+        font-size: 16px;
         color: {c['text_muted']};
     }}
 
@@ -769,14 +914,17 @@ def get_observador_css():
         margin: 1.5rem 0;
     }}
 
-    [data-testid="stExpander"] {{
+    /* El borde nativo vive en el `details`, no en el div con el testid: la
+       regla anterior agregaba un SEGUNDO borde alrededor en vez de cambiar el
+       que ya estaba. Lo marcó Codex. */
+    [data-testid="stExpander"] details {{
         border: 1px solid {c['border']} !important;
         border-radius: 8px !important;
-        background: {c['background']} !important;
+        background: transparent !important;
     }}
 
     .footer-text {{
-        font-size: 0.8rem;
+        font-size: 16px;
         color: {c['text_muted']};
         line-height: 1.6;
         margin-top: 1.5rem;
@@ -785,16 +933,34 @@ def get_observador_css():
     }}
 
     /* ---------- Móvil ---------- */
+    /* EL MÓVIL DEL FIGMA MANTIENE DOS COLUMNAS DE CAMPOS. Sacar la regla propia
+       de apilado no alcanzaba: por debajo de 640px Streamlit le pone a cada
+       columna un `min-width` del 100% y las apila igual. Hay que anularlo.
+       El titular se achica en las DOS reglas —`.main-title` y su `span`—,
+       porque el span trae tamaño propio con `!important` y no hereda. */
     @media (max-width: 640px) {{
-        [data-testid="stHorizontalBlock"] {{ flex-direction: column !important; }}
-        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
-            width: 100% !important;
-            flex: 1 1 100% !important;
+        [data-testid="stColumn"] {{
+            min-width: 0 !important;
+            flex: 1 1 calc(50% - 0.5rem) !important;
         }}
-        .main-title {{ font-size: 1.6rem; }}
-        .result-number {{ font-size: 2.6rem; }}
+        html, body, [class*="css"] {{ font-size: 16px; }}
+        [data-testid="stWidgetLabel"] p {{ font-size: 16px !important; }}
+        .main-title, .main-title span {{
+            font-size: 24px !important;
+            line-height: 32px !important;
+        }}
+        .subtitle {{ font-size: 19px !important; line-height: 20px !important; }}
+        .result-number {{ font-size: 40px !important; }}
+        /* En el frame de 331px la barra mide 18px, no 31. Medido sobre el PNG. */
+        .prob-container {{ height: 18px; }}
+        .prob-endpoint, .prob-label {{ font-size: 16px; }}
+        /* Dos columnas en móvil, como el frame de 331px. El borde separador
+           se saca entero: a ese ancho no hay lugar para el padding que pide. */
         .grupo-cifras {{ grid-template-columns: repeat(2, 1fr); gap: 0.75rem 1rem; }}
-        .grupo-celda {{ border-left: none; padding: 0 0 0.25rem 0; }}
+        .grupo-celda, .grupo-celda:nth-child(4n + 1) {{
+            border-left: none;
+            padding: 0 0 0.25rem 0;
+        }}
         .grupo-celda-label {{ min-height: 0; }}
     }}
 </style>

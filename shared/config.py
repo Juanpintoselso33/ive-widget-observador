@@ -88,31 +88,55 @@ def get_interpretation(prob, mode="light"):
 # ============================================================
 # PALETA "PRODUCTO UY" — el Figma de la diseñadora
 # ============================================================
-# Sale del archivo de Figma "Producto UY" (node 1-2) que pasó Tomer el
-# 7/9/2026. Los valores están MUESTREADOS DE LA IMAGEN, no inspeccionados: el
-# archivo está compartido en modo vista y sin cuenta no se puede abrir el panel
-# de inspección, que es el único lugar donde están los hex exactos y los nombres
-# de las tipografías. Si alguien consigue acceso de edición, conviene reemplazar
-# estos valores por los reales antes de dar el diseño por cerrado.
+# Sale del archivo de Figma "Producto UY" (node 1-2) que pasó Tomer el 7/9/2026,
+# página "Widget IVE". Los valores están LEÍDOS DEL PANEL DE INSPECCIÓN, uno por
+# uno, desde el 8/9/2026. Este encabezado decía lo contrario —que estaban
+# muestreados de una imagen y pendientes de inspección— y se contradecía con el
+# bloque de abajo; lo marcó Codex.
 #
 # Es una paleta CLARA y sin variante oscura, porque el Figma no la tiene. El
 # widget que la use queda en claro pase lo que pase con el tema del lector.
 OBSERVADOR_COLORS = {
-    # Verde profundo: titular, número del resultado, botones y pill activa.
-    # Ajustado de #14392C: a tamaño de titular leía negro, no verde.
-    "primary": "#1B5E3F",
-    # Naranja: extremo "en contra" del gradiente y las diferencias negativas.
-    "accent": "#E07B39",
-    # Azul del extremo "a favor" del gradiente y de las diferencias positivas.
-    "azul": "#4A63C8",
+    # LEÍDOS DEL PANEL DE INSPECCIÓN DE FIGMA el 8/9/2026, uno por uno, no
+    # muestreados de una captura. Ver docs/diseno/figma-producto-uy.md, que trae
+    # además los dos frames exportados a 2x como evidencia.
+    #
+    # VAN TAL CUAL, sin retoques de legibilidad. Antes había variantes
+    # oscurecidas del naranja y del azul para que la diferencia contra el
+    # promedio pasara WCAG AA; Juan pidió el diseño exacto y se sacaron. Queda
+    # dicho lo que eso cuesta, porque es medible y no es chico:
+    #
+    #   sobre blanco    sobre #EDEDED   (AA para texto normal pide 4,5:1)
+    #   #F57F00  2,65:1     2,27:1
+    #   #93B6EE  2,07:1     1,76:1
+    #   #999998  2,85:1     2,44:1
+    #
+    # Los tres se usan como TEXTO —la diferencia contra el promedio, las
+    # diferencias por grupo y las notas al pie—, así que son tres textos que no
+    # cumplen AA. Si alguna vez se quiere volver atrás, las variantes que
+    # conservaban el tono y pasaban SOBRE BLANCO eran #B55E00 (4,60), #2F73DE
+    # (4,54) y #767675 (4,55). Ojo, porque decir "pasaban" a secas era engañoso
+    # y lo marcó Codex: sobre la banda gris esas mismas dan 3,93 / 3,88 / 3,88,
+    # o sea que tampoco alcanzan ahí. Para pasar AA sobre el gris habría que
+    # oscurecerlas más.
+
+    # SON DOS VERDES, no uno. Muestrear una captura los promediaba y daba un
+    # tercer verde que no existe en el diseño.
+    "primary": "#006B36",   # titular y filete superior de 2px
+    "solid": "#0D443B",     # botón, pastilla activa y número grande
+
+    # El naranja y el azul son los MISMOS del gradiente y de las diferencias.
+    "accent": "#F57F00",
+    "azul": "#93B6EE",
+
     "background": "#FFFFFF",
-    # Gris cálido del bloque de resultado, distinto del blanco de la tarjeta.
-    "secondary_bg": "#F4F4F1",
-    "text": "#1A1A1A",
-    "text_muted": "#6B6B6B",
-    "border": "#E2E2DE",
+    # Banda de la zona de resultado y comparación: un tercio del área del diseño.
+    "secondary_bg": "#EDEDED",
+    "text": "#1B1B19",
+    "text_muted": "#999998",
+    "border": "#D0CFCF",
     "card_bg": "#FFFFFF",
-    "card_shadow": "rgba(0,0,0,0.08)",
-    # Relleno de los selectores.
-    "input_bg": "#F0F0EE",
+    "card_shadow": "rgba(0,0,0,0.15)",
+    "input_bg": "#F2F2F2",
+    "input_text": "#515151",
 }

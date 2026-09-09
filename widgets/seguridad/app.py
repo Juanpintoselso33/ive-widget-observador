@@ -139,8 +139,15 @@ intervalo = intervalo_probabilidad(MODEL, *inputs)
 # ver el docstring de model.banda_decision().
 banda = banda_decision(MODEL, *inputs)
 
-render_probability_bar(prob)
-render_result_card(MODEL, prob, colors, intervalo, banda)
-render_comparisons(MODEL)
-render_methodology(MODEL)
-render_footer(MODEL)
+# LA BANDA GRIS DEL FIGMA. Desde el gradiente hasta el pie, el diseño va sobre
+# #EDEDED y no sobre blanco: es un tercio del área. No se puede hacer sólo con
+# CSS porque esto son bloques sueltos de Streamlit —markdown, `st.tabs`, más
+# markdown— y no hay un ancestro común que envuelva justo a esos y a ninguno
+# más. Un `st.container(key=...)` sí lo crea, y Streamlit le pone la clase
+# `st-key-<key>`, que es la vía soportada para engancharle CSS.
+with st.container(key="banda_resultado"):
+    render_probability_bar(prob)
+    render_result_card(MODEL, prob, colors, intervalo, banda)
+    render_comparisons(MODEL)
+    render_methodology(MODEL)
+    render_footer(MODEL)

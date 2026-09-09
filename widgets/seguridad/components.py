@@ -182,7 +182,9 @@ def render_inputs():
 
 
 def render_probability_bar(prob):
-    st.markdown('<hr class="editorial-divider">', unsafe_allow_html=True)
+    # SIN LÍNEA DIVISORIA ACÁ. La había, y ahora el corte entre el formulario y
+    # el resultado lo hace el borde de la banda gris del Figma, que empieza
+    # justo en este punto. Dejar las dos era una raya suelta sobre el gris.
     st.markdown(f"""
     <div class="prob-bar-wrapper">
         <div class="prob-endpoints">
@@ -279,6 +281,15 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
         )
 
     brecha = brecha_nacional(prob_r, nacional_r, intervalo)
+    # EL COLOR SIGUE AL SIGNO, como en las diferencias por grupo: azul para el
+    # lado "a favor" y naranja para el "en contra", los mismos dos colores que
+    # los extremos del gradiente. Estaba cableado en naranja pasara lo que
+    # pasara —con un `!important` en la hoja que además pisaba el color en
+    # línea que se le pasaba acá—, así que una diferencia positiva salía del
+    # color de las negativas. Lo marcó Codex.
+    _d = prob_r - nacional_r
+    clase_brecha = ("grupo-celda-delta--sube" if _d > 0
+                    else "grupo-celda-delta--baja" if _d < 0 else "")
 
     st.markdown(f"""
     <div class="result-card">
@@ -293,7 +304,7 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
         <div class="result-nacional">
             Promedio nacional:
             <span class="result-nacional-value">{formato_pct(model["prob_favor_nacional"])}</span>
-            <span class="result-nacional-diff" style="color: {colors["text_muted"]};">
+            <span class="result-nacional-diff {clase_brecha}">
                 {brecha}
             </span>
         </div>
