@@ -59,6 +59,11 @@ CAMPOS = ("tramo_edad", "es_mujer", "nivel_educ", "ideologia", "victima",
 
 # Los cortes son de PESO ponderado, no de casos crudos: el ponderador de diseño
 # es lo que define cuánto pesa cada respuesta en el ajuste.
+# Los niveles que tendría sentido publicar. El 95 es el piso: por debajo deja de
+# ser un intervalo del 95% y pasa a ser otra cosa. El 90 va sólo como cota
+# inferior de lo que se podría ganar, no como opción.
+NIVELES = (90, 95, 96, 97, 98, 99)
+
 CORTES = (
     ("todos", lambda s: np.ones(len(s), bool)),
     ("sin ningún caso", lambda s: s == 0),
@@ -103,8 +108,32 @@ def analizar(slug, df0, modelo, perfiles):
     ])
     soporte = soporte_de_cada_perfil(d, w, perfiles)
 
+    # SENSIBILIDAD AL NIVEL. Contesta cuánto podría achicar el ancho el estudio
+    # de cobertura a B=10.000 si su resultado fuera favorable — la pregunta que
+    # hizo Juan el 9/9/2026 al enterarse de que el intervalo se dejaba de
+    # mostrar por ancho. Medido en los perfiles mejor sostenidos, que es el caso
+    # más favorable.
+    #
+    # OJO CON CÓMO SE DICE ESTO. Escribí que el nivel es "lo único" que esa
+    # corrida puede mover y es falso: `cobertura_simulada.py` evalúa también
+    # FACTORES de ensanchamiento (1,00 a 1,30). Lo marcó Codex. Lo que sí vale
+    # es la conclusión, por otro motivo: los factores sólo ENSANCHAN, así que la
+    # opción más angosta que la corrida puede avalar es nivel 95 con factor
+    # 1,00, que es exactamente la columna "95" de esta tabla.
+    mejor = soporte >= 10
+    por_nivel = {
+        str(niv): float(np.median([
+            (lambda iv: iv[1] - iv[0])(
+                intervalo_probabilidad(modelo, **p, nivel=niv))
+            for p, m in zip(perfiles, mejor) if m
+        ]))
+        for niv in NIVELES
+    }
+
     info = modelo.get("model_info", {})
     return {
+        "nivel_publicado": config.NIVEL_CALIBRADO.get(slug),
+        "ancho_por_nivel_en_los_mejor_sostenidos": por_nivel,
         "slug": slug,
         "n": info.get("n"),
         "n_efectivo_kish": info.get("n_efectivo_kish"),
@@ -147,7 +176,32 @@ def main():
     print(f"En los perfiles MEJOR SOSTENIDOS el ancho mediano va de "
           f"{min(mejores):.1f} a {max(mejores):.1f} pp.")
     print("Ese es el número que decide: si acá fuera angosto, la salida sería "
-          "restringir la grilla en vez de esconder el intervalo.")
+          "restringir la grilla en vez de esconder el intervalo.\n")
+
+    print("CUÁNTO PODRÍA ACHICARLO EL NIVEL. El estudio de cobertura a B=10.000\n"
+          "evalúa niveles Y factores de ensanchamiento, pero los factores sólo\n"
+          "ensanchan: lo más angosto que puede avalar es la columna 95 de acá\n"
+          "abajo (mediana en los perfiles mejor sostenidos).")
+    print(f"\n{'pregunta':<20} {'publica':>8} " +
+          " ".join(f"{n:>6}" for n in NIVELES))
+    for b in salida:
+        fila = b["ancho_por_nivel_en_los_mejor_sostenidos"]
+        print(f"{b['slug']:<20} {b['nivel_publicado']:>8} " +
+              " ".join(f"{fila[str(n)]:>6.1f}" for n in NIVELES))
+    piso = {b["slug"]: b["ancho_por_nivel_en_los_mejor_sostenidos"]["95"]
+            for b in salida}
+    print(f"\nBajar al 95 —el piso— dejaría anchos de {min(piso.values()):.1f} a "
+          f"{max(piso.values()):.1f} pp.")
+    # No generalizar: la primera versión de esta línea decía "sigue sin ser
+    # publicable" para las cuatro, y humillación queda en 10,9. Lo marcó Codex.
+    UMBRAL = 15.0
+    anchas = [s for s, v in piso.items() if v > UMBRAL]
+    angostas = [s for s, v in piso.items() if v <= UMBRAL]
+    print(f"  sigue sin ser publicable en: {', '.join(anchas)}")
+    if angostas:
+        print(f"  quedaría en el margen en:    {', '.join(angostas)} "
+              f"({', '.join(f'{piso[s]:.1f} pp' for s in angostas)})")
+    print("Y el signo no se conoce: el nivel también podría tener que SUBIR.")
 
     destino = (Path(args.salida) if args.salida
                else Path(__file__).parent / "salidas" / "anchos-por-soporte.json")
