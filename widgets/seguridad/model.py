@@ -212,9 +212,13 @@ def _interp(xs, ys, x):
 
 
 def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                              victima, es_montevideo):
+                              victima, es_montevideo, ordenar=True):
     """
-    Las B probabilidades del perfil, una por réplica bootstrap, ordenadas.
+    Las B probabilidades del perfil, una por réplica bootstrap.
+
+    `ordenar=False` las devuelve EN EL ORDEN DE LAS RÉPLICAS, que es lo que
+    necesita `intervalo_brecha()`: para restarle a cada una la tasa nacional de
+    su misma réplica, la posición i tiene que seguir siendo la réplica i.
 
     Devuelve None si el modelo no trae bootstrap.
     """
@@ -247,7 +251,8 @@ def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia
         else:
             probabilidades.append(_calibrar(model, pct))
 
-    probabilidades.sort()
+    if ordenar:
+        probabilidades.sort()
     return probabilidades
 
 
@@ -278,6 +283,51 @@ def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
         nivel = model.get("nivel_calibrado", 95)
     cola = (100 - nivel) / 2 / 100
     return _percentil(probabilidades, cola), _percentil(probabilidades, 1 - cola)
+
+
+def intervalo_brecha(model, tramo_edad, es_mujer, nivel_educ, ideologia,
+                     victima, es_montevideo, nivel=None):
+    """
+    Intervalo de la DIFERENCIA entre el perfil y el promedio nacional.
+
+    POR QUÉ EXISTE. El widget afirmaba "este perfil está X pp por encima del
+    promedio" comparando el INTERVALO del perfil contra el promedio nacional
+    tratado como un PUNTO. Pero el promedio también se estimó con esta misma
+    muestra y tiene su propia incertidumbre, así que ese chequeo comparaba una
+    cosa con error contra otra cosa con error ignorando el error de la segunda.
+
+    Yo había escrito en el código que eso era "conservador de un solo lado". NO
+    ESTABA DEMOSTRADO, y el signo no es obvio: la varianza de la resta es
+    Var(perfil) + Var(promedio) − 2·Cov, y esa covarianza es positiva porque los
+    dos salen de la misma muestra. Si la covarianza es grande, el chequeo viejo
+    ensancha de más y es conservador; si es chica, ensancha de menos y AFIRMA DE
+    MÁS — que es exactamente la clase de error del que ya se sacaron 1.883 casos.
+    Nadie la había calculado.
+
+    CÓMO SE ARREGLA. `train_model` serializa, junto a cada réplica de
+    coeficientes, la tasa nacional DE ESA MISMA RÉPLICA — mismo remuestreo, misma
+    posición—. Entonces la diferencia se puede calcular dentro de cada réplica y
+    la covarianza entra sola, sin estimarla ni suponerle signo.
+
+    Devuelve (bajo, alto) en puntos porcentuales, o None si el JSON no trae la
+    tasa nacional por réplica (artefacto viejo): en ese caso el llamador se cae
+    al chequeo anterior, que es lo que había.
+    """
+    boot = model.get("bootstrap") or {}
+    nacional = boot.get("nacional")
+    if not nacional:
+        return None
+    probabilidades = _probabilidades_bootstrap(
+        model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+        es_montevideo, ordenar=False)
+    if probabilidades is None:
+        return None
+    n = min(len(probabilidades), len(nacional))
+    diferencias = sorted(probabilidades[i] - nacional[i] for i in range(n))
+    if nivel is None:
+        nivel = model.get("nivel_calibrado", 95)
+    cola = (100 - nivel) / 2 / 100
+    return _percentil(diferencias, cola), _percentil(diferencias, 1 - cola)
 
 
 # 1,96: el z de una banda del 95% para la posición del percentil.

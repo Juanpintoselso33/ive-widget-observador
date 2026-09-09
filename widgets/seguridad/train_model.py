@@ -462,6 +462,13 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
     # —las cuatro preguntas tienen 10.000 de 10.000— pero el defecto estaba
     # latente y lo marcó Codex el 8/9/2026.
     sorteos_validos = []
+    # LA TASA NACIONAL DE CADA RÉPLICA, del MISMO remuestreo que los
+    # coeficientes. Es lo que permite bootstrapear la DIFERENCIA perfil menos
+    # promedio en vez de comparar un intervalo contra un punto: la covarianza
+    # entre los dos —que es positiva, porque salen de la misma muestra— sólo se
+    # captura si se calculan dentro de la misma réplica. Sale gratis, es un
+    # promedio ponderado sobre índices que ya están sorteados.
+    nacional = []
 
     for i in range(n_replicas):
         idx = np.concatenate([
@@ -485,6 +492,7 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
         coeficientes.append([float(m.intercept_[0])] + [float(v) for v in m.coef_[0]])
         c_elegidos.append(float(mejor_c))
         sorteos_validos.append(i)
+        nacional.append(float(np.average(yb, weights=wb) * 100))
 
         if (i + 1) % 200 == 0:
             print(f"    {i + 1}/{n_replicas} réplicas")
@@ -495,7 +503,7 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
         "semilla": int(RANDOM_STATE),
         "c_por_replica": {str(c): c_elegidos.count(c) for c in sorted(set(c_elegidos))},
     }
-    return coeficientes, meta, sorteos_validos
+    return coeficientes, meta, sorteos_validos, nacional
 
 
 
@@ -706,7 +714,8 @@ def entrenar(df_crudo, slug, n_replicas=None):
 
     print("\nBootstrap estratificado para los intervalos (re-elige C en cada")
     print("réplica, así que tarda unos minutos)...")
-    boot, boot_meta, sorteos_validos = bootstrap_coeficientes(d, X, y, w, n_replicas)
+    boot, boot_meta, sorteos_validos, nacional_boot = bootstrap_coeficientes(
+        d, X, y, w, n_replicas)
     print(f"  {boot_meta['utiles']} réplicas útiles sobre {n_replicas}")
     print(f"  C elegido por réplica: {boot_meta['c_por_replica']}")
 
@@ -836,6 +845,9 @@ def entrenar(df_crudo, slug, n_replicas=None):
         "bootstrap": {
             "orden": ["intercept"] + list(PREDICTORES),
             "replicas": [[round(v, 5) for v in fila] for fila in boot],
+            # Apareada una a una con `replicas`: la posición i de las dos sale
+            # del mismo remuestreo. `model.intervalo_brecha()` cuenta con eso.
+            "nacional": [round(v, 4) for v in nacional_boot],
             **boot_meta,
         },
         "prob_favor_nacional": round(prop_pond, 2),

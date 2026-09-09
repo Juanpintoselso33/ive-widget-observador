@@ -200,7 +200,7 @@ def render_probability_bar(prob):
     """, unsafe_allow_html=True)
 
 
-def brecha_nacional(prob_r, nacional_r, intervalo):
+def brecha_nacional(prob_r, nacional_r, intervalo, brecha_iv=None):
     """
     La línea que compara el perfil contra el promedio nacional.
 
@@ -223,10 +223,23 @@ def brecha_nacional(prob_r, nacional_r, intervalo):
     perfil. Se compara contra el intervalo REDONDEADO, que es el que ve el
     lector, y de forma inclusiva.
 
-    QUÉ QUEDA PENDIENTE. Lo estadísticamente limpio sería bootstrapear la
-    diferencia perfil−promedio: el promedio nacional tampoco trae su propia
-    incertidumbre, así que este chequeo es conservador de un solo lado. Necesita
-    la tasa nacional por réplica, que hoy no se serializa. Anotado en el README.
+    YA NO SE COMPARA UN INTERVALO CONTRA UN PUNTO. Durante un tiempo esta
+    función decidía preguntando si el intervalo DEL PERFIL contenía al promedio
+    nacional, tratando al promedio como si fuera exacto. Pero el promedio se
+    estima con la misma muestra y tiene su propia incertidumbre. En el docstring
+    anterior yo había escrito que ignorarla era "conservador de un solo lado":
+    NO ESTABA DEMOSTRADO. La varianza de la resta es Var(perfil) + Var(promedio)
+    − 2·Cov, con la covarianza positiva porque los dos salen de la misma
+    muestra; si esa covarianza es chica, el chequeo viejo afirma DE MÁS, que es
+    justo la clase de error del que ya se sacaron 1.883 casos.
+
+    Ahora `train_model` guarda, junto a cada réplica de coeficientes, la tasa
+    nacional de ESE mismo remuestreo, y `model.intervalo_brecha()` bootstrapea
+    la diferencia directamente: la covarianza entra sola, sin estimarla ni
+    suponerle signo. `brecha_iv` es ese intervalo.
+
+    Si no viene —artefacto viejo, sin la tasa por réplica— se cae al chequeo
+    anterior, que es lo que había. Peor, pero no roto.
     """
     diff = prob_r - nacional_r
     if not diff:
@@ -235,17 +248,23 @@ def brecha_nacional(prob_r, nacional_r, intervalo):
     arrow = "↑" if diff > 0 else "↓"
     posicion = "por encima" if diff > 0 else "por debajo"
 
-    promedio_dentro = (
-        intervalo is not None
-        and round(intervalo[0]) <= nacional_r <= round(intervalo[1])
-    )
+    if brecha_iv is not None:
+        # La comparación va sobre los extremos REDONDEADOS y es inclusiva, por
+        # el mismo motivo que abajo: es lo que ve el lector.
+        promedio_dentro = round(brecha_iv[0]) <= 0 <= round(brecha_iv[1])
+    else:
+        promedio_dentro = (
+            intervalo is not None
+            and round(intervalo[0]) <= nacional_r <= round(intervalo[1])
+        )
     if promedio_dentro:
         return (f"{arrow} la estimación puntual queda {abs(diff)}pp {posicion}, "
                 "pero el margen de error no permite afirmar la diferencia")
     return f"{arrow} este perfil está {abs(diff)}pp {posicion}"
 
 
-def render_result_card(model, prob, colors, intervalo=None, banda=None):
+def render_result_card(model, prob, colors, intervalo=None, banda=None,
+                       brecha_iv=None):
     color, texto = interpretar(prob, colors, intervalo, banda)
 
     # La diferencia se calcula sobre los valores YA redondeados que ve el
@@ -280,7 +299,7 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
             f'<strong>{formato_pct(alto)}</strong></div>'
         )
 
-    brecha = brecha_nacional(prob_r, nacional_r, intervalo)
+    brecha = brecha_nacional(prob_r, nacional_r, intervalo, brecha_iv)
     # EL COLOR SIGUE AL SIGNO, como en las diferencias por grupo: azul para el
     # lado "a favor" y naranja para el "en contra", los mismos dos colores que
     # los extremos del gradiente. Estaba cableado en naranja pasara lo que

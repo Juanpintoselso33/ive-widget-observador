@@ -277,3 +277,83 @@ class TestPercentilValidaQ:
     def test_los_extremos_exactos_son_validos(self):
         assert _percentil([1, 2, 3], 0.0) == 1
         assert _percentil([1, 2, 3], 1.0) == 3
+
+
+class TestIntervaloDeLaBrecha:
+    """
+    La diferencia contra el promedio nacional se bootstrapea APAREADA.
+
+    Existe porque durante un tiempo el widget comparaba el intervalo del perfil
+    contra el promedio nacional tratado como un punto exacto, y el docstring
+    afirmaba que eso era "conservador de un solo lado" sin demostrarlo. La
+    varianza de la resta es Var(perfil) + Var(promedio) − 2·Cov, con covarianza
+    positiva; según cuánto valga, el chequeo viejo podía estar afirmando DE MÁS.
+    """
+
+    @staticmethod
+    def _modelo_sintetico(probs, nacional):
+        """Un JSON mínimo cuyas réplicas dan exactamente `probs`."""
+        from widgets.seguridad.config import PREDICTORES
+        import math
+        filas = []
+        for p in probs:
+            z = math.log(p / (100 - p))
+            filas.append([z] + [0.0] * len(PREDICTORES))
+        return {
+            "bootstrap": {"orden": ["intercept"] + list(PREDICTORES),
+                          "replicas": filas, "nacional": nacional},
+            "nivel_calibrado": 95,
+        }
+
+    def test_sin_la_tasa_por_replica_devuelve_none(self):
+        """Artefacto viejo: el llamador se cae al chequeo anterior, no rompe."""
+        from widgets.seguridad.model import intervalo_brecha
+        m = self._modelo_sintetico([40.0] * 10, None)
+        del m["bootstrap"]["nacional"]
+        assert intervalo_brecha(m, 1, 0, 1, 3, 0, 0) is None
+
+    def test_la_resta_va_replica_contra_replica(self):
+        """
+        Es lo que hace toda la diferencia: si perfil y promedio se movieran
+        juntos, la resta casi no varía aunque cada uno varíe mucho.
+        """
+        from widgets.seguridad.model import intervalo_brecha, intervalo_probabilidad
+        probs = [30.0, 40.0, 50.0, 60.0, 70.0] * 40
+        # el promedio acompaña al perfil: la resta es constante en 10
+        nacional = [p - 10 for p in probs]
+        m = self._modelo_sintetico(probs, nacional)
+        bajo, alto = intervalo_brecha(m, 1, 0, 1, 3, 0, 0)
+        assert abs(bajo - 10) < 1e-6 and abs(alto - 10) < 1e-6, (
+            "la resta apareada tiene que dar 10 exacto; si da un rango ancho, "
+            "se está comparando contra el promedio de todas las réplicas"
+        )
+        # y el intervalo del PERFIL sí es ancho: son dos cosas distintas
+        ilo, ihi = intervalo_probabilidad(m, 1, 0, 1, 3, 0, 0)
+        assert ihi - ilo > 20
+
+    def test_si_los_dos_se_mueven_en_contra_la_resta_se_ensancha(self):
+        """Control opuesto: covarianza negativa, la resta varía MÁS que el perfil."""
+        from widgets.seguridad.model import intervalo_brecha
+        probs = [30.0, 40.0, 50.0, 60.0, 70.0] * 40
+        nacional = [100 - p for p in probs]          # se mueven al revés
+        m = self._modelo_sintetico(probs, nacional)
+        bajo, alto = intervalo_brecha(m, 1, 0, 1, 3, 0, 0)
+        assert alto - bajo > 60, (alto - bajo)
+
+    def test_la_afirmacion_usa_el_intervalo_de_la_brecha_cuando_esta(self):
+        """
+        Si el intervalo de la DIFERENCIA contiene el cero, no se afirma la
+        diferencia — aunque el intervalo del perfil no contenga al promedio.
+        """
+        from widgets.seguridad.components import brecha_nacional
+        # el intervalo del perfil (27-45) NO contiene al promedio (67): con la
+        # regla vieja afirmaría. El de la brecha sí contiene el 0.
+        texto = brecha_nacional(36, 67, (27.0, 45.0), brecha_iv=(-8.0, 4.0))
+        assert "no permite afirmar" in texto
+        assert "este perfil está" not in texto
+
+    def test_y_afirma_cuando_el_cero_queda_afuera(self):
+        from widgets.seguridad.components import brecha_nacional
+        texto = brecha_nacional(36, 67, (27.0, 45.0), brecha_iv=(-40.0, -22.0))
+        assert "este perfil está" in texto
+        assert "31pp por debajo" in texto

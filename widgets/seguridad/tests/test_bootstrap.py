@@ -54,7 +54,7 @@ def test_el_bootstrap_reelige_c_en_cada_replica(sintetico):
     único valor y este test falla — que es exactamente lo que no pasaba antes.
     """
     d, X, y, w = sintetico
-    coefs, meta, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=15)
+    coefs, meta, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=15)
 
     assert len(meta["c_por_replica"]) > 1, (
         "todas las réplicas eligieron el mismo C: o la re-selección se rompió, "
@@ -66,7 +66,7 @@ def test_el_bootstrap_reelige_c_en_cada_replica(sintetico):
 
 def test_la_metadata_reconcilia_con_las_replicas(sintetico):
     d, X, y, w = sintetico
-    coefs, meta, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=15)
+    coefs, meta, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=15)
 
     assert meta["solicitadas"] == 15
     assert meta["utiles"] == len(coefs)
@@ -76,7 +76,7 @@ def test_la_metadata_reconcilia_con_las_replicas(sintetico):
 
 def test_cada_replica_trae_intercepto_mas_un_coeficiente_por_predictor(sintetico):
     d, X, y, w = sintetico
-    coefs, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
+    coefs, _, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
     assert coefs, "no sobrevivió ninguna réplica"
     for fila in coefs:
         assert len(fila) == len(PREDICTORES) + 1
@@ -86,8 +86,8 @@ def test_cada_replica_trae_intercepto_mas_un_coeficiente_por_predictor(sintetico
 def test_es_reproducible(sintetico):
     """Misma semilla, mismos coeficientes: si no, el JSON no es auditable."""
     d, X, y, w = sintetico
-    a, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
-    b, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
+    a, _, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
+    b, _, _, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=5)
     assert a == b
 
 
@@ -232,7 +232,7 @@ def test_los_mapas_quedan_apareados_con_los_coeficientes_aunque_se_descarte(
         return real(*a, **k)
 
     monkeypatch.setattr(tm, "elegir_c", elegir_c_que_falla_en_una)
-    coefs, meta, validos = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=n)
+    coefs, meta, validos, _ = tm.bootstrap_coeficientes(d, X, y, w, n_replicas=n)
     monkeypatch.setattr(tm, "elegir_c", real)
 
     assert meta["utiles"] < meta["solicitadas"], (
