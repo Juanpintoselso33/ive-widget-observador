@@ -402,10 +402,10 @@ irreparable ni se demostró que lo cause el apoyo mayoritario.
 - **Errores estándar design-aware por linealización de Taylor.** El bootstrap
   estratificado respeta los estratos pero la base no trae conglomerados.
 - ~~Recalibrar mano dura.~~ **HECHO** — ver la sección de abajo.
-- **Cobertura real de los intervalos.** El bootstrap los genera pero nadie
-  demostró que cubran el 95% frente a error de especificación. Son anchos
-  —mediana de 27,5, 24,5, 29,3 y 12,5 pp según la pregunta, y percentil 90 de
-  hasta 51 pp—, así que el caveat no es teórico.
+- ~~**Cobertura real de los intervalos frente a error de especificación.**~~
+  **HECHO el 9/9/2026.** El intervalo que se publica se estira hasta contener lo
+  que dicen todas las especificaciones que la muestra no logra distinguir de la
+  publicada — ver "El intervalo contiene a las otras especificaciones" abajo.
 - **Validar tasas por celda agrupada.** Las 1.008 combinaciones no se pueden
   validar una por una: la mediana de casos efectivos por perfil observado es
   ~2, y sólo entre 45 y 54 celdas llegan a 10. Habría que preagrupar.
@@ -487,6 +487,81 @@ diferencia importa porque el widget publica el número, no un ranking.
   ajusta el mapa están congeladas —vienen del modelo estimado sobre la muestra
   original—, así que no se captura cómo cambiarían al reestimar el pipeline
   entero. El efecto neto sobre el intervalo no tiene signo garantizado.
+
+## El intervalo contiene a las otras especificaciones
+
+El bootstrap remuestrea casos con **la forma funcional fija**, así que su
+intervalo no dice nada sobre cuánto se movería el número si el modelo se hubiera
+escrito de otra manera igual de defendible. `scripts/error_especificacion.py`
+mide ese movimiento sobre nueve formas; desde el 9/9/2026 el widget además lo
+**absorbe**: el intervalo publicado es el más chico que contiene tanto al
+bootstrap de la forma publicada como a lo que dicen las demás admitidas.
+
+La tabla por perfil está en `modelos/envolvente_espec.json`, la genera
+`scripts/agregar_envolvente.py` a partir de la salida del estudio, y
+`model.load_envolvente()` la aplica a las tres cosas que dependen del intervalo:
+el que se muestra, la banda que decide sobre el 50% y el intervalo de la brecha
+contra el promedio nacional.
+
+**Es una unión, no una suma.** El rango entre especificaciones mezcla forma
+funcional con ruido de estimación, así que sumarlo al ancho del bootstrap
+contaría dos veces el mismo ruido. Tomar el máximo no supone independencia de
+nada.
+
+### Por qué hacía falta, y por qué sobre todo en pena de muerte
+
+| pregunta | perfiles que se salían | exceso máximo |
+|---|---|---|
+| Mano dura | 0 | — |
+| Cadena perpetua | 7 | 4,01 pp |
+| **Pena de muerte** | **113** | **12,18 pp** |
+| Humillación | 19 | 0,83 pp |
+
+Pena de muerte es la única donde el criterio de admisión **no descartó ninguna**
+de las nueve especificaciones, y la de peor ajuste base (log-loss 0,5415).
+
+Lo que no es obvio y decidió el asunto: **las dos especificaciones que empujaban
+afuera son las que PREDICEN MEJOR que la publicada.** `todas_2do_orden` da
+log-loss 0,532 contra 0,542 —entra como "indistinguible" sólo porque su t de
+−2,69 no llega al umbral de 2,776— y explica 96 de los 113; `ideolxeduc`, la
+única declarada mejor, explica los otros 17. O sea que el intervalo dejaba afuera
+justamente a los modelos que la muestra prefiere.
+
+Tampoco eran perfiles marginales, que era la explicación cómoda: sólo el 31% de
+los 113 no tiene ningún caso detrás, contra el 47% del total. Y 79 de ellos
+llevaban una afirmación de mayoría y 68 una de brecha.
+
+### Qué costó y qué se ganó
+
+Se retiran **2 afirmaciones de mayoría sobre 2.562** y **5 de brecha sobre
+1.742**, todas de pena de muerte. El ancho mediano del intervalo mostrado no se
+mueve en ninguna pregunta salvo pena de muerte, que pasa de 32,38 a 32,43 pp.
+Cambian 139 perfiles de los 4.032.
+
+A cambio, barriendo los 4.032 resultados con el código publicado: **ninguna
+especificación admisible queda fuera del intervalo** en ninguna pregunta, y
+**ninguna de las 2.560 afirmaciones de mayoría ni de las 1.737 de brecha queda
+contradicha** por una de ellas. Las 2 y las 4 que sí lo estaban desaparecen por
+construcción, no por suerte: si una especificación admisible cae del otro lado
+del 50, el intervalo ensanchado contiene al 50 y el widget se abstiene.
+
+### Que falte el archivo es un error, no una degradación
+
+Sin `envolvente_espec.json` la aritmética sigue funcionando y devuelve el
+intervalo **sin** ensanchar, que es lo que se publicaba antes. Eso sería publicar
+intervalos más angostos con la pantalla idéntica, así que
+`model.problemas_de_envolvente()` lo reporta al arrancar y la app no sirve.
+
+El artefacto guarda la huella del contrato de cada pregunta, y además se verifica
+que **el punto publicado caiga dentro de la envolvente de su perfil** — la base
+está entre las admitidas, así que tiene que cumplirse. Ese control es el que
+agarra una envolvente vieja después de un reentrenamiento; la huella sola no,
+porque cubre la configuración y no los coeficientes.
+
+**Lo que no arregla.** Cubre la dispersión dentro de las nueve formas que se
+probaron, bajo un criterio de admisión que el propio estudio describe como poco
+confiable al pie de la letra. Si la verdad tiene una forma que no está en la
+lista, esto no la alcanza.
 
 ## Decisión de diseño: se actualiza en vivo, sin botón de confirmar
 

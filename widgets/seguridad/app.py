@@ -7,6 +7,7 @@ elija cuál estimar: hay un modelo entrenado por pregunta y todos se cargan al
 arrancar.
 """
 
+import itertools as _itertools
 import sys
 from pathlib import Path
 _ROOT = Path(__file__).parent.parent.parent
@@ -20,6 +21,7 @@ from shared.config import OBSERVADOR_COLORS
 from widgets.seguridad.model import (
     load_modelos as _load_modelos, predict_probability, intervalo_probabilidad,
     banda_decision, problemas_de_calibracion, intervalo_brecha,
+    problemas_de_envolvente,
 )
 from widgets.seguridad.components import (
     render_selector_pregunta, render_header, render_inputs,
@@ -29,8 +31,24 @@ from widgets.seguridad.components import (
 
 from widgets.seguridad.config import (
     PREGUNTAS, SLUGS, PREGUNTA_DEFECTO, ETIQUETA_A_SLUG, PREDICTORES,
-    huella_contrato,
+    huella_contrato, EDAD_UI_TO_CODE, EDUC_UI_TO_CODE, IDEOLOGIA_UI_TO_CODE,
+    VICTIMA_UI_TO_CODE, REGION_UI_TO_CODE,
 )
+
+# La grilla completa de perfiles que el lector puede armar. Se calcula una vez
+# y sirve para verificar al arrancar que la envolvente los cubra a todos: si
+# cubriera sólo algunos, el widget ensancharía unos perfiles y otros no, y la
+# diferencia sería invisible desde la pantalla.
+_PERFILES_UI = [
+    dict(zip(("tramo_edad", "es_mujer", "nivel_educ", "ideologia", "victima",
+              "es_montevideo"), _v))
+    for _v in _itertools.product(
+        sorted(set(EDAD_UI_TO_CODE.values())), (0, 1),
+        sorted(set(EDUC_UI_TO_CODE.values())),
+        sorted(set(IDEOLOGIA_UI_TO_CODE.values())),
+        sorted(set(VICTIMA_UI_TO_CODE.values())),
+        sorted(set(REGION_UI_TO_CODE.values())))
+]
 
 # El título de la pestaña sigue a la pregunta elegida. Se lee de session_state
 # ANTES de set_page_config porque ésa tiene que ser la primera orden de
@@ -104,6 +122,12 @@ for _slug in SLUGS:
     # contenido del JSON.
     _problemas.extend(problemas_de_calibracion(_slug, _modelo))
 
+    # La envolvente de especificación vive en su propio archivo y la genera un
+    # script aparte, así que puede quedar vieja frente a un reentrenamiento sin
+    # que nada más lo note. Que falte no es problema —se publica sin
+    # ensanchar—; que esté y no corresponda, sí.
+    _problemas.extend(problemas_de_envolvente(_slug, _modelo, _PERFILES_UI))
+
     _esperados = set(PREDICTORES)
     _reales = set(_modelo.get("coefficients", {})) - {"intercept"}
     if _esperados != _reales or "intercept" not in _modelo.get("coefficients", {}):
@@ -112,6 +136,11 @@ for _slug in SLUGS:
             f"(faltan: {sorted(_esperados - _reales)}; "
             f"sobran: {sorted(_reales - _esperados)})"
         )
+
+# Sin deduplicar, un problema que no depende de la pregunta —que falte el
+# archivo de la envolvente, por ejemplo— sale repetido cuatro veces, una por
+# vuelta del bucle, y la pantalla de error parece cuatro fallas distintas.
+_problemas = list(dict.fromkeys(_problemas))
 
 if _problemas:
     st.error(
