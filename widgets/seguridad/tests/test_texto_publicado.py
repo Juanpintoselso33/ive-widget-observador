@@ -29,7 +29,7 @@ import pytest
 
 from widgets.seguridad import config
 from widgets.seguridad.components import (
-    MARCA_ABSTENCION, brecha_nacional, formato_pct,
+    MARCA_ABSTENCION, brecha_nacional, formato_pct, interpretar,
 )
 from widgets.seguridad.model import predict_probability, intervalo_probabilidad
 
@@ -135,31 +135,38 @@ class TestBarridoDeTodosLosResultados:
         ]
 
     def test_ningun_resultado_afirma_una_diferencia_que_el_intervalo_no_sostiene(self):
-        fallos = []
+        fallos, comparados = [], 0
         for slug, modelo in _modelos_entrenados():
             nacional_r = round(modelo["prob_favor_nacional"])
             for perfil in self._perfiles():
+                comparados += 1
                 prob = predict_probability(modelo, **perfil)
                 iv = intervalo_probabilidad(modelo, **perfil)
                 texto = brecha_nacional(round(prob), nacional_r, iv)
                 contiene = iv and round(iv[0]) <= nacional_r <= round(iv[1])
                 if contiene and "este perfil está" in texto:
                     fallos.append((slug, perfil, round(prob), iv))
+        # `assert not fallos` pasa igual con CERO comparaciones. Sin este
+        # conteo, una grilla vacía —o un `_modelos_entrenados()` que no
+        # encuentre nada— dejaría el barrido en verde sin haber mirado nada.
+        assert comparados == 4032, f"el barrido comparó {comparados}, no 4.032"
         assert not fallos, (
             f"{len(fallos)} resultados afirman una diferencia contra el promedio "
             f"que su intervalo no sostiene. Primero: {fallos[0]}"
         )
 
     def test_ningun_resultado_se_publica_como_cero_o_cien_sin_serlo(self):
-        fallos = []
+        fallos, comparados = [], 0
         for slug, modelo in _modelos_entrenados():
             for perfil in self._perfiles():
+                comparados += 1
                 prob = predict_probability(modelo, **perfil)
                 mostrado = formato_pct(prob)
                 if mostrado == "0%" and prob > 0:
                     fallos.append((slug, perfil, prob, mostrado))
                 if mostrado == "100%" and prob < 100:
                     fallos.append((slug, perfil, prob, mostrado))
+        assert comparados == 4032, f"el barrido comparó {comparados}, no 4.032"
         assert not fallos, (
             f"{len(fallos)} resultados se publican como 0% o 100% sin serlo. "
             f"Primero: {fallos[0]}"
@@ -242,3 +249,42 @@ class TestMapaDeRecalibracion:
             "el punto quedó fuera de su intervalo: señal de que el mapa se "
             "aplicó a uno y no al otro"
         )
+
+
+class TestLaMarcaDeAbstencionDiscrimina:
+    """
+    Controles negativos para `MARCA_ABSTENCION`.
+
+    POR QUÉ. Los doce tests que verifican que el widget se abstiene lo hacen
+    preguntando `MARCA_ABSTENCION in texto`. Esa comparación es VERDADERA PARA
+    CUALQUIER TEXTO si la constante quedara vacía, así que los doce pasarían sin
+    probar nada — el mismo agujero que se quería evitar al dejar de asertar la
+    frase literal, movido de lugar. Lo marcó Codex al revisar el commit que
+    introdujo la constante.
+
+    Ver [[test-que-fabrica-su-esperado]]: una aserción que se cumple igual con
+    el conjunto vacío no es una verificación.
+    """
+
+    def test_la_marca_no_esta_vacia_y_tiene_forma_de_frase(self):
+        assert MARCA_ABSTENCION, "una marca vacía hace pasar todos los tests"
+        assert len(MARCA_ABSTENCION) > 15
+        assert " " in MARCA_ABSTENCION, "tiene que ser una frase, no un token"
+
+    def test_un_texto_que_SI_afirma_no_contiene_la_marca(self):
+        """
+        El control negativo. Sin esto, "el texto de abstención contiene la
+        marca" se cumpliría igual con la marca vacía.
+        """
+        afirma = brecha_nacional(20, 67, (10.0, 35.0))
+        assert "este perfil está" in afirma
+        assert MARCA_ABSTENCION not in afirma.lower()
+
+    def test_las_dos_frases_de_abstencion_la_comparten(self):
+        mayoria = interpretar(50, {"primary": "#000"}, (30.0, 70.0))[1]
+        brecha = brecha_nacional(55, 67, (27.0, 77.0))
+        assert MARCA_ABSTENCION in mayoria.lower()
+        assert MARCA_ABSTENCION in brecha.lower()
+        # Y siguen siendo frases distintas: compartir el arranque no puede
+        # significar que las dos digan lo mismo.
+        assert mayoria != brecha

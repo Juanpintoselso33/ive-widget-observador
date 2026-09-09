@@ -48,11 +48,23 @@ ive_widget/                         # Raíz del repo (plataforma multi-widget)
 
 ## Workflow para crear un widget nuevo
 
+0. **Antes de maquetar nada**, dividir el N EFECTIVO (Kish, no el nominal) por
+   la cantidad de combinaciones que va a poder armar el lector. Esa cuenta
+   decide si el widget puede mostrar un número por perfil o si es una
+   orientación cualitativa, y no se puede revertir después. En seguridad dio
+   entre 0,57 y 0,63 casos efectivos por celda, y el intervalo quedó de 13 a 28
+   puntos de mediana incluso en los perfiles mejor sostenidos
+   (`scripts/anchos_por_soporte.py`) — ver `widgets/_template/WIDGET_README.md`,
+   "Lo que aprendimos con el widget de seguridad".
 1. `cp -r widgets/_template widgets/<nombre>`
 2. Adaptar `config.py`, `model.py`, `components.py`, `app.py`
 3. Crear `widgets/<nombre>/train_model.py` y entrenarlo
 4. Testear: `streamlit run widgets/<nombre>/app.py`
 5. Registrar en `docs/widget-catalog.md`
+
+> **El intervalo no se muestra**, por pedido editorial de El Observador. Se
+> calcula, se calibra y GOBIERNA lo que el widget afirma, pero no se publica en
+> pantalla. Si un widget nuevo va a mostrar incertidumbre, preguntar antes.
 
 ### Entry points
 
