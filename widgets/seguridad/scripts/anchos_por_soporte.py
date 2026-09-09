@@ -59,6 +59,11 @@ CAMPOS = ("tramo_edad", "es_mujer", "nivel_educ", "ideologia", "victima",
 
 # Los cortes son de PESO ponderado, no de casos crudos: el ponderador de diseño
 # es lo que define cuánto pesa cada respuesta en el ajuste.
+# Los niveles que tendría sentido publicar. El 95 es el piso: por debajo deja de
+# ser un intervalo del 95% y pasa a ser otra cosa. El 90 va sólo como cota
+# inferior de lo que se podría ganar, no como opción.
+NIVELES = (90, 95, 96, 97, 98, 99)
+
 CORTES = (
     ("todos", lambda s: np.ones(len(s), bool)),
     ("sin ningún caso", lambda s: s == 0),
@@ -103,8 +108,25 @@ def analizar(slug, df0, modelo, perfiles):
     ])
     soporte = soporte_de_cada_perfil(d, w, perfiles)
 
+    # SENSIBILIDAD AL NIVEL. El estudio de cobertura a B=10.000 puede mover el
+    # nivel calibrado, y nada más. Esta tabla contesta cuánto podría achicar el
+    # ancho si el resultado fuera favorable — la pregunta que hizo Juan el
+    # 9/9/2026 al enterarse de que el intervalo se dejaba de mostrar por ancho.
+    # Medido en los perfiles mejor sostenidos, que es el caso más favorable.
+    mejor = soporte >= 10
+    por_nivel = {
+        str(niv): float(np.median([
+            (lambda iv: iv[1] - iv[0])(
+                intervalo_probabilidad(modelo, **p, nivel=niv))
+            for p, m in zip(perfiles, mejor) if m
+        ]))
+        for niv in NIVELES
+    }
+
     info = modelo.get("model_info", {})
     return {
+        "nivel_publicado": config.NIVEL_CALIBRADO.get(slug),
+        "ancho_por_nivel_en_los_mejor_sostenidos": por_nivel,
         "slug": slug,
         "n": info.get("n"),
         "n_efectivo_kish": info.get("n_efectivo_kish"),
@@ -147,7 +169,20 @@ def main():
     print(f"En los perfiles MEJOR SOSTENIDOS el ancho mediano va de "
           f"{min(mejores):.1f} a {max(mejores):.1f} pp.")
     print("Ese es el número que decide: si acá fuera angosto, la salida sería "
-          "restringir la grilla en vez de esconder el intervalo.")
+          "restringir la grilla en vez de esconder el intervalo.\n")
+
+    print("CUÁNTO PODRÍA ACHICARLO EL NIVEL, que es lo único que el estudio de "
+          "cobertura\na B=10.000 puede mover (mediana en los mejor sostenidos):")
+    print(f"\n{'pregunta':<20} {'publica':>8} " +
+          " ".join(f"{n:>6}" for n in NIVELES))
+    for b in salida:
+        fila = b["ancho_por_nivel_en_los_mejor_sostenidos"]
+        print(f"{b['slug']:<20} {b['nivel_publicado']:>8} " +
+              " ".join(f"{fila[str(n)]:>6.1f}" for n in NIVELES))
+    piso = [b["ancho_por_nivel_en_los_mejor_sostenidos"]["95"] for b in salida]
+    print(f"\nBajar al 95 —el piso— dejaría anchos de {min(piso):.1f} a "
+          f"{max(piso):.1f} pp: sigue sin ser publicable.")
+    print("Y el signo no se conoce: el nivel también podría tener que SUBIR.")
 
     destino = (Path(args.salida) if args.salida
                else Path(__file__).parent / "salidas" / "anchos-por-soporte.json")
