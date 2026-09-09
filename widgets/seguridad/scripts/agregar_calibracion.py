@@ -42,12 +42,33 @@ AQUI = os.path.dirname(os.path.abspath(__file__))
 SALIDAS = os.path.join(AQUI, "salidas")
 
 
-def _cargar():
+def _cargar(salidas=SALIDAS):
+    """
+    Junta las corridas de una carpeta, y DICE DE CUÁL.
+
+    Antes leía de `scripts/salidas` y punto, sin argumento y sin imprimir la
+    ruta. El estudio a B=10.000 escribe en `salidas-b10000`, así que correrlo
+    tal cual habría agregado las corridas VIEJAS de 1.000 réplicas y devuelto
+    un resultado con la forma correcta y el contenido equivocado — la clase de
+    error que no se nota porque nada falla.
+    """
     por_slug = collections.defaultdict(list)
-    for ruta in sorted(glob.glob(os.path.join(SALIDAS, "cal-*.json"))):
+    rutas = sorted(glob.glob(os.path.join(salidas, "cal-*.json")))
+    if not rutas:
+        raise SystemExit(f"no hay corridas 'cal-*.json' en {salidas}")
+    print(f"leyendo {len(rutas)} corridas de {salidas}")
+    for ruta in rutas:
         with open(ruta, encoding="utf-8") as f:
             j = json.load(f)
+        # Las réplicas con las que se corrió el bootstrap interno son lo que
+        # distingue un estudio de otro. Se imprimen para que no haya dudas.
         por_slug[j["slug"]].append(j)
+    replicas = {j.get("replicas") for lista in por_slug.values() for j in lista}
+    print(f"réplicas del bootstrap interno: {sorted(r for r in replicas if r)}")
+    if len(replicas) > 1:
+        raise SystemExit(
+            f"la carpeta mezcla estudios con distintas réplicas ({replicas}); "
+            "elegir uno con --salidas")
     return por_slug
 
 
@@ -94,7 +115,12 @@ def elegir(corridas):
 
 
 def main():
-    por_slug = _cargar()
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--salidas", default=SALIDAS,
+                    help=f"carpeta con las corridas (por defecto {SALIDAS})")
+    args = ap.parse_args()
+    por_slug = _cargar(args.salidas)
     if not por_slug:
         print(f"No hay salidas en {SALIDAS}. Corré cobertura_simulada.py primero.")
         return
