@@ -98,46 +98,42 @@ def get_interpretation(prob, mode="light"):
 # Es una paleta CLARA y sin variante oscura, porque el Figma no la tiene. El
 # widget que la use queda en claro pase lo que pase con el tema del lector.
 OBSERVADOR_COLORS = {
-    # LEÍDOS DEL PANEL DE INSPECCIÓN DE FIGMA el 8/9/2026, no muestreados de una
-    # captura. La versión anterior salía de promediar píxeles de una imagen y
-    # tenía los tres colores de marca mal. Ver docs/diseno/figma-producto-uy.md.
+    # LEÍDOS DEL PANEL DE INSPECCIÓN DE FIGMA el 8/9/2026, uno por uno, no
+    # muestreados de una captura. Ver docs/diseno/figma-producto-uy.md, que trae
+    # además los dos frames exportados a 2x como evidencia.
+    #
+    # VAN TAL CUAL, sin retoques de legibilidad. Antes había variantes
+    # oscurecidas del naranja y del azul para que la diferencia contra el
+    # promedio pasara WCAG AA; Juan pidió el diseño exacto y se sacaron. Queda
+    # dicho lo que eso cuesta, porque es medible y no es chico:
+    #
+    #   sobre blanco    sobre #EDEDED   (AA para texto normal pide 4,5:1)
+    #   #F57F00  2,65:1     2,27:1
+    #   #93B6EE  2,07:1     1,76:1
+    #   #999998  2,85:1     2,44:1
+    #
+    # Los tres se usan como TEXTO —la diferencia contra el promedio, las
+    # diferencias por grupo y las notas al pie—, así que son tres textos que no
+    # cumplen AA. Si alguna vez se quiere volver atrás, las variantes que sí
+    # pasaban conservando el tono eran #B55E00, #2F73DE y #767675.
 
     # SON DOS VERDES, no uno. Muestrear una captura los promediaba y daba un
     # tercer verde que no existe en el diseño.
-    # Acento: titular y filete superior de 2px.
-    "primary": "#006B36",
-    # Superficies sólidas: botón, pastilla activa y el número grande.
-    "solid": "#0D443B",
+    "primary": "#006B36",   # titular y filete superior de 2px
+    "solid": "#0D443B",     # botón, pastilla activa y número grande
 
-    # El naranja y el azul son los MISMOS del gradiente y de las diferencias:
-    # el extremo "en contra" y una diferencia negativa comparten color, y lo
-    # mismo del lado "a favor". En el mobile del Figma se ve explícito.
+    # El naranja y el azul son los MISMOS del gradiente y de las diferencias.
     "accent": "#F57F00",
     "azul": "#93B6EE",
 
-    # LOS MISMOS DOS COLORES, OSCURECIDOS, PARA CUANDO SON TEXTO.
-    #
-    # No es libertad creativa: los del Figma no se leen. Sobre blanco, el naranja
-    # da 2,65:1 de contraste y el azul 2,07:1, contra el 4,5:1 que pide WCAG AA
-    # para texto normal. En una barra o un relleno eso da igual —son formas, no
-    # letras—, pero la diferencia contra el promedio se publica COMO TEXTO, y en
-    # celeste claro sobre blanco no la lee nadie.
-    #
-    # Se conserva el tono y se baja la luminosidad hasta el mínimo que pasa AA,
-    # así que siguen leyéndose como el mismo naranja y el mismo azul.
-    "accent_texto": "#B55E00",   # 4,60:1
-    "azul_texto": "#2F73DE",     # 4,54:1
-
     "background": "#FFFFFF",
-    # Banda de la zona de resultado y comparación: un tercio del área del
-    # diseño. Ver el pendiente anotado en get_observador_css().
+    # Banda de la zona de resultado y comparación: un tercio del área del diseño.
     "secondary_bg": "#EDEDED",
     "text": "#1B1B19",
-    # El gris tenue del Figma (#999998) da 2,85:1 y tampoco pasa AA; mismo
-    # criterio que arriba, mismo tono, apenas más oscuro.
-    "text_muted": "#767675",
+    "text_muted": "#999998",
     "border": "#D0CFCF",
     "card_bg": "#FFFFFF",
     "card_shadow": "rgba(0,0,0,0.15)",
     "input_bg": "#F2F2F2",
+    "input_text": "#515151",
 }

@@ -28,6 +28,9 @@ sacada a ojo de una captura, y **las dos familias tipográficas estaban mal**.
 | Número grande del resultado | Instrument Sans | **600 SemiBold** | 50 px | `#0D443B` |
 | Botón y pastillas de comparación | Instrument Sans | 400 | 16,26 px, centrado | `#FFFFFF` |
 | Diferencia contra el promedio ("↓2pp por debajo") | Instrument Sans | 400 | 17 / 36 px | según signo |
+| Etiqueta de grupo ("NADA religioso") | Instrument Sans | 400 | 13 px | `#1B1B19` |
+| Número de grupo ("65.9%") | Instrument Sans | **500 Medium** | 25 px | `#1B1B19` |
+| Diferencia por grupo ("-9pp") | Instrument Sans | **700 Bold** | 17 px | según signo |
 
 Las dos están en Google Fonts. `Instrument Sans` es variable y trae eje de
 ancho, así que la Condensed sale con `wdth` 75 de la misma familia.
@@ -52,9 +55,11 @@ más oscuro y apagado, es el de las superficies sólidas y el número. Muestrear
 captura los promediaba y daba un tercer verde que no existe.
 
 **Los colores del gradiente son los mismos que los de las diferencias**: naranja
-para el lado "en contra" y azul para el "a favor", y una diferencia positiva se
-pinta del azul del gradiente y una negativa del naranja. En el mobile se ve
-claro: dos `-9pp` en azul arriba y dos en naranja abajo.
+para el lado "en contra" y azul para el "a favor". El diseño usa los dos para las
+diferencias por grupo, pero **no demuestra qué signo lleva cada uno**: los cuatro
+valores del mock dicen `-9pp` y aparecen dos en azul y dos en naranja. Que el azul
+sea el positivo es una inferencia por analogía con los extremos del gradiente, no
+algo que el archivo diga. Marcado porque lo señaló Codex y es una lectura mía.
 
 ## Geometría
 
@@ -66,7 +71,7 @@ claro: dos `-9pp` en azul arriba y dos en naranja abajo.
 | Selector | alto 37 px, radio 9 px, borde 1 px |
 | Botón y pastillas | alto 30 px, radio 7 px, padding 9 px, gap 10 px |
 | Tarjeta del resultado | radio 10 px, sin borde |
-| Barra de gradiente | alto 31 px |
+| Barra de gradiente | alto **31 px** en escritorio y **18 px** en móvil |
 
 ## Detalles de layout que no son obvios
 
@@ -75,6 +80,9 @@ claro: dos `-9pp` en azul arriba y dos en naranja abajo.
 - Sólo la zona de resultado y comparación va sobre el gris; el formulario queda
   sobre blanco. El corte es una banda de ancho completo, no una tarjeta.
 - El pie "¿Cómo funciona este modelo?" va con una flecha `→` y en gris tenue.
+- **La pastilla del valor va ARRIBA de la barra**, no debajo: medido sobre los
+  PNG, 65 filas de pastilla por encima y ninguna por debajo en el frame de
+  escritorio.
 
 ## Lo que este archivo no define
 

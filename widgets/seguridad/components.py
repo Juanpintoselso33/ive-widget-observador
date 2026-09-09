@@ -182,7 +182,9 @@ def render_inputs():
 
 
 def render_probability_bar(prob):
-    st.markdown('<hr class="editorial-divider">', unsafe_allow_html=True)
+    # SIN LÍNEA DIVISORIA ACÁ. La había, y ahora el corte entre el formulario y
+    # el resultado lo hace el borde de la banda gris del Figma, que empieza
+    # justo en este punto. Dejar las dos era una raya suelta sobre el gris.
     st.markdown(f"""
     <div class="prob-bar-wrapper">
         <div class="prob-endpoints">
