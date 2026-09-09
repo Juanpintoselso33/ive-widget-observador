@@ -60,6 +60,13 @@ def _cargar(salidas=SALIDAS):
     for ruta in rutas:
         with open(ruta, encoding="utf-8") as f:
             j = json.load(f)
+        # Un parcial es un checkpoint de una corrida que no terminó. Agregarlo
+        # como si fuera completo daría una cobertura calculada sobre menos
+        # simulaciones de las que dice el archivo.
+        if j.get("parcial"):
+            print(f"  SALTEO {os.path.basename(ruta)}: parcial, "
+                  f"{j.get('sims_hechas')}/{j.get('sims_objetivo')} sims")
+            continue
         # Las réplicas con las que se corrió el bootstrap interno son lo que
         # distingue un estudio de otro. Se imprimen para que no haya dudas.
         por_slug[j["slug"]].append(j)
