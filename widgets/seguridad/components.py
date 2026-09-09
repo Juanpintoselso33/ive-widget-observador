@@ -281,6 +281,15 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
         )
 
     brecha = brecha_nacional(prob_r, nacional_r, intervalo)
+    # EL COLOR SIGUE AL SIGNO, como en las diferencias por grupo: azul para el
+    # lado "a favor" y naranja para el "en contra", los mismos dos colores que
+    # los extremos del gradiente. Estaba cableado en naranja pasara lo que
+    # pasara —con un `!important` en la hoja que además pisaba el color en
+    # línea que se le pasaba acá—, así que una diferencia positiva salía del
+    # color de las negativas. Lo marcó Codex.
+    _d = prob_r - nacional_r
+    clase_brecha = ("grupo-celda-delta--sube" if _d > 0
+                    else "grupo-celda-delta--baja" if _d < 0 else "")
 
     st.markdown(f"""
     <div class="result-card">
@@ -295,7 +304,7 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None):
         <div class="result-nacional">
             Promedio nacional:
             <span class="result-nacional-value">{formato_pct(model["prob_favor_nacional"])}</span>
-            <span class="result-nacional-diff" style="color: {colors["text_muted"]};">
+            <span class="result-nacional-diff {clase_brecha}">
                 {brecha}
             </span>
         </div>

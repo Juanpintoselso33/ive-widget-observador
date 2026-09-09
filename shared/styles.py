@@ -507,7 +507,9 @@ def get_observador_css():
        eso el rango 75..100 en la URL. */
     @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Libre+Baskerville:wght@400;700&display=swap');
 
-    html, body, [class*="css"] {{
+    /* Sin `[class*="css"]`: las clases de Streamlit son `st-emotion-cache-…` y
+       ese selector sólo acertaría por casualidad si el hash llevara "css". */
+    html, body {{
         font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         font-size: 19px;
     }}
@@ -516,8 +518,12 @@ def get_observador_css():
        en los contenedores de markdown y de los widgets, así que todo lo que
        escribe el widget la hereda de ahí y no de body: medido, la mitad de los
        nodos con texto seguía en Source Sans después de cambiar body; ahora son
-       cero de 301. Va ANTES que las de Libre Baskerville: el titular y el
-       título de sección las pisan por especificidad, no por orden. */
+       cero de 301. Va ANTES que las de Libre Baskerville, y eso importa:
+       `.main-title span` gana por especificidad, pero `.section-header` EMPATA
+       con `[data-testid="stMarkdownContainer"] *` y gana sólo por venir
+       después. Mover este bloque más abajo le cambiaría la tipografía al título
+       de sección. (Decía que las dos ganaban por especificidad; era falso y lo
+       marcó Codex.) */
     [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] *,
     [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
     [data-testid="stSelectbox"], [data-testid="stSelectbox"] *,
@@ -533,7 +539,8 @@ def get_observador_css():
         color: {c['text']} !important;
     }}
 
-    #MainMenu, footer, header {{visibility: hidden;}}
+    /* Sin `footer`: esta app no tiene ese elemento. El pie es un `p`. */
+    #MainMenu, header {{visibility: hidden;}}
 
     /* El marco: 698px de ancho, filete superior de 2px y sombra. */
     [data-testid="stMainBlockContainer"] {{
@@ -592,16 +599,30 @@ def get_observador_css():
        Selectbox a React Aria, así que el borde, el radio y el alto del diseño
        no llegaban nunca; el relleno coincidía de casualidad porque el tema
        compartido ya usaba el mismo gris. */
+    /* El alto va con `height`, no sólo con `min-height`: el control trae
+       `height: 2.5rem` y con el mínimo solo quedaba en 47,5px en vez de los 37
+       del diseño. Lo marcó Codex. */
     [data-testid="stSelectbox"] [role="group"] {{
         background: {c['input_bg']} !important;
         border: 1px solid {c['border']} !important;
         border-radius: 9px !important;
+        height: 37px !important;
         min-height: 37px !important;
     }}
 
-    /* El valor elegido va en gris, no en el negro de la etiqueta. */
+    /* El valor elegido va en gris, no en el negro de la etiqueta, y a 19px: el
+       input conserva `font-size: 0.875rem` y quedaba en 16,6. */
     [data-testid="stSelectbox"] [role="group"] * {{
         color: {c['input_text']} !important;
+        font-size: 19px !important;
+    }}
+
+    /* Y HAY QUE DEVOLVERLE LA SEÑAL DE FOCO. Streamlit la da cambiando el color
+       del borde con `[data-focus-within]`, y el borde de arriba, con su
+       `!important`, dejaba el mismo color enfocado y sin enfocar: al llegar con
+       Tab al campo cerrado no pasaba nada visible. Lo marcó Codex. */
+    [data-testid="stSelectbox"] [role="group"][data-focus-within] {{
+        border-color: {c['primary']} !important;
     }}
 
     /* EL TAMAÑO VA EN EL `p`, no en el `label`: Streamlit mete el texto de la
@@ -745,8 +766,11 @@ def get_observador_css():
 
     .result-nacional-value {{ font-weight: 700; }}
 
+    /* SIN COLOR ACÁ. El color lo pone la clase de signo que agrega
+       `components.py` —`--sube` o `--baja`—, igual que en las diferencias por
+       grupo. Esta regla lo forzaba en naranja con `!important`, así que una
+       diferencia positiva salía del color de las negativas. */
     .result-nacional-diff {{
-        color: {c['accent']} !important;
         font-weight: 400;
     }}
 
@@ -779,7 +803,8 @@ def get_observador_css():
        Figma la tiene en 30px con 9px de padding arriba y abajo, o sea 12px de
        caja de texto. Con el interlineado que trae el contenedor de markdown la
        pastilla salía bastante más alta y el padding no alcanzaba para
-       corregirlo. */
+       corregirlo. Quedan en 32px medidos, no 30: son los 30 del diseño más el
+       borde de 1px de cada lado, que el Figma no tiene. */
     [data-testid="stTab"] p {{
         font-size: 16px !important;
         line-height: 12px !important;
@@ -792,18 +817,28 @@ def get_observador_css():
 
     [data-testid="stTab"][aria-selected="true"] p {{ color: #FFFFFF !important; }}
 
-    /* La línea de selección la dibuja React Aria en este nodo. Los dos
-       selectores `data-baseweb` que había acá no matcheaban nada. */
-    [data-testid="stTabs"] .react-aria-SelectionIndicator {{
+    /* Dos cosas distintas y hay que apagar las dos: el indicador de selección,
+       que dibuja React Aria en su propio nodo, y la línea de base del tablist,
+       que NO es un `border-bottom` sino un `::after` absoluto. Apagar sólo el
+       primero dejaba la raya, y los dos selectores `data-baseweb` que había
+       antes no matcheaban ninguna de las dos. Lo marcó Codex. */
+    [data-testid="stTabs"] .react-aria-SelectionIndicator,
+    [data-testid="stTabs"] [role="tablist"]::after {{
         display: none !important;
     }}
 
     /* EL ANILLO DE FOCO SE RECOLOREA, NO SE SACA. La versión anterior ponía
        `box-shadow: none`, que es lo que Streamlit usa para dibujarlo: al
        recorrer las solapas con el teclado desaparecía la señal de foco. */
-    [data-testid="stTab"]:focus-visible {{
+    /* El anillo nativo es un `box-shadow` con el color primario del tema, así
+       que hay que apagarlo Y poner el verde; si no, quedan los dos. Y el
+       `outline-offset` va NEGATIVO porque el tablist tiene `overflow-x: auto` y
+       recortaba el anillo que sobresalía. Lo marcó Codex. */
+    [data-testid="stTab"]:focus-visible,
+    [data-testid="stTab"][data-focus-visible] {{
+        box-shadow: none !important;
         outline: 2px solid {c['primary']} !important;
-        outline-offset: 2px !important;
+        outline-offset: -2px !important;
     }}
 
     /* Grid y no flex: con flex, los grupos que pasan a una segunda fila se
@@ -879,7 +914,10 @@ def get_observador_css():
         margin: 1.5rem 0;
     }}
 
-    [data-testid="stExpander"] {{
+    /* El borde nativo vive en el `details`, no en el div con el testid: la
+       regla anterior agregaba un SEGUNDO borde alrededor en vez de cambiar el
+       que ya estaba. Lo marcó Codex. */
+    [data-testid="stExpander"] details {{
         border: 1px solid {c['border']} !important;
         border-radius: 8px !important;
         background: transparent !important;

@@ -79,7 +79,11 @@ algo que el archivo diga. Marcado porque lo señaló Codex y es una lectura mía
 - La grilla de comparación pasa de 4 columnas en escritorio a **2 × 2** en mobile.
 - Sólo la zona de resultado y comparación va sobre el gris; el formulario queda
   sobre blanco. El corte es una banda de ancho completo, no una tarjeta.
-- El pie "¿Cómo funciona este modelo?" va con una flecha `→` y en gris tenue.
+- El pie del diseño dice "¿Cómo funciona este modelo?" con una flecha `→` y en
+  gris tenue. **El widget no lo reproduce**: usa un `st.expander("Cómo se
+  calcula")` con el chevron nativo de Streamlit y sin el gris. Es una diferencia
+  conocida, no un descuido — el expander despliega la metodología y el enlace
+  del Figma no lleva a ningún lado.
 - **La pastilla del valor va ARRIBA de la barra**, no debajo: medido sobre los
   PNG, 65 filas de pastilla por encima y ninguna por debajo en el frame de
   escritorio.

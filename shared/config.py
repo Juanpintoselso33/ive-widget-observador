@@ -88,12 +88,11 @@ def get_interpretation(prob, mode="light"):
 # ============================================================
 # PALETA "PRODUCTO UY" — el Figma de la diseñadora
 # ============================================================
-# Sale del archivo de Figma "Producto UY" (node 1-2) que pasó Tomer el
-# 7/9/2026. Los valores están MUESTREADOS DE LA IMAGEN, no inspeccionados: el
-# archivo está compartido en modo vista y sin cuenta no se puede abrir el panel
-# de inspección, que es el único lugar donde están los hex exactos y los nombres
-# de las tipografías. Si alguien consigue acceso de edición, conviene reemplazar
-# estos valores por los reales antes de dar el diseño por cerrado.
+# Sale del archivo de Figma "Producto UY" (node 1-2) que pasó Tomer el 7/9/2026,
+# página "Widget IVE". Los valores están LEÍDOS DEL PANEL DE INSPECCIÓN, uno por
+# uno, desde el 8/9/2026. Este encabezado decía lo contrario —que estaban
+# muestreados de una imagen y pendientes de inspección— y se contradecía con el
+# bloque de abajo; lo marcó Codex.
 #
 # Es una paleta CLARA y sin variante oscura, porque el Figma no la tiene. El
 # widget que la use queda en claro pase lo que pase con el tema del lector.
@@ -114,8 +113,12 @@ OBSERVADOR_COLORS = {
     #
     # Los tres se usan como TEXTO —la diferencia contra el promedio, las
     # diferencias por grupo y las notas al pie—, así que son tres textos que no
-    # cumplen AA. Si alguna vez se quiere volver atrás, las variantes que sí
-    # pasaban conservando el tono eran #B55E00, #2F73DE y #767675.
+    # cumplen AA. Si alguna vez se quiere volver atrás, las variantes que
+    # conservaban el tono y pasaban SOBRE BLANCO eran #B55E00 (4,60), #2F73DE
+    # (4,54) y #767675 (4,55). Ojo, porque decir "pasaban" a secas era engañoso
+    # y lo marcó Codex: sobre la banda gris esas mismas dan 3,93 / 3,88 / 3,88,
+    # o sea que tampoco alcanzan ahí. Para pasar AA sobre el gris habría que
+    # oscurecerlas más.
 
     # SON DOS VERDES, no uno. Muestrear una captura los promediaba y daba un
     # tercer verde que no existe en el diseño.
