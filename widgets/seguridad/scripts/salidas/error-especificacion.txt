@@ -1,0 +1,157 @@
+  víctima sin dato: 53 casos (1.6%) — con dummy propia, no mezclados con los 'No'
+
+==============================================================================
+politico_mano_dura
+==============================================================================
+log-loss fuera de muestra, 5 particiones, comparación APAREADA (base 0.51190)
+
+  especificación         logloss   Δ vs base    EE(Δ)       t       veredicto
+  ideolxeduc             0.51014    -0.00176  0.00038   -4.63           MEJOR
+  todas_2do_orden        0.51024    -0.00166  0.00277   -0.60  indistinguible
+  ideolxedad             0.51122    -0.00068  0.00314   -0.22  indistinguible
+  base                   0.51190    +0.00000        —       —    (referencia)
+  educxedad              0.51286    +0.00096  0.00037   +2.60  indistinguible
+  ideolxsexo             0.51388    +0.00198  0.00143   +1.39  indistinguible
+  ideolxvictima          0.51442    +0.00252  0.00054   +4.68            peor
+  ideolxregion           0.51451    +0.00260  0.00292   +0.89  indistinguible
+  victimaxregion         0.51476    +0.00285  0.00094   +3.04            peor
+
+  Especificaciones admitidas: 7 de 9
+  (ideolxeduc, todas_2do_orden, ideolxedad, base, educxedad, ideolxsexo, ideolxregion)
+
+  MOVIMIENTO DEL NÚMERO PUBLICADO, en puntos porcentuales:
+    rango entre especificaciones   mediana 10.36  p95 26.31  máx 36.98
+    desvío contra la base          mediana  7.65  máx 35.35
+    ancho del intervalo publicado  mediana 34.34
+    rango / ancho                  30.2% del intervalo
+    rango sin la más flexible      mediana  6.85
+    OJO: le ganan a la base -> ideolxeduc
+
+  POR SOPORTE EN LA MUESTRA (rango entre especificaciones):
+    perfiles                     n  mediana     p95     máx
+    todos                     1008    10.36   26.31   36.98
+    con al menos un caso       562     8.99   20.72   36.98
+    con 10+ de peso             74     7.23   15.42   31.28
+    sin ningún caso            446    11.99   30.22   36.98
+
+  CONCLUSIONES QUE SE DAN VUELTA:
+    cruzan el 50%                         136 de 1008
+    cambian de lado contra el promedio    131 de 1008
+  víctima sin dato: 53 casos (1.6%) — con dummy propia, no mezclados con los 'No'
+
+==============================================================================
+cadena_perpetua
+==============================================================================
+log-loss fuera de muestra, 5 particiones, comparación APAREADA (base 0.48673)
+
+  especificación         logloss   Δ vs base    EE(Δ)       t       veredicto
+  ideolxregion           0.48526    -0.00147  0.00044   -3.33           MEJOR
+  base                   0.48673    +0.00000        —       —    (referencia)
+  ideolxeduc             0.48749    +0.00076  0.00136   +0.56  indistinguible
+  ideolxvictima          0.48771    +0.00098  0.00033   +2.94            peor
+  victimaxregion         0.48866    +0.00193  0.00172   +1.12  indistinguible
+  educxedad              0.48870    +0.00197  0.00136   +1.46  indistinguible
+  todas_2do_orden        0.48913    +0.00240  0.00190   +1.26  indistinguible
+  ideolxedad             0.48916    +0.00243  0.00143   +1.70  indistinguible
+  ideolxsexo             0.49166    +0.00493  0.00115   +4.30            peor
+
+  Especificaciones admitidas: 7 de 9
+  (ideolxregion, base, ideolxeduc, victimaxregion, educxedad, todas_2do_orden, ideolxedad)
+
+  MOVIMIENTO DEL NÚMERO PUBLICADO, en puntos porcentuales:
+    rango entre especificaciones   mediana  7.28  p95 22.12  máx 33.66
+    desvío contra la base          mediana  5.33  máx 26.41
+    ancho del intervalo publicado  mediana 32.82
+    rango / ancho                  22.2% del intervalo
+    rango sin la más flexible      mediana  5.91
+    OJO: le ganan a la base -> ideolxregion
+
+  POR SOPORTE EN LA MUESTRA (rango entre especificaciones):
+    perfiles                     n  mediana     p95     máx
+    todos                     1008     7.28   22.12   33.66
+    con al menos un caso       571     6.43   20.63   31.99
+    con 10+ de peso             87     5.69   15.19   20.48
+    sin ningún caso            437     9.02   23.58   33.66
+
+  CONCLUSIONES QUE SE DAN VUELTA:
+    cruzan el 50%                         116 de 1008
+    cambian de lado contra el promedio    208 de 1008
+  víctima sin dato: 53 casos (1.6%) — con dummy propia, no mezclados con los 'No'
+
+==============================================================================
+pena_muerte
+==============================================================================
+log-loss fuera de muestra, 5 particiones, comparación APAREADA (base 0.54155)
+
+  especificación         logloss   Δ vs base    EE(Δ)       t       veredicto
+  todas_2do_orden        0.53206    -0.00949  0.00353   -2.69  indistinguible
+  ideolxeduc             0.53788    -0.00366  0.00110   -3.32           MEJOR
+  ideolxedad             0.53985    -0.00170  0.00441   -0.39  indistinguible
+  educxedad              0.54014    -0.00141  0.00105   -1.34  indistinguible
+  ideolxregion           0.54058    -0.00097  0.00175   -0.55  indistinguible
+  ideolxvictima          0.54059    -0.00096  0.00181   -0.53  indistinguible
+  victimaxregion         0.54147    -0.00008  0.00082   -0.09  indistinguible
+  base                   0.54155    +0.00000        —       —    (referencia)
+  ideolxsexo             0.54259    +0.00104  0.00194   +0.54  indistinguible
+
+  Especificaciones admitidas: 9 de 9
+  (todas_2do_orden, ideolxeduc, ideolxedad, educxedad, ideolxregion, ideolxvictima, victimaxregion, base, ideolxsexo)
+
+  MOVIMIENTO DEL NÚMERO PUBLICADO, en puntos porcentuales:
+    rango entre especificaciones   mediana 12.33  p95 28.62  máx 49.65
+    desvío contra la base          mediana  9.23  máx 41.27
+    ancho del intervalo publicado  mediana 32.38
+    rango / ancho                  38.1% del intervalo
+    rango sin la más flexible      mediana  9.57
+    OJO: le ganan a la base -> ideolxeduc
+
+  POR SOPORTE EN LA MUESTRA (rango entre especificaciones):
+    perfiles                     n  mediana     p95     máx
+    todos                     1008    12.33   28.62   49.65
+    con al menos un caso       534    10.66   22.93   36.92
+    con 10+ de peso             74     8.26   18.99   27.38
+    sin ningún caso            474    14.41   32.93   49.65
+
+  CONCLUSIONES QUE SE DAN VUELTA:
+    cruzan el 50%                         172 de 1008
+    cambian de lado contra el promedio    215 de 1008
+  víctima sin dato: 53 casos (1.6%) — con dummy propia, no mezclados con los 'No'
+
+==============================================================================
+humillacion_presos
+==============================================================================
+log-loss fuera de muestra, 5 particiones, comparación APAREADA (base 0.29345)
+
+  especificación         logloss   Δ vs base    EE(Δ)       t       veredicto
+  educxedad              0.29251    -0.00094  0.00048   -1.94  indistinguible
+  base                   0.29345    +0.00000        —       —    (referencia)
+  victimaxregion         0.29435    +0.00090  0.00024   +3.75            peor
+  ideolxregion           0.29512    +0.00167  0.00251   +0.67  indistinguible
+  ideolxvictima          0.29591    +0.00247  0.00143   +1.73  indistinguible
+  ideolxeduc             0.29710    +0.00365  0.00202   +1.81  indistinguible
+  ideolxsexo             0.29834    +0.00489  0.00241   +2.03  indistinguible
+  todas_2do_orden        0.29958    +0.00613  0.00268   +2.29  indistinguible
+  ideolxedad             0.30043    +0.00699  0.00238   +2.93            peor
+
+  Especificaciones admitidas: 7 de 9
+  (educxedad, base, ideolxregion, ideolxvictima, ideolxeduc, ideolxsexo, todas_2do_orden)
+
+  MOVIMIENTO DEL NÚMERO PUBLICADO, en puntos porcentuales:
+    rango entre especificaciones   mediana  3.74  p95 17.36  máx 26.56
+    desvío contra la base          mediana  2.62  máx 24.75
+    ancho del intervalo publicado  mediana 15.00
+    rango / ancho                  24.9% del intervalo
+    rango sin la más flexible      mediana  2.52
+
+  POR SOPORTE EN LA MUESTRA (rango entre especificaciones):
+    perfiles                     n  mediana     p95     máx
+    todos                     1008     3.74   17.36   26.56
+    con al menos un caso       549     3.52   15.52   22.46
+    con 10+ de peso             79     2.42   12.85   19.37
+    sin ningún caso            459     4.12   20.27   26.56
+
+  CONCLUSIONES QUE SE DAN VUELTA:
+    cruzan el 50%                          47 de 1008
+    cambian de lado contra el promedio    139 de 1008
+
+resumen en /private/tmp/claude-501/-Users-juan/e6f4e0c9-034a-4608-92b0-1629d25aee8d/scratchpad/espec2.json

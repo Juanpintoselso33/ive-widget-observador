@@ -245,7 +245,7 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 # El promedio tapa la cola, y por eso la UI dice "intervalo estimado del modelo"
 # y no promete un 95% que no se sostiene perfil por perfil.
 #
-# DOS COSAS QUE ESTOS NÚMEROS SIGUEN SIN RESOLVER:
+# DOS COSAS QUE ESTOS NÚMEROS NO RESUELVEN:
 #
 # 1. EL NIVEL SE ELIGIÓ CON 1.000 RÉPLICAS Y SE PUBLICA CON 10.000, y el signo
 #    de esa diferencia NO se conoce. El simulador corre el bootstrap interno en
@@ -263,9 +263,41 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #    encontró 263 perfiles donde el intervalo se ANGOSTA, con hasta 4,98 pp de
 #    movimiento en un extremo. Saber el signo exige medir a B=10.000.
 #
-# 2. LA VERDAD SIMULADA ES EL PROPIO MODELO. Esto corrige la sub-cobertura del
-#    PROCEDIMIENTO. El error de especificación —que el mundo no sea aditivo en
-#    estas seis variables— se suma encima y no está medido.
+# 2. LA VERDAD SIMULADA ES EL PROPIO MODELO, así que todo esto corrige la
+#    sub-cobertura del PROCEDIMIENTO suponiendo que la forma funcional es la
+#    correcta. El error de especificación se suma encima y NO entra en el
+#    intervalo, porque el bootstrap remuestrea casos con la forma fija.
+#
+#    YA NO ES UNA ADVERTENCIA SIN NÚMERO. `scripts/error_especificacion.py` lo
+#    mide: compara la especificación publicada contra otras siete formas
+#    funcionales sobre LAS MISMAS seis variables —interacciones de a pares y
+#    todas las de segundo orden juntas—, se queda con las que la muestra no
+#    logra ordenar por log-loss fuera de muestra, y mira cuánto se mueve el
+#    número de cada uno de los 1.008 perfiles.
+#
+#    Se mueve mucho. Entre especificaciones indistinguibles, la mediana del
+#    rango va de 3,7 pp (humillación) a 12,3 pp (pena de muerte), y el p95
+#    llega a 28,6. Eso es entre el 22% y el 38% del ancho del intervalo que se
+#    publica — una incertidumbre del mismo orden que la muestral, que el
+#    intervalo no incluye. Sacando la especificación más flexible por si fuera
+#    ella sola la que empuja, la mediana sigue en 2,5 a 9,6 pp.
+#
+#    Y CAMBIA CONCLUSIONES, no sólo decimales: según cuál de las
+#    especificaciones admisibles se elija, entre 47 y 172 perfiles cruzan el
+#    50% —o sea cambia de qué lado está la mayoría— y entre 131 y 215 cambian
+#    de lado contra el promedio nacional.
+#
+#    Los perfiles sin ningún caso en la muestra discrepan más (mediana 4,1 a
+#    14,4 pp) que los que tienen respaldo real (2,4 a 8,3 pp), que es lo
+#    esperable: ahí toda especificación extrapola. Pero el widget publica un
+#    número para los dos.
+#
+#    QUÉ NO DICE ESE ESTUDIO: cuál especificación es la correcta. Aparece que
+#    ideología x educación le gana a la base en dos preguntas e ideología x
+#    región en una tercera, pero gana una distinta en cada una y ninguna en la
+#    cuarta, que es el patrón de minar ruido; además el error estándar de la
+#    validación cruzada está subestimado por construcción. Ver el docstring del
+#    script.
 #
 # Y una afirmación mía que quedó sobredicha: dije que subir el nivel gana sobre
 # ensanchar por un factor "a igualdad de cobertura". No era a igualdad, ni antes
