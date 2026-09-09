@@ -108,11 +108,18 @@ def analizar(slug, df0, modelo, perfiles):
     ])
     soporte = soporte_de_cada_perfil(d, w, perfiles)
 
-    # SENSIBILIDAD AL NIVEL. El estudio de cobertura a B=10.000 puede mover el
-    # nivel calibrado, y nada más. Esta tabla contesta cuánto podría achicar el
-    # ancho si el resultado fuera favorable — la pregunta que hizo Juan el
-    # 9/9/2026 al enterarse de que el intervalo se dejaba de mostrar por ancho.
-    # Medido en los perfiles mejor sostenidos, que es el caso más favorable.
+    # SENSIBILIDAD AL NIVEL. Contesta cuánto podría achicar el ancho el estudio
+    # de cobertura a B=10.000 si su resultado fuera favorable — la pregunta que
+    # hizo Juan el 9/9/2026 al enterarse de que el intervalo se dejaba de
+    # mostrar por ancho. Medido en los perfiles mejor sostenidos, que es el caso
+    # más favorable.
+    #
+    # OJO CON CÓMO SE DICE ESTO. Escribí que el nivel es "lo único" que esa
+    # corrida puede mover y es falso: `cobertura_simulada.py` evalúa también
+    # FACTORES de ensanchamiento (1,00 a 1,30). Lo marcó Codex. Lo que sí vale
+    # es la conclusión, por otro motivo: los factores sólo ENSANCHAN, así que la
+    # opción más angosta que la corrida puede avalar es nivel 95 con factor
+    # 1,00, que es exactamente la columna "95" de esta tabla.
     mejor = soporte >= 10
     por_nivel = {
         str(niv): float(np.median([
@@ -171,17 +178,29 @@ def main():
     print("Ese es el número que decide: si acá fuera angosto, la salida sería "
           "restringir la grilla en vez de esconder el intervalo.\n")
 
-    print("CUÁNTO PODRÍA ACHICARLO EL NIVEL, que es lo único que el estudio de "
-          "cobertura\na B=10.000 puede mover (mediana en los mejor sostenidos):")
+    print("CUÁNTO PODRÍA ACHICARLO EL NIVEL. El estudio de cobertura a B=10.000\n"
+          "evalúa niveles Y factores de ensanchamiento, pero los factores sólo\n"
+          "ensanchan: lo más angosto que puede avalar es la columna 95 de acá\n"
+          "abajo (mediana en los perfiles mejor sostenidos).")
     print(f"\n{'pregunta':<20} {'publica':>8} " +
           " ".join(f"{n:>6}" for n in NIVELES))
     for b in salida:
         fila = b["ancho_por_nivel_en_los_mejor_sostenidos"]
         print(f"{b['slug']:<20} {b['nivel_publicado']:>8} " +
               " ".join(f"{fila[str(n)]:>6.1f}" for n in NIVELES))
-    piso = [b["ancho_por_nivel_en_los_mejor_sostenidos"]["95"] for b in salida]
-    print(f"\nBajar al 95 —el piso— dejaría anchos de {min(piso):.1f} a "
-          f"{max(piso):.1f} pp: sigue sin ser publicable.")
+    piso = {b["slug"]: b["ancho_por_nivel_en_los_mejor_sostenidos"]["95"]
+            for b in salida}
+    print(f"\nBajar al 95 —el piso— dejaría anchos de {min(piso.values()):.1f} a "
+          f"{max(piso.values()):.1f} pp.")
+    # No generalizar: la primera versión de esta línea decía "sigue sin ser
+    # publicable" para las cuatro, y humillación queda en 10,9. Lo marcó Codex.
+    UMBRAL = 15.0
+    anchas = [s for s, v in piso.items() if v > UMBRAL]
+    angostas = [s for s, v in piso.items() if v <= UMBRAL]
+    print(f"  sigue sin ser publicable en: {', '.join(anchas)}")
+    if angostas:
+        print(f"  quedaría en el margen en:    {', '.join(angostas)} "
+              f"({', '.join(f'{piso[s]:.1f} pp' for s in angostas)})")
     print("Y el signo no se conoce: el nivel también podría tener que SUBIR.")
 
     destino = (Path(args.salida) if args.salida
