@@ -774,8 +774,16 @@ def get_observador_css():
         white-space: nowrap;
     }}
 
-    /* El tamaño va en el `p`, por lo mismo que las etiquetas. */
-    [data-testid="stTab"] p {{ font-size: 16px !important; }}
+    /* El tamaño va en el `p`, por lo mismo que las etiquetas. Y el
+       INTERLINEADO también, porque es lo que decide el alto de la pastilla: el
+       Figma la tiene en 30px con 9px de padding arriba y abajo, o sea 12px de
+       caja de texto. Con el interlineado que trae el contenedor de markdown la
+       pastilla salía bastante más alta y el padding no alcanzaba para
+       corregirlo. */
+    [data-testid="stTab"] p {{
+        font-size: 16px !important;
+        line-height: 12px !important;
+    }}
 
     [data-testid="stTab"][aria-selected="true"] {{
         background: {c['solid']} !important;
@@ -800,15 +808,17 @@ def get_observador_css():
 
     /* Grid y no flex: con flex, los grupos que pasan a una segunda fila se
        estiran para llenarla y quedan desalineados respecto de la primera. Con
-       siete tramos ideológicos eso pasa siempre. */
+       siete tramos ideológicos eso pasa siempre.
+       CUATRO COLUMNAS FIJAS, no `auto-fit`, y por dos motivos. Es lo que hace
+       el Figma —cuatro en escritorio, dos en móvil— y además es lo único que
+       permite sacarle el borde izquierdo a la primera celda DE CADA FILA: con
+       `auto-fit` el CSS no sabe cuántas columnas entraron, así que `nth-child`
+       no puede apuntarlas y las filas de abajo arrancaban con una raya suelta.
+       Con cuatro columnas de 698px de ancho entra "CENTROIZQUIERDA" a 13px sin
+       partirse, que es la etiqueta más larga que puede tocar. */
     .grupo-cifras {{
         display: grid;
-        /* 140px es lo que mide la etiqueta más larga que puede tocar —
-           "CENTROIZQUIERDA", a 13px y sin partir— más el padding de la celda.
-           Con menos, esa etiqueta se mete en la columna de al lado: no
-           desborda el contenedor, así que ningún chequeo de scroll lo agarra;
-           hay que mirar si las celdas se pisan entre sí. */
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(4, 1fr);
         gap: 1rem 0;
     }}
 
@@ -818,10 +828,9 @@ def get_observador_css():
         text-align: left;
     }}
 
-    /* Saca el borde de la primera celda de la grilla. NO de la primera de cada
-       fila: `:first-child` no puede eso, y el comentario anterior decía que sí.
-       Las filas siguientes arrancan con una línea suelta a la izquierda. */
-    .grupo-celda:first-child {{ border-left: none; padding-left: 0; }}
+    /* La primera celda DE CADA FILA, ahora sí: con la grilla en cuatro columnas
+       fijas, son la 1, la 5, la 9... */
+    .grupo-celda:nth-child(4n + 1) {{ border-left: none; padding-left: 0; }}
 
     /* Del panel: 13px, peso 400. Con 14px y 600 las etiquetas de siete tramos
        ideológicos se pisaban entre columnas. */
@@ -907,8 +916,13 @@ def get_observador_css():
         /* En el frame de 331px la barra mide 18px, no 31. Medido sobre el PNG. */
         .prob-container {{ height: 18px; }}
         .prob-endpoint, .prob-label {{ font-size: 16px; }}
+        /* Dos columnas en móvil, como el frame de 331px. El borde separador
+           se saca entero: a ese ancho no hay lugar para el padding que pide. */
         .grupo-cifras {{ grid-template-columns: repeat(2, 1fr); gap: 0.75rem 1rem; }}
-        .grupo-celda {{ border-left: none; padding: 0 0 0.25rem 0; }}
+        .grupo-celda, .grupo-celda:nth-child(4n + 1) {{
+            border-left: none;
+            padding: 0 0 0.25rem 0;
+        }}
         .grupo-celda-label {{ min-height: 0; }}
     }}
 </style>
