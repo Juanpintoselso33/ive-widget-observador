@@ -3,10 +3,11 @@
   "slug": "politico_mano_dura",
   "admitidas": [
    "ideolxeduc",
-   "todas_2do_orden",
+   "educxedad",
    "ideolxedad",
    "base",
-   "educxedad",
+   "ideolxvictima",
+   "victimaxregion",
    "ideolxsexo",
    "ideolxregion"
   ],
@@ -14,54 +15,58 @@
    "ideolxeduc"
   ],
   "descartadas": [
-   "ideolxvictima",
-   "victimaxregion"
+   "todas_2do_orden"
   ],
-  "rango_mediana_sin_la_flexible": 6.846003232428707,
-  "logloss_base": 0.5119006959640694,
-  "rango_mediana": 10.364703628756018,
-  "rango_p95": 26.30982698982906,
-  "rango_max": 36.97844775609921,
-  "desvio_vs_base_mediana": 7.648836889821464,
-  "desvio_vs_base_max": 35.345009992612574,
+  "rango_mediana_sin_la_flexible": 5.77997662968361,
+  "logloss_base": 0.5085379041435385,
+  "rango_mediana": 5.77997662968361,
+  "rango_p95": 18.296647775034014,
+  "rango_max": 26.767091498811055,
+  "desvio_vs_base_mediana": 4.09785116656864,
+  "desvio_vs_base_max": 19.026299385086027,
   "ancho_intervalo_mediano": 34.34263131275061,
-  "razon_mediana": 0.3018028389952708,
-  "perfiles_que_cruzan_50": 136,
-  "perfiles_que_cambian_lado_nacional": 131,
+  "razon_mediana": 0.16830325483934716,
+  "afirma_mayoria": 592,
+  "afirmaciones_de_mayoria_que_se_dan_vuelta": 0,
+  "afirma_brecha": 530,
+  "afirmaciones_de_brecha_que_se_dan_vuelta": 0,
+  "perfiles_con_alguna_espec_fuera_del_intervalo": 0,
+  "exceso_mediano_de_los_que_se_salen": 0.0,
+  "exceso_maximo": 0.0,
   "perfiles": 1008,
   "perfiles_sin_soporte": 446,
   "cortes_por_soporte": [
    {
     "etiqueta": "todos",
     "n": 1008,
-    "rango_mediana": 10.364703628756018,
-    "rango_p95": 26.30982698982906,
-    "rango_max": 36.97844775609921,
-    "desvio_mediana": 7.648836889821464
+    "rango_mediana": 5.77997662968361,
+    "rango_p95": 18.296647775034014,
+    "rango_max": 26.767091498811055,
+    "desvio_mediana": 4.09785116656864
    },
    {
     "etiqueta": "con al menos un caso",
     "n": 562,
-    "rango_mediana": 8.987828974282213,
-    "rango_p95": 20.72225675599192,
-    "rango_max": 36.97844775609921,
-    "desvio_mediana": 6.764634508102695
+    "rango_mediana": 4.789963348052186,
+    "rango_p95": 16.03384195314259,
+    "rango_max": 26.182406372360553,
+    "desvio_mediana": 3.4101090252024413
    },
    {
     "etiqueta": "con 10+ de peso",
     "n": 74,
-    "rango_mediana": 7.232758556702194,
-    "rango_p95": 15.420196548972827,
-    "rango_max": 31.28064270986711,
-    "desvio_mediana": 5.6300216914186265
+    "rango_mediana": 3.592067647503285,
+    "rango_p95": 10.919975263689983,
+    "rango_max": 16.438603362811023,
+    "desvio_mediana": 2.5121564636575755
    },
    {
     "etiqueta": "sin ningún caso",
     "n": 446,
-    "rango_mediana": 11.994039016884223,
-    "rango_p95": 30.221208370913082,
-    "rango_max": 36.978067697228035,
-    "desvio_mediana": 8.467487620262695
+    "rango_mediana": 9.706171930079613,
+    "rango_p95": 21.51567710533149,
+    "rango_max": 26.767091498811055,
+    "desvio_mediana": 6.557357575399839
    }
   ]
  },
@@ -92,8 +97,13 @@
   "desvio_vs_base_max": 26.409049030076545,
   "ancho_intervalo_mediano": 32.81557852978942,
   "razon_mediana": 0.22177865972317573,
-  "perfiles_que_cruzan_50": 116,
-  "perfiles_que_cambian_lado_nacional": 208,
+  "afirma_mayoria": 587,
+  "afirmaciones_de_mayoria_que_se_dan_vuelta": 0,
+  "afirma_brecha": 251,
+  "afirmaciones_de_brecha_que_se_dan_vuelta": 0,
+  "perfiles_con_alguna_espec_fuera_del_intervalo": 7,
+  "exceso_mediano_de_los_que_se_salen": 0.975427738223857,
+  "exceso_maximo": 4.012217784453632,
   "perfiles": 1008,
   "perfiles_sin_soporte": 437,
   "cortes_por_soporte": [
@@ -157,8 +167,13 @@
   "desvio_vs_base_max": 41.27142231013522,
   "ancho_intervalo_mediano": 32.375534111527195,
   "razon_mediana": 0.38095280562033007,
-  "perfiles_que_cruzan_50": 172,
-  "perfiles_que_cambian_lado_nacional": 215,
+  "afirma_mayoria": 560,
+  "afirmaciones_de_mayoria_que_se_dan_vuelta": 2,
+  "afirma_brecha": 519,
+  "afirmaciones_de_brecha_que_se_dan_vuelta": 4,
+  "perfiles_con_alguna_espec_fuera_del_intervalo": 113,
+  "exceso_mediano_de_los_que_se_salen": 1.7308747678952088,
+  "exceso_maximo": 12.17760807388553,
   "perfiles": 1008,
   "perfiles_sin_soporte": 474,
   "cortes_por_soporte": [
@@ -221,8 +236,13 @@
   "desvio_vs_base_max": 24.75343808148495,
   "ancho_intervalo_mediano": 14.995470870805608,
   "razon_mediana": 0.24927837754552398,
-  "perfiles_que_cruzan_50": 47,
-  "perfiles_que_cambian_lado_nacional": 139,
+  "afirma_mayoria": 823,
+  "afirmaciones_de_mayoria_que_se_dan_vuelta": 0,
+  "afirma_brecha": 436,
+  "afirmaciones_de_brecha_que_se_dan_vuelta": 0,
+  "perfiles_con_alguna_espec_fuera_del_intervalo": 19,
+  "exceso_mediano_de_los_que_se_salen": 0.19434304134083602,
+  "exceso_maximo": 0.8268498152710828,
   "perfiles": 1008,
   "perfiles_sin_soporte": 459,
   "cortes_por_soporte": [

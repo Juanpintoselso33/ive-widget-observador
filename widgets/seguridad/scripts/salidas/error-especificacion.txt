@@ -3,40 +3,44 @@
 ==============================================================================
 politico_mano_dura
 ==============================================================================
-log-loss fuera de muestra, 5 particiones, comparación APAREADA (base 0.51190)
+log-loss fuera de muestra, 5 particiones, comparación APAREADA (base 0.50854)
 
   especificación         logloss   Δ vs base    EE(Δ)       t       veredicto
-  ideolxeduc             0.51014    -0.00176  0.00038   -4.63           MEJOR
-  todas_2do_orden        0.51024    -0.00166  0.00277   -0.60  indistinguible
-  ideolxedad             0.51122    -0.00068  0.00314   -0.22  indistinguible
-  base                   0.51190    +0.00000        —       —    (referencia)
-  educxedad              0.51286    +0.00096  0.00037   +2.60  indistinguible
-  ideolxsexo             0.51388    +0.00198  0.00143   +1.39  indistinguible
-  ideolxvictima          0.51442    +0.00252  0.00054   +4.68            peor
-  ideolxregion           0.51451    +0.00260  0.00292   +0.89  indistinguible
-  victimaxregion         0.51476    +0.00285  0.00094   +3.04            peor
+  ideolxeduc             0.50536    -0.00318  0.00095   -3.35           MEJOR
+  educxedad              0.50789    -0.00065  0.00134   -0.49  indistinguible
+  ideolxedad             0.50806    -0.00048  0.00533   -0.09  indistinguible
+  base                   0.50854    +0.00000        —       —    (referencia)
+  ideolxvictima          0.50860    +0.00006  0.00225   +0.03  indistinguible
+  victimaxregion         0.50891    +0.00037  0.00137   +0.27  indistinguible
+  ideolxsexo             0.50956    +0.00103  0.00205   +0.50  indistinguible
+  ideolxregion           0.51033    +0.00179  0.00407   +0.44  indistinguible
+  todas_2do_orden        0.51479    +0.00626  0.00213   +2.93            peor
 
-  Especificaciones admitidas: 7 de 9
-  (ideolxeduc, todas_2do_orden, ideolxedad, base, educxedad, ideolxsexo, ideolxregion)
+  Especificaciones admitidas: 8 de 9
+  (ideolxeduc, educxedad, ideolxedad, base, ideolxvictima, victimaxregion, ideolxsexo, ideolxregion)
 
   MOVIMIENTO DEL NÚMERO PUBLICADO, en puntos porcentuales:
-    rango entre especificaciones   mediana 10.36  p95 26.31  máx 36.98
-    desvío contra la base          mediana  7.65  máx 35.35
+    rango entre especificaciones   mediana  5.78  p95 18.30  máx 26.77
+    desvío contra la base          mediana  4.10  máx 19.03
     ancho del intervalo publicado  mediana 34.34
-    rango / ancho                  30.2% del intervalo
-    rango sin la más flexible      mediana  6.85
+    rango / ancho                  16.8% del intervalo
+    rango sin la más flexible      mediana  5.78
     OJO: le ganan a la base -> ideolxeduc
 
   POR SOPORTE EN LA MUESTRA (rango entre especificaciones):
     perfiles                     n  mediana     p95     máx
-    todos                     1008    10.36   26.31   36.98
-    con al menos un caso       562     8.99   20.72   36.98
-    con 10+ de peso             74     7.23   15.42   31.28
-    sin ningún caso            446    11.99   30.22   36.98
+    todos                     1008     5.78   18.30   26.77
+    con al menos un caso       562     4.79   16.03   26.18
+    con 10+ de peso             74     3.59   10.92   16.44
+    sin ningún caso            446     9.71   21.52   26.77
 
-  CONCLUSIONES QUE SE DAN VUELTA:
-    cruzan el 50%                         136 de 1008
-    cambian de lado contra el promedio    131 de 1008
+  AFIRMACIONES DEL WIDGET QUE SE DARÍAN VUELTA:
+    «la mayoría está...»          0 de  592 que se afirman
+    «X pp por encima/debajo»      0 de  530 que se afirman
+
+  ¿EL INTERVALO PUBLICADO YA CONTIENE A LAS OTRAS ESPECIFICACIONES?
+    perfiles con alguna afuera     0 de 1008 (0.0%)
+    exceso de los que se salen  mediana 0.00 pp, máx 0.00 pp
   víctima sin dato: 53 casos (1.6%) — con dummy propia, no mezclados con los 'No'
 
 ==============================================================================
@@ -73,9 +77,13 @@ log-loss fuera de muestra, 5 particiones, comparación APAREADA (base 0.48673)
     con 10+ de peso             87     5.69   15.19   20.48
     sin ningún caso            437     9.02   23.58   33.66
 
-  CONCLUSIONES QUE SE DAN VUELTA:
-    cruzan el 50%                         116 de 1008
-    cambian de lado contra el promedio    208 de 1008
+  AFIRMACIONES DEL WIDGET QUE SE DARÍAN VUELTA:
+    «la mayoría está...»          0 de  587 que se afirman
+    «X pp por encima/debajo»      0 de  251 que se afirman
+
+  ¿EL INTERVALO PUBLICADO YA CONTIENE A LAS OTRAS ESPECIFICACIONES?
+    perfiles con alguna afuera     7 de 1008 (0.7%)
+    exceso de los que se salen  mediana 0.98 pp, máx 4.01 pp
   víctima sin dato: 53 casos (1.6%) — con dummy propia, no mezclados con los 'No'
 
 ==============================================================================
@@ -112,9 +120,13 @@ log-loss fuera de muestra, 5 particiones, comparación APAREADA (base 0.54155)
     con 10+ de peso             74     8.26   18.99   27.38
     sin ningún caso            474    14.41   32.93   49.65
 
-  CONCLUSIONES QUE SE DAN VUELTA:
-    cruzan el 50%                         172 de 1008
-    cambian de lado contra el promedio    215 de 1008
+  AFIRMACIONES DEL WIDGET QUE SE DARÍAN VUELTA:
+    «la mayoría está...»          2 de  560 que se afirman
+    «X pp por encima/debajo»      4 de  519 que se afirman
+
+  ¿EL INTERVALO PUBLICADO YA CONTIENE A LAS OTRAS ESPECIFICACIONES?
+    perfiles con alguna afuera   113 de 1008 (11.2%)
+    exceso de los que se salen  mediana 1.73 pp, máx 12.18 pp
   víctima sin dato: 53 casos (1.6%) — con dummy propia, no mezclados con los 'No'
 
 ==============================================================================
@@ -150,8 +162,12 @@ log-loss fuera de muestra, 5 particiones, comparación APAREADA (base 0.29345)
     con 10+ de peso             79     2.42   12.85   19.37
     sin ningún caso            459     4.12   20.27   26.56
 
-  CONCLUSIONES QUE SE DAN VUELTA:
-    cruzan el 50%                          47 de 1008
-    cambian de lado contra el promedio    139 de 1008
+  AFIRMACIONES DEL WIDGET QUE SE DARÍAN VUELTA:
+    «la mayoría está...»          0 de  823 que se afirman
+    «X pp por encima/debajo»      0 de  436 que se afirman
 
-resumen en /private/tmp/claude-501/-Users-juan/e6f4e0c9-034a-4608-92b0-1629d25aee8d/scratchpad/espec2.json
+  ¿EL INTERVALO PUBLICADO YA CONTIENE A LAS OTRAS ESPECIFICACIONES?
+    perfiles con alguna afuera    19 de 1008 (1.9%)
+    exceso de los que se salen  mediana 0.19 pp, máx 0.83 pp
+
+resumen en widgets/seguridad/scripts/salidas/error-especificacion.json

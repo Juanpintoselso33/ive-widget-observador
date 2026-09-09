@@ -83,7 +83,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold
 
 from widgets.seguridad import config, train_model as tm
-from widgets.seguridad.model import build_features, intervalo_probabilidad
+from widgets.seguridad.model import (build_features, intervalo_probabilidad,
+                                     banda_decision, _interp)
 
 SEMILLAS = (1, 2, 3, 4, 5)
 
@@ -158,10 +159,24 @@ def matriz_perfiles(Xp_dict, cols, pares):
     return X
 
 
-def oof_logloss(d, cols, pares, w, y, semilla):
+def _mapa(d, X, y, w):
     """
-    Log-loss fuera de muestra con CV anidada: el C se elige DENTRO de cada
-    fold de entrenamiento, nunca sobre los casos con los que después se evalúa.
+    El mapa de recalibración de producción, sin réplicas (acá sólo se necesita
+    la curva central). `ajustar_calibracion` hace su propia CV interna, así que
+    darle sólo el fold de entrenamiento es lo correcto y no filtra nada.
+    """
+    return tm.ajustar_calibracion(d.assign(a_favor=y), X, y, w, 0, None)
+
+
+def oof_logloss(d, cols, pares, w, y, semilla, recalibra):
+    """
+    Log-loss fuera de muestra con CV anidada: el C se elige DENTRO de cada fold
+    de entrenamiento, nunca sobre los casos con los que después se evalúa.
+
+    SI LA PREGUNTA SE RECALIBRA, el mapa también se ajusta dentro del fold y se
+    aplica al fold de prueba. Sin eso se estaría comparando un procedimiento que
+    no es el que se publica — que es justo el defecto que tenía la primera
+    versión de este script y que marcó Codex.
     """
     X = matriz(d, cols, pares)
     cv = StratifiedKFold(5, shuffle=True, random_state=semilla)
@@ -172,19 +187,38 @@ def oof_logloss(d, cols, pares, w, y, semilla):
             return None
         m = LogisticRegression(C=c, max_iter=2000, random_state=tm.RANDOM_STATE)
         m.fit(X[tr], y[tr], sample_weight=w[tr])
-        p[te] = m.predict_proba(X[te])[:, 1]
+        pte = m.predict_proba(X[te])[:, 1]
+        if recalibra:
+            cal = _mapa(d.iloc[tr], X[tr], y[tr], w[tr])
+            if cal is None:
+                return None
+            pte = np.array([_interp(cal["grilla"], cal["valores"], v) for v in pte])
+        p[te] = pte
     p = np.clip(p, 1e-9, 1 - 1e-9)
     return float(-np.average(y * np.log(p) + (1 - y) * np.log(1 - p), weights=w))
 
 
-def probabilidades_perfiles(d, cols, pares, w, y, Xp_dict):
-    """Ajusta sobre TODOS los datos y predice los 1.008 perfiles, en 0-100."""
+def probabilidades_perfiles(d, cols, pares, w, y, Xp_dict, recalibra):
+    """
+    Ajusta sobre TODOS los datos y predice los 1.008 perfiles, en 0-100,
+    PASANDO POR EL PROCEDIMIENTO COMPLETO: si la pregunta se recalibra, el mapa
+    se ajusta con la misma receta de producción y se aplica.
+
+    La primera versión devolvía la logística cruda y por eso, en mano dura, la
+    "base" del estudio no era el número publicado: diferían una mediana de 3,52
+    pp y hasta 9,32. Lo encontró Codex.
+    """
     X = matriz(d, cols, pares)
     c, _ = tm.elegir_c(X, y, w)
     m = LogisticRegression(C=c, max_iter=2000, random_state=tm.RANDOM_STATE)
     m.fit(X, y, sample_weight=w)
     Xp = matriz_perfiles(Xp_dict, cols, pares)
-    return m.predict_proba(Xp)[:, 1] * 100, c
+    p = m.predict_proba(Xp)[:, 1]
+    if recalibra:
+        cal = _mapa(d, X, y, w)
+        if cal is not None:
+            p = np.array([_interp(cal["grilla"], cal["valores"], v) for v in p])
+    return p * 100, c
 
 
 def analizar(slug, df0, verbose=True):
@@ -200,11 +234,13 @@ def analizar(slug, df0, verbose=True):
 
     with open(config.ruta_modelo(slug), encoding="utf-8") as f:
         modelo = json.load(f)
+    recalibra = slug in config.PREGUNTAS_A_RECALIBRAR
 
     specs = especificaciones()
     ll = {}
     for nombre, (cols, pares) in specs.items():
-        vals = [oof_logloss(d, cols, pares, w, y, s) for s in SEMILLAS]
+        vals = [oof_logloss(d, cols, pares, w, y, s, recalibra)
+                for s in SEMILLAS]
         if any(v is None for v in vals):
             continue
         ll[nombre] = np.array(vals)
@@ -251,7 +287,8 @@ def analizar(slug, df0, verbose=True):
     P = {}
     for nombre in admitidas:
         cols, pares = specs[nombre]
-        P[nombre], _ = probabilidades_perfiles(d, cols, pares, w, y, Xp_dict)
+        P[nombre], _ = probabilidades_perfiles(d, cols, pares, w, y,
+                                               Xp_dict, recalibra)
 
     M = np.vstack([P[nm] for nm in admitidas])        # specs x perfiles
     base_p = P["base"]
@@ -299,11 +336,48 @@ def analizar(slug, df0, verbose=True):
               bloque(~con_soporte, "sin ningún caso")]
     cortes = [c for c in cortes if c]
 
-    # ¿Cuántas veces cambia la conclusión que el widget publica?
-    cruza_50 = int(np.sum((M > 50).any(axis=0) & (M < 50).any(axis=0)))
-    nacional = modelo["prob_favor_nacional"]
-    lado_nacional = int(np.sum((M > nacional).any(axis=0)
-                               & (M < nacional).any(axis=0)))
+    # ¿CUÁNTAS AFIRMACIONES QUE EL WIDGET HACE SE DARÍAN VUELTA?
+    #
+    # La primera versión contaba cruces de estimaciones puntuales —perfiles con
+    # alguna especificación de cada lado del 50%— y presentaba eso como
+    # "cambian de qué lado está la mayoría". No es lo mismo, y Codex mostró por
+    # qué: de esos cruces, el intervalo publicado YA contenía el 50% en 136 de
+    # 136, 116 de 116, 170 de 172 y 47 de 47. O sea que el widget ya se estaba
+    # absteniendo en casi todos, y no había ninguna afirmación que dar vuelta.
+    #
+    # Lo que hay que contar es sobre las afirmaciones que el widget SÍ hace, y
+    # con sus reglas:
+    #   · mayoría: `components.interpretar()` decide con la BANDA de decisión
+    #     —no con el intervalo mostrado—, redondeada y de forma inclusiva.
+    #   · brecha: `components.brecha_nacional()` decide con el intervalo
+    #     MOSTRADO, redondeado y de forma inclusiva.
+    #
+    # QUÉ NO SE PUEDE HACER CON ESTO, y hay que decirlo: no se bootstrapea cada
+    # especificación alternativa, así que no se sabe qué afirmaría ELLA. Lo que
+    # se mide es si su estimación puntual contradice la afirmación publicada,
+    # que es una cota inferior de la sensibilidad y no la cifra exacta.
+    bandas = [banda_decision(modelo, **pf) for pf in perfiles]
+    ivs = [intervalo_probabilidad(modelo, **pf) for pf in perfiles]
+    nacional_r = round(modelo["prob_favor_nacional"])
+
+    afirma_mayoria = np.array([
+        not (round(b[0]) <= 50 <= round(b[1])) for b in bandas])
+    contradice_mayoria = ((M > 50).any(axis=0) & (M < 50).any(axis=0))
+    vuelta_mayoria = int((afirma_mayoria & contradice_mayoria).sum())
+
+    afirma_brecha = np.array([
+        not (round(iv[0]) <= nacional_r <= round(iv[1])) for iv in ivs])
+    Mr = np.round(M)
+    contradice_brecha = ((Mr > nacional_r).any(axis=0)
+                         & (Mr < nacional_r).any(axis=0))
+    vuelta_brecha = int((afirma_brecha & contradice_brecha).sum())
+
+    # ¿El intervalo publicado YA contiene lo que dicen las otras
+    # especificaciones? Es la pregunta que decide si haría falta ensancharlo.
+    lo = np.array([iv[0] for iv in ivs]); hi = np.array([iv[1] for iv in ivs])
+    exceso = np.maximum(np.maximum(lo - M.min(axis=0), 0),
+                        np.maximum(M.max(axis=0) - hi, 0))
+    fuera = exceso > 1e-9
 
     resumen = {
         "slug": slug,
@@ -319,8 +393,14 @@ def analizar(slug, df0, verbose=True):
         "desvio_vs_base_max": float(desvio_vs_base.max()),
         "ancho_intervalo_mediano": float(np.median(anchos)),
         "razon_mediana": float(np.median(rango) / np.median(anchos)),
-        "perfiles_que_cruzan_50": cruza_50,
-        "perfiles_que_cambian_lado_nacional": lado_nacional,
+        "afirma_mayoria": int(afirma_mayoria.sum()),
+        "afirmaciones_de_mayoria_que_se_dan_vuelta": vuelta_mayoria,
+        "afirma_brecha": int(afirma_brecha.sum()),
+        "afirmaciones_de_brecha_que_se_dan_vuelta": vuelta_brecha,
+        "perfiles_con_alguna_espec_fuera_del_intervalo": int(fuera.sum()),
+        "exceso_mediano_de_los_que_se_salen": float(
+            np.median(exceso[fuera])) if fuera.any() else 0.0,
+        "exceso_maximo": float(exceso.max()),
         "perfiles": len(perfiles),
         "perfiles_sin_soporte": int((~con_soporte).sum()),
         "cortes_por_soporte": cortes,
@@ -345,9 +425,17 @@ def analizar(slug, df0, verbose=True):
         for cc in cortes:
             print(f"    {cc['etiqueta']:<24} {cc['n']:>5} {cc['rango_mediana']:>8.2f} "
                   f"{cc['rango_p95']:>7.2f} {cc['rango_max']:>7.2f}")
-        print(f"\n  CONCLUSIONES QUE SE DAN VUELTA:")
-        print(f"    cruzan el 50%                        {cruza_50:4d} de {len(perfiles)}")
-        print(f"    cambian de lado contra el promedio   {lado_nacional:4d} de {len(perfiles)}")
+        print(f"\n  AFIRMACIONES DEL WIDGET QUE SE DARÍAN VUELTA:")
+        print(f"    «la mayoría está...»       {vuelta_mayoria:4d} de "
+              f"{int(afirma_mayoria.sum()):4d} que se afirman")
+        print(f"    «X pp por encima/debajo»   {vuelta_brecha:4d} de "
+              f"{int(afirma_brecha.sum()):4d} que se afirman")
+        print(f"\n  ¿EL INTERVALO PUBLICADO YA CONTIENE A LAS OTRAS ESPECIFICACIONES?")
+        print(f"    perfiles con alguna afuera  {int(fuera.sum()):4d} de "
+              f"{len(perfiles)} ({fuera.mean():.1%})")
+        print(f"    exceso de los que se salen  mediana "
+              f"{(np.median(exceso[fuera]) if fuera.any() else 0):.2f} pp, "
+              f"máx {exceso.max():.2f} pp")
     return resumen
 
 

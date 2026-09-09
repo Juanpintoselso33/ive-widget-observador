@@ -269,35 +269,52 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #    intervalo, porque el bootstrap remuestrea casos con la forma fija.
 #
 #    YA NO ES UNA ADVERTENCIA SIN NÚMERO. `scripts/error_especificacion.py` lo
-#    mide: compara la especificación publicada contra otras siete formas
-#    funcionales sobre LAS MISMAS seis variables —interacciones de a pares y
-#    todas las de segundo orden juntas—, se queda con las que la muestra no
-#    logra ordenar por log-loss fuera de muestra, y mira cuánto se mueve el
-#    número de cada uno de los 1.008 perfiles.
+#    mide: compara el procedimiento publicado —incluida la recalibración, para
+#    la pregunta que la lleva— contra otras siete formas funcionales sobre LAS
+#    MISMAS seis variables, se queda con las que la muestra no logra ordenar por
+#    log-loss fuera de muestra, y mira cuánto se mueve el número de cada uno de
+#    los 1.008 perfiles.
 #
-#    Se mueve mucho. Entre especificaciones indistinguibles, la mediana del
-#    rango va de 3,7 pp (humillación) a 12,3 pp (pena de muerte), y el p95
-#    llega a 28,6. Eso es entre el 22% y el 38% del ancho del intervalo que se
-#    publica — una incertidumbre del mismo orden que la muestral, que el
-#    intervalo no incluye. Sacando la especificación más flexible por si fuera
-#    ella sola la que empuja, la mediana sigue en 2,5 a 9,6 pp.
+#    EL NÚMERO SE MUEVE. Entre especificaciones que la muestra no ordena, la
+#    mediana del rango va de 3,7 pp (humillación) a 12,3 (pena de muerte), y el
+#    p95 llega a 28,6. Sacando la más flexible por si fuera ella sola la que
+#    empuja, la mediana queda entre 2,5 y 9,6. Los perfiles sin ningún caso en
+#    la muestra discrepan más (4,1 a 14,4) que los que tienen al menos uno (3,5
+#    a 10,7), que es lo esperable porque ahí toda especificación extrapola.
 #
-#    Y CAMBIA CONCLUSIONES, no sólo decimales: según cuál de las
-#    especificaciones admisibles se elija, entre 47 y 172 perfiles cruzan el
-#    50% —o sea cambia de qué lado está la mayoría— y entre 131 y 215 cambian
-#    de lado contra el promedio nacional.
+#    LAS AFIRMACIONES, EN CAMBIO, NO SE MUEVEN. De las 2.562 veces que el widget
+#    afirma de qué lado está la mayoría, cambiarían DOS. De las 1.736 veces que
+#    afirma una diferencia contra el promedio nacional, CUATRO. Seis de 4.298.
 #
-#    Los perfiles sin ningún caso en la muestra discrepan más (mediana 4,1 a
-#    14,4 pp) que los que tienen respaldo real (2,4 a 8,3 pp), que es lo
-#    esperable: ahí toda especificación extrapola. Pero el widget publica un
-#    número para los dos.
+#    Y EL INTERVALO YA ABSORBE CASI TODO: contiene lo que dicen todas las
+#    especificaciones admitidas en el 100% de los perfiles de mano dura, el
+#    99,3% de cadena perpetua y el 98,1% de humillación. La excepción es PENA DE
+#    MUERTE, con 113 perfiles (11,2%) donde alguna especificación cae afuera y
+#    un exceso máximo de 12,2 pp. Si alguna vez se ensancha un intervalo por
+#    esto, es el de esa pregunta y no el de las cuatro.
 #
-#    QUÉ NO DICE ESE ESTUDIO: cuál especificación es la correcta. Aparece que
+#    DOS DEFECTOS QUE TUVO ESTE ESTUDIO Y QUE ENCONTRÓ CODEX, porque los números
+#    de arriba son los de después de arreglarlos y los de antes estaban inflados:
+#      · la "base" no incluía la recalibración, así que en mano dura se comparaba
+#        contra algo que no era el número publicado —mediana 3,52 pp de
+#        diferencia, hasta 9,32—. Arreglado, el rango de mano dura bajó de 10,4 a
+#        5,8 pp y sus perfiles fuera del intervalo pasaron de 73 a CERO.
+#      · se contaban cruces de estimaciones puntuales y se presentaban como
+#        afirmaciones dadas vuelta. No lo eran: de esos cruces, el intervalo
+#        publicado YA contenía el 50% en 136 de 136, 116 de 116, 170 de 172 y 47
+#        de 47. El widget ya se abstenía en casi todos. Ahora se cuenta sobre las
+#        afirmaciones que el widget hace, con la regla de `interpretar()` y la de
+#        `brecha_nacional()`.
+#
+#    QUÉ NO DICE ESTE ESTUDIO. Cuál especificación es la correcta: aparece que
 #    ideología x educación le gana a la base en dos preguntas e ideología x
 #    región en una tercera, pero gana una distinta en cada una y ninguna en la
-#    cuarta, que es el patrón de minar ruido; además el error estándar de la
-#    validación cruzada está subestimado por construcción. Ver el docstring del
-#    script.
+#    cuarta, ninguna pasa Bonferroni sobre 32 comparaciones, y el error estándar
+#    de la validación cruzada está subestimado por construcción. Tampoco es una
+#    COTA del error de especificación: si la verdad está fuera de la familia
+#    probada, el rango puede quedar corto o largo. Y el rango mezcla forma
+#    funcional con ruido de estimación, así que no es una incertidumbre
+#    independiente que se pueda sumar al intervalo. Ver el docstring del script.
 #
 # Y una afirmación mía que quedó sobredicha: dije que subir el nivel gana sobre
 # ensanchar por un factor "a igualdad de cobertura". No era a igualdad, ni antes
