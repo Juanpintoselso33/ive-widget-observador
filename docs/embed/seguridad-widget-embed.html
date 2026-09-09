@@ -20,85 +20,69 @@
   widget dentro de un iframe de cada ancho y recorrer LAS CUATRO PREGUNTAS una
   por una, quedándose con la más alta (9/9/2026, después del rediseño del Figma):
 
-      ancho    alto del contenido (peor caso de las cuatro)
-      331 px   2881
-      375 px   2682
-      420 px   2530
-      640 px   2084
-      698 px   2216
-      720 px   2216
-      900 px   2216
+      ancho    alto        ancho    alto
+      300 px   3033        470 px   2328
+      320 px   2955        550 px   2232
+      331 px   2881        640 px   2084
+      345 px   2789        641 px   2320
+      375 px   2682        698 px   2216
+      395 px   2591        900 px   2216
+      430 px   2475
 
-  DOS COSAS QUE CAMBIARON con el diseño del Figma y simplifican mucho esto:
+  300 px es el ancho más angosto medido; por debajo de eso no hay dato.
 
-  1. DE 698 PX PARA ARRIBA EL ALTO NO CAMBIA MÁS. El marco está topado en 698 px
-     —es el ancho del frame de escritorio del diseño—, así que a 698, 720 y 900
-     el contenido mide exactamente lo mismo. Para cualquier nota de escritorio
-     alcanza UN SOLO número y no hace falta la variante que ajusta por ancho.
+  ============================================================
+  LA REGLA: CADA TRAMO SE DIMENSIONA POR SU EXTREMO ANGOSTO
+  ============================================================
+  El alto CRECE cuando el ancho baja —el texto envuelve en más líneas—, así que
+  un tramo que cubre de 395 a 469 px tiene su caso peor en 395, no en 469.
+  Dimensionarlo con la altura del extremo ancho corta contenido en todo el
+  resto del tramo, y como el iframe va con `scrolling="no"`, lo cortado no se
+  puede recuperar desplazando.
 
-  2. EL SALTO ESTÁ EN 640, Y VA PARA ARRIBA. Hasta 640 px rige la consulta de
-     móvil: tipografía de 16 px en vez de 19 y barra de 18 px en vez de 31, así
-     que el contenido es MÁS BAJO (2084). Pasando de 640 vuelve a la tipografía
-     de escritorio y sube a 2216. Es al revés que en el diseño anterior, donde
-     el salto venía de apilar los selectores en una columna: ahora el móvil
-     mantiene las dos columnas, como el frame de 331 px del Figma.
+  No es una precaución teórica: la versión anterior de este archivo le daba
+  2130 px a todo el tramo 431–640 porque los había medido en 640. En 430 px el
+  widget mide 2475, o sea que en la mayor parte de ese tramo se comían unos
+  345 px —el pie y parte de la comparación por grupos—. Lo encontró la revisión
+  de Codex.
 
-  Los valores de abajo llevan unos 45 px de margen sobre lo medido, para
-  absorber la diferencia entre que las tipografías estén en caché o se bajen en
-  el momento. Si se agrega una pregunta con un enunciado más largo que el de
-  "cadena perpetua", hay que volver a medir.
+  Los cuatro tramos de abajo llevan entre 39 y 47 px de margen sobre el valor
+  medido en su extremo angosto, para absorber la diferencia entre que las
+  tipografías estén en caché o se bajen en el momento:
+
+      tramo          medido en su extremo angosto   se publica
+      300–344 px     3033 (en 300)                  3080
+      345–394 px     2789 (en 345)                  2830
+      395–469 px     2591 (en 395)                  2630
+      470 px o más   2328 (en 470)                  2370
+
+  DOS COSAS DEL REDISEÑO QUE SIMPLIFICAN EL ÚLTIMO TRAMO:
+
+  1. DE 698 PX PARA ARRIBA EL ALTO NO CAMBIA MÁS. El marco está topado en 698
+     —es el ancho del frame de escritorio del Figma—, así que a 698, 720 y 900
+     el contenido mide exactamente lo mismo: 2216 en los tres.
+
+  2. EL ÚNICO CORTE DE CSS ESTÁ EN 640 PX, Y EL SALTO VA PARA ARRIBA. Hasta 640
+     rige la consulta de móvil: tipografía de 16 px en vez de 19 y barra de 18
+     en vez de 31, así que el contenido es MÁS BAJO (2084). Pasando de 640 sube
+     a 2320. Ese salto es lo que hace que un solo número, 2370, cubra todo de
+     470 px para arriba: el pico de 641 (2320) queda por debajo del de 470
+     (2328). Es al revés que en el diseño anterior, donde el salto venía de
+     apilar los selectores en una columna; ahora el móvil mantiene las dos
+     columnas, como el frame de 331 px del Figma.
+
+  Si se agrega una pregunta con un enunciado más largo que el de "humillación a
+  los presos" —que es la más alta en casi todos los anchos— hay que volver a
+  medir.
 -->
 
 
 <!-- ============================================================
      1. NOTA — la del cuerpo del artículo. Copiar desde acá.
      ============================================================
-     Un solo alto sirve para cualquier ancho de escritorio, porque el widget se
-     topa en 698 px. Si la nota se lee sobre todo en celular, usar la variante 3.
--->
-<div style="width:100%;max-width:698px;margin:2rem auto;">
-  <iframe
-    src="https://observador-seguridad.streamlit.app/?embed=true"
-    title="¿Quiénes apoyan las medidas de mano dura en Uruguay? — El Observador"
-    width="100%"
-    height="2260"
-    frameborder="0"
-    scrolling="no"
-    style="display:block;border:none;width:100%;"
-    loading="lazy"
-  ></iframe>
-</div>
-
-
-<!-- ============================================================
-     2. HOME — versión compacta, para el módulo de portada.
-     ============================================================
-     Mismo widget, con el ancho de la caja de la home. Si la caja mide menos de
-     640 px el widget entra en modo móvil y crece: usar la tabla de arriba.
--->
-<div style="width:100%;max-width:698px;margin:0 auto;">
-  <iframe
-    src="https://observador-seguridad.streamlit.app/?embed=true"
-    title="¿Quiénes apoyan las medidas de mano dura en Uruguay? — El Observador"
-    width="100%"
-    height="2260"
-    frameborder="0"
-    scrolling="no"
-    style="display:block;border:none;width:100%;"
-    loading="lazy"
-  ></iframe>
-</div>
-
-
-<!-- ============================================================
-     3. RESPONSIVE — ajusta el alto al ancho real del contenedor.
-     ============================================================
-     Es la que conviene si la nota se lee mayoritariamente en celular: con el
-     alto fijo de escritorio, en un teléfono queda contenido cortado.
-
-     Los cortes son los de la tabla de arriba, redondeados hacia arriba. El
-     último tramo cubre todo lo que sea 641 px o más, porque de 698 en adelante
-     el alto ya no cambia.
+     Es la versión que ajusta el alto al ancho real del contenedor, y es la que
+     conviene por defecto: con un alto fijo de escritorio, en un teléfono queda
+     contenido cortado.
 -->
 <div style="width:100%;max-width:698px;margin:2rem auto;">
   <iframe
@@ -106,7 +90,7 @@
     src="https://observador-seguridad.streamlit.app/?embed=true"
     title="¿Quiénes apoyan las medidas de mano dura en Uruguay? — El Observador"
     width="100%"
-    height="2260"
+    height="3080"
     frameborder="0"
     scrolling="no"
     style="display:block;border:none;width:100%;"
@@ -117,17 +101,44 @@
 (function () {
   var iframe = document.getElementById('widget-seguridad');
   if (!iframe) return;
-  // [ancho máximo del contenedor, alto del iframe]. De 641 para arriba es
-  // constante: el widget se topa en 698 px de ancho.
-  var ALTOS = [[340, 2930], [380, 2730], [430, 2580], [640, 2130]];
+  // [ancho máximo del tramo, alto]. Cada alto es el medido en el extremo
+  // ANGOSTO del tramo, que es el caso peor. De 470 px para arriba es constante.
+  var ALTOS = [[344, 3080], [394, 2830], [469, 2630]];
+  var ALTO_ANCHO = 2370;
   function ajustar() {
     var ancho = iframe.parentElement.clientWidth;
     for (var i = 0; i < ALTOS.length; i++) {
       if (ancho <= ALTOS[i][0]) { iframe.height = ALTOS[i][1]; return; }
     }
-    iframe.height = 2260;
+    iframe.height = ALTO_ANCHO;
   }
   ajustar();
   window.addEventListener('resize', ajustar);
 })();
 </script>
+
+
+<!-- ============================================================
+     2. SIN JAVASCRIPT — sólo si el contenedor NUNCA baja de 470 px.
+     ============================================================
+     Un alto fijo funciona únicamente si se puede garantizar que el iframe no se
+     angosta por debajo de 470 px: un módulo de portada de ancho fijo, por
+     ejemplo. En el cuerpo de una nota que se lee en teléfonos NO sirve, porque
+     ahí el iframe baja a 360 px y el widget necesita 2830.
+
+     Si hace falta un alto fijo que aguante también los teléfonos, el número es
+     3080 — el del tramo más angosto—, a costa de dejar unos 700 px de blanco
+     abajo en escritorio.
+-->
+<div style="width:100%;max-width:698px;margin:2rem auto;">
+  <iframe
+    src="https://observador-seguridad.streamlit.app/?embed=true"
+    title="¿Quiénes apoyan las medidas de mano dura en Uruguay? — El Observador"
+    width="100%"
+    height="2370"
+    frameborder="0"
+    scrolling="no"
+    style="display:block;border:none;width:100%;"
+    loading="lazy"
+  ></iframe>
+</div>
