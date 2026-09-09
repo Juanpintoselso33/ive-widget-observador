@@ -57,18 +57,36 @@ seguridad porque son de la familia entera, no de esa pregunta.
 Es la cuenta que decide si el widget puede mostrar un número por perfil, y hay
 que hacerla **antes** de maquetar, no después.
 
-En seguridad: 2.700 respuestas, pero el efecto de diseño de los ponderadores las
-deja en unas 600 **efectivas** (Kish), repartidas entre **1.008** combinaciones
-que el lector puede armar. Da menos de un caso efectivo por celda. El resultado
-es que el intervalo de confianza mide **entre 21 y 28 puntos porcentuales** hasta
-en los perfiles mejor sostenidos, y casi la mitad de las combinaciones no tienen
-un solo encuestado detrás.
+En seguridad, según la pregunta: entre **2.672 y 2.969** respuestas con postura
+definida, que el efecto de diseño de los ponderadores deja en entre **571 y 632
+efectivas** (Kish). Repartidas entre **1.008** combinaciones que el lector puede
+armar, da entre 0,57 y 0,63 casos efectivos por celda.
 
-**Eso no se arregla con un modelo mejor ni con mejor diseño.** Se arregla con
-menos celdas o con más muestra, y las dos son decisiones que hay que tomar al
-principio. Si la cuenta da mal y no se puede cambiar, el widget igual sirve —pero
-como orientación cualitativa, no como medición—, y conviene saberlo antes de
-prometerle precisión a nadie.
+El resultado medido: el intervalo mide **entre 13 y 28 puntos porcentuales de
+mediana incluso en los perfiles con 10 o más de peso muestral detrás**, y entre
+el 43% y el 47% de las combinaciones no tienen un solo encuestado.
+
+```bash
+python widgets/seguridad/scripts/anchos_por_soporte.py
+```
+
+Los números salen de ahí y quedan en `scripts/salidas/anchos-por-soporte.json`.
+No se citan de memoria: la primera versión de esta guía decía "21 a 28" y estaba
+mal —se había perdido de vista humillación, que da 13,1— porque la medición se
+había corrido con un script descartable. Lo marcó Codex.
+
+**Lo que ese número prueba y lo que no.** Prueba que el ancho NO lo empujan los
+perfiles que casi no existen: restringir a los mejor sostenidos casi no lo
+achica, así que el problema no es la extrapolación y restringir la grilla no lo
+resolvería. **No prueba que ninguna especificación pueda dar intervalos más
+angostos**: el modelo comparte coeficientes entre perfiles y no estima 1.008
+proporciones independientes. Tomalo como diagnóstico de arranque, no como
+imposibilidad demostrada.
+
+Si la cuenta da mal, el margen de maniobra es menos celdas o más muestra, y las
+dos son decisiones del principio. Y si no se puede cambiar ninguna, el widget
+igual sirve —como orientación cualitativa, no como medición—, pero conviene
+saberlo antes de prometerle precisión a nadie.
 
 Regla práctica: cada variable que se le agrega al formulario **multiplica** las
 celdas. Seis variables con 4, 2, 3, 7, 3 y 2 categorías ya dan mil.
@@ -100,10 +118,13 @@ esconderlo.
 
 Las frases se reescribieron para decir **qué pasa**, no **con qué se calculó**:
 
-| antes | ahora |
-|---|---|
-| El margen de error no permite afirmar de qué lado está la mayoría | Con estos datos no se puede afirmar de qué lado está la mayoría |
-| la estimación puntual queda 3pp por encima, pero el margen de error no permite afirmar la diferencia | la estimación da 3pp por encima, pero con estos datos no se puede afirmar la diferencia |
+Las dos frases completas, tal como salen de `components.py` (verificadas
+ejecutando las funciones, no transcritas):
+
+| | antes | ahora |
+|---|---|---|
+| mayoría | El margen de error no permite afirmar de qué lado está la mayoría en este perfil | Con estos datos no se puede afirmar de qué lado está la mayoría en este perfil |
+| brecha | ↑ la estimación puntual queda 3pp por encima, pero el margen de error no permite afirmar la diferencia | ↑ la estimación da 3pp por encima, pero con estos datos no se puede afirmar la diferencia |
 
 Y una consecuencia para los tests: si el texto publicado se va a poder retocar,
 **los tests no pueden asertar la frase literal**. En seguridad las dos frases de
@@ -111,3 +132,13 @@ abstención comparten un arranque que vive en la constante `MARCA_ABSTENCION`, y
 los tests verifican contra ella. Un test pegado a la redacción se pone rojo por
 un cambio de estilo, y el arreglo tentador —copiar la frase nueva al test— lo
 deja sin probar nada, en silencio.
+
+**Pero una constante compartida abre su propio agujero, y hay que taparlo.** Con
+`MARCA_ABSTENCION = ""`, la comparación `MARCA_ABSTENCION in texto` es verdadera
+para CUALQUIER texto y los doce tests pasan sin probar nada. Es la misma familia
+de error que se quería evitar, movida de lugar. Lo marcó Codex. Hace falta:
+
+- una aserción de que la marca no está vacía y de que tiene forma de frase;
+- un **control negativo**: un texto donde el widget SÍ afirma no puede contener
+  la marca. Sin eso, "el texto contiene la marca" se cumple igual con la marca
+  vacía.

@@ -52,9 +52,10 @@ ive_widget/                         # Raíz del repo (plataforma multi-widget)
    la cantidad de combinaciones que va a poder armar el lector. Esa cuenta
    decide si el widget puede mostrar un número por perfil o si es una
    orientación cualitativa, y no se puede revertir después. En seguridad dio
-   menos de un caso efectivo por celda y los intervalos quedaron de 21 a 28
-   puntos — ver `widgets/_template/WIDGET_README.md`, "Lo que aprendimos con el
-   widget de seguridad".
+   entre 0,57 y 0,63 casos efectivos por celda, y el intervalo quedó de 13 a 28
+   puntos de mediana incluso en los perfiles mejor sostenidos
+   (`scripts/anchos_por_soporte.py`) — ver `widgets/_template/WIDGET_README.md`,
+   "Lo que aprendimos con el widget de seguridad".
 1. `cp -r widgets/_template widgets/<nombre>`
 2. Adaptar `config.py`, `model.py`, `components.py`, `app.py`
 3. Crear `widgets/<nombre>/train_model.py` y entrenarlo

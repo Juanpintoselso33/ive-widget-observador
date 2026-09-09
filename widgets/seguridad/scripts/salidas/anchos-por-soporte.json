@@ -1,0 +1,146 @@
+[
+ {
+  "slug": "politico_mano_dura",
+  "n": 2710,
+  "n_efectivo_kish": 576,
+  "perfiles": 1008,
+  "cortes": [
+   {
+    "etiqueta": "todos",
+    "n": 1008,
+    "ancho_mediano": 34.34263131275061,
+    "ancho_p90": 70.79132248397478,
+    "ancho_max": 76.60401996273677
+   },
+   {
+    "etiqueta": "sin ningún caso",
+    "n": 446,
+    "ancho_mediano": 49.23991294954058,
+    "ancho_p90": 73.07526626510057,
+    "ancho_max": 76.60401996273677
+   },
+   {
+    "etiqueta": "con al menos uno",
+    "n": 562,
+    "ancho_mediano": 28.37931783840977,
+    "ancho_p90": 55.17464866679623,
+    "ancho_max": 75.54726949739609
+   },
+   {
+    "etiqueta": "con 10+ de peso",
+    "n": 74,
+    "ancho_mediano": 26.84343783613803,
+    "ancho_p90": 52.609996728942725,
+    "ancho_max": 73.57123680253527
+   }
+  ]
+ },
+ {
+  "slug": "cadena_perpetua",
+  "n": 2950,
+  "n_efectivo_kish": 619,
+  "perfiles": 1008,
+  "cortes": [
+   {
+    "etiqueta": "todos",
+    "n": 1008,
+    "ancho_mediano": 32.81557852978942,
+    "ancho_p90": 55.10283175542269,
+    "ancho_max": 68.6869170396204
+   },
+   {
+    "etiqueta": "sin ningún caso",
+    "n": 437,
+    "ancho_mediano": 42.39068964309731,
+    "ancho_p90": 58.36370859421875,
+    "ancho_max": 68.6869170396204
+   },
+   {
+    "etiqueta": "con al menos uno",
+    "n": 571,
+    "ancho_mediano": 26.558452225614317,
+    "ancho_p90": 45.72739619231224,
+    "ancho_max": 63.7375814048128
+   },
+   {
+    "etiqueta": "con 10+ de peso",
+    "n": 87,
+    "ancho_mediano": 20.959499709125588,
+    "ancho_p90": 37.23439924325891,
+    "ancho_max": 62.51103750986579
+   }
+  ]
+ },
+ {
+  "slug": "pena_muerte",
+  "n": 2672,
+  "n_efectivo_kish": 571,
+  "perfiles": 1008,
+  "cortes": [
+   {
+    "etiqueta": "todos",
+    "n": 1008,
+    "ancho_mediano": 32.425332841230464,
+    "ancho_p90": 50.823022575170384,
+    "ancho_max": 72.05048173704564
+   },
+   {
+    "etiqueta": "sin ningún caso",
+    "n": 474,
+    "ancho_mediano": 37.33382610160435,
+    "ancho_p90": 58.51056229302112,
+    "ancho_max": 72.05048173704564
+   },
+   {
+    "etiqueta": "con al menos uno",
+    "n": 534,
+    "ancho_mediano": 28.096284645625143,
+    "ancho_p90": 43.06493825076166,
+    "ancho_max": 66.54857884361277
+   },
+   {
+    "etiqueta": "con 10+ de peso",
+    "n": 74,
+    "ancho_mediano": 28.02193356048185,
+    "ancho_p90": 38.16213375025513,
+    "ancho_max": 63.4268306466405
+   }
+  ]
+ },
+ {
+  "slug": "humillacion_presos",
+  "n": 2969,
+  "n_efectivo_kish": 632,
+  "perfiles": 1008,
+  "cortes": [
+   {
+    "etiqueta": "todos",
+    "n": 1008,
+    "ancho_mediano": 14.995470870805608,
+    "ancho_p90": 57.051449583881805,
+    "ancho_max": 70.14562427292151
+   },
+   {
+    "etiqueta": "sin ningún caso",
+    "n": 459,
+    "ancho_mediano": 16.326877498546615,
+    "ancho_p90": 59.92704502469554,
+    "ancho_max": 70.14562427292151
+   },
+   {
+    "etiqueta": "con al menos uno",
+    "n": 549,
+    "ancho_mediano": 14.42036025083821,
+    "ancho_p90": 50.39030957584089,
+    "ancho_max": 67.62694636817402
+   },
+   {
+    "etiqueta": "con 10+ de peso",
+    "n": 79,
+    "ancho_mediano": 13.061863508843711,
+    "ancho_p90": 45.31186516365606,
+    "ancho_max": 66.40295253029616
+   }
+  ]
+ }
+]
