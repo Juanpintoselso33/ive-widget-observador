@@ -245,7 +245,7 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 # El promedio tapa la cola, y por eso la UI dice "intervalo estimado del modelo"
 # y no promete un 95% que no se sostiene perfil por perfil.
 #
-# DOS COSAS QUE ESTOS NÚMEROS SIGUEN SIN RESOLVER:
+# DOS COSAS QUE ESTOS NÚMEROS NO RESUELVEN:
 #
 # 1. EL NIVEL SE ELIGIÓ CON 1.000 RÉPLICAS Y SE PUBLICA CON 10.000, y el signo
 #    de esa diferencia NO se conoce. El simulador corre el bootstrap interno en
@@ -263,9 +263,60 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #    encontró 263 perfiles donde el intervalo se ANGOSTA, con hasta 4,98 pp de
 #    movimiento en un extremo. Saber el signo exige medir a B=10.000.
 #
-# 2. LA VERDAD SIMULADA ES EL PROPIO MODELO. Esto corrige la sub-cobertura del
-#    PROCEDIMIENTO. El error de especificación —que el mundo no sea aditivo en
-#    estas seis variables— se suma encima y no está medido.
+# 2. LA VERDAD SIMULADA ES EL PROPIO MODELO, así que todo esto corrige la
+#    sub-cobertura del PROCEDIMIENTO suponiendo que la forma funcional es la
+#    correcta. El error de especificación se suma encima y NO entra en el
+#    intervalo, porque el bootstrap remuestrea casos con la forma fija.
+#
+#    YA NO ES UNA ADVERTENCIA SIN NÚMERO. `scripts/error_especificacion.py` lo
+#    mide: compara el procedimiento publicado —incluida la recalibración, para
+#    la pregunta que la lleva— contra otras siete formas funcionales sobre LAS
+#    MISMAS seis variables, se queda con las que la muestra no logra ordenar por
+#    log-loss fuera de muestra, y mira cuánto se mueve el número de cada uno de
+#    los 1.008 perfiles.
+#
+#    EL NÚMERO SE MUEVE. Entre especificaciones que la muestra no ordena, la
+#    mediana del rango va de 3,7 pp (humillación) a 12,3 (pena de muerte), y el
+#    p95 llega a 28,6. Sacando la más flexible por si fuera ella sola la que
+#    empuja, la mediana queda entre 2,5 y 9,6. Los perfiles sin ningún caso en
+#    la muestra discrepan más (4,1 a 14,4) que los que tienen al menos uno (3,5
+#    a 10,7), que es lo esperable porque ahí toda especificación extrapola.
+#
+#    LAS AFIRMACIONES, EN CAMBIO, NO SE MUEVEN. De las 2.562 veces que el widget
+#    afirma de qué lado está la mayoría, cambiarían DOS. De las 1.742 veces que
+#    afirma una diferencia contra el promedio nacional, CUATRO. Seis de 4.304.
+#    (Eran 1.736 y 4.298 antes de bootstrapear la diferencia; el estudio se
+#    quedó midiendo la regla vieja cuando el widget cambió y lo marcó Codex.)
+#
+#    Y EL INTERVALO YA ABSORBE CASI TODO: contiene lo que dicen todas las
+#    especificaciones admitidas en el 100% de los perfiles de mano dura, el
+#    99,3% de cadena perpetua y el 98,1% de humillación. La excepción es PENA DE
+#    MUERTE, con 113 perfiles (11,2%) donde alguna especificación cae afuera y
+#    un exceso máximo de 12,2 pp. Si alguna vez se ensancha un intervalo por
+#    esto, es el de esa pregunta y no el de las cuatro.
+#
+#    DOS DEFECTOS QUE TUVO ESTE ESTUDIO Y QUE ENCONTRÓ CODEX, porque los números
+#    de arriba son los de después de arreglarlos y los de antes estaban inflados:
+#      · la "base" no incluía la recalibración, así que en mano dura se comparaba
+#        contra algo que no era el número publicado —mediana 3,52 pp de
+#        diferencia, hasta 9,32—. Arreglado, el rango de mano dura bajó de 10,4 a
+#        5,8 pp y sus perfiles fuera del intervalo pasaron de 73 a CERO.
+#      · se contaban cruces de estimaciones puntuales y se presentaban como
+#        afirmaciones dadas vuelta. No lo eran: de esos cruces, el intervalo
+#        publicado YA contenía el 50% en 136 de 136, 116 de 116, 170 de 172 y 47
+#        de 47. El widget ya se abstenía en casi todos. Ahora se cuenta sobre las
+#        afirmaciones que el widget hace, con la regla de `interpretar()` y la de
+#        `brecha_nacional()`.
+#
+#    QUÉ NO DICE ESTE ESTUDIO. Cuál especificación es la correcta: aparece que
+#    ideología x educación le gana a la base en dos preguntas e ideología x
+#    región en una tercera, pero gana una distinta en cada una y ninguna en la
+#    cuarta, ninguna pasa Bonferroni sobre 32 comparaciones, y el error estándar
+#    de la validación cruzada está subestimado por construcción. Tampoco es una
+#    COTA del error de especificación: si la verdad está fuera de la familia
+#    probada, el rango puede quedar corto o largo. Y el rango mezcla forma
+#    funcional con ruido de estimación, así que no es una incertidumbre
+#    independiente que se pueda sumar al intervalo. Ver el docstring del script.
 #
 # Y una afirmación mía que quedó sobredicha: dije que subir el nivel gana sobre
 # ensanchar por un factor "a igualdad de cobertura". No era a igualdad, ni antes

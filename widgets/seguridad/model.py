@@ -113,22 +113,42 @@ def problemas_de_calibracion(slug, model):
 
     Devuelve una lista de problemas, vacía si está todo bien.
     """
+    problemas = []
+
+    # EL APAREAMIENTO DE LA TASA NACIONAL, chequeado al arrancar y no sólo en
+    # los tests. `intervalo_brecha()` devuelve None si los largos no coinciden
+    # —se cae al chequeo viejo en vez de restar contra la réplica equivocada—,
+    # pero eso pasa en silencio: sin este aviso, el widget publicaría con la
+    # regla vieja durante meses sin que nadie se entere. Lo marcó Codex.
+    boot = model.get("bootstrap") or {}
+    nac = boot.get("nacional")
+    if nac is not None and len(nac) != len(boot.get("replicas") or []):
+        problemas.append(
+            f"«{slug}»: la tasa nacional por réplica tiene {len(nac)} valores "
+            f"y hay {len(boot.get('replicas') or [])} réplicas de coeficientes "
+            "— no están apareadas y la brecha se calcularía contra la réplica "
+            "equivocada"
+        )
+
     cal = model.get("calibracion")
     debe_tener = slug in PREGUNTAS_A_RECALIBRAR
 
     if debe_tener and not cal:
-        return [f"«{slug}» está declarada en PREGUNTAS_A_RECALIBRAR y su JSON no "
-                "trae mapa: se publicaría sin recalibrar"]
+        return problemas + [
+            f"«{slug}» está declarada en PREGUNTAS_A_RECALIBRAR y su JSON no "
+            "trae mapa: se publicaría sin recalibrar"]
     if cal and not debe_tener:
-        return [f"«{slug}» trae un mapa de recalibración y no está declarada: se "
-                "aplicaría una corrección que nadie pidió"]
+        return problemas + [
+            f"«{slug}» trae un mapa de recalibración y no está declarada: se "
+            "aplicaría una corrección que nadie pidió"]
     if not cal:
-        return []
+        return problemas
 
-    fallas = []
+    fallas = list(problemas)
     xs, ys = cal.get("grilla"), cal.get("valores")
     if not xs or not ys or len(xs) != len(ys):
-        return [f"«{slug}»: la grilla y los valores no tienen el mismo largo"]
+        return fallas + [
+            f"«{slug}»: la grilla y los valores no tienen el mismo largo"]
     if len(xs) < 2:
         fallas.append(f"«{slug}»: la grilla tiene menos de dos puntos")
     if any(not math.isfinite(v) for v in xs + ys):
@@ -212,9 +232,13 @@ def _interp(xs, ys, x):
 
 
 def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                              victima, es_montevideo):
+                              victima, es_montevideo, ordenar=True):
     """
-    Las B probabilidades del perfil, una por réplica bootstrap, ordenadas.
+    Las B probabilidades del perfil, una por réplica bootstrap.
+
+    `ordenar=False` las devuelve EN EL ORDEN DE LAS RÉPLICAS, que es lo que
+    necesita `intervalo_brecha()`: para restarle a cada una la tasa nacional de
+    su misma réplica, la posición i tiene que seguir siendo la réplica i.
 
     Devuelve None si el modelo no trae bootstrap.
     """
@@ -247,7 +271,8 @@ def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia
         else:
             probabilidades.append(_calibrar(model, pct))
 
-    probabilidades.sort()
+    if ordenar:
+        probabilidades.sort()
     return probabilidades
 
 
@@ -278,6 +303,64 @@ def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
         nivel = model.get("nivel_calibrado", 95)
     cola = (100 - nivel) / 2 / 100
     return _percentil(probabilidades, cola), _percentil(probabilidades, 1 - cola)
+
+
+def intervalo_brecha(model, tramo_edad, es_mujer, nivel_educ, ideologia,
+                     victima, es_montevideo, nivel=None):
+    """
+    Intervalo de la DIFERENCIA entre el perfil y el promedio nacional.
+
+    POR QUÉ EXISTE. El widget afirmaba "este perfil está X pp por encima del
+    promedio" comparando el INTERVALO del perfil contra el promedio nacional
+    tratado como un PUNTO. Pero el promedio también se estimó con esta misma
+    muestra y tiene su propia incertidumbre, así que ese chequeo comparaba una
+    cosa con error contra otra cosa con error ignorando el error de la segunda.
+
+    Yo había escrito en el código que eso era "conservador de un solo lado". NO
+    ESTABA DEMOSTRADO, y el signo no es obvio: la varianza de la resta es
+    Var(perfil) + Var(promedio) − 2·Cov, y de esa covarianza dependía todo. Si
+    es grande, el chequeo viejo ensancha de más y es conservador; si es chica o
+    negativa, ensancha de menos y AFIRMA DE MÁS — que es exactamente la clase de
+    error del que ya se sacaron 1.883 casos. Nadie la había calculado.
+
+    Y NO SIEMPRE ES POSITIVA, aunque suene razonable que lo sea por venir de la
+    misma muestra: escribí eso acá y era falso. Codex la calculó perfil por
+    perfil y encontró covarianzas NEGATIVAS en cadena perpetua, pena de muerte y
+    humillación, de hasta −1,45 pp². Que el signo no se pueda anticipar es
+    precisamente el motivo por el que hay que calcular la resta réplica a
+    réplica en vez de suponerle una dirección.
+
+    CÓMO SE ARREGLA. `train_model` serializa, junto a cada réplica de
+    coeficientes, la tasa nacional DE ESA MISMA RÉPLICA — mismo remuestreo, misma
+    posición—. Entonces la diferencia se puede calcular dentro de cada réplica y
+    la covarianza entra sola, sin estimarla ni suponerle signo.
+
+    Devuelve (bajo, alto) en puntos porcentuales, o None si el JSON no trae la
+    tasa nacional por réplica (artefacto viejo): en ese caso el llamador se cae
+    al chequeo anterior, que es lo que había.
+    """
+    boot = model.get("bootstrap") or {}
+    nacional = boot.get("nacional")
+    if not nacional:
+        return None
+    probabilidades = _probabilidades_bootstrap(
+        model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+        es_montevideo, ordenar=False)
+    if probabilidades is None:
+        return None
+    # LARGOS DISTINTOS = ARTEFACTO ROTO, y hay que rechazarlo en vez de
+    # truncar. Con `min()` se descartaba el sobrante en silencio y la resta
+    # quedaba contra réplicas que no eran las suyas: Codex lo mostró con un
+    # ejemplo mínimo donde truncar convierte una abstención en una afirmación.
+    # Devolver None hace que el llamador se caiga al chequeo anterior, que es
+    # peor pero honesto; y `problemas_de_calibracion` lo reporta al arrancar.
+    if len(probabilidades) != len(nacional):
+        return None
+    diferencias = sorted(pi - ni for pi, ni in zip(probabilidades, nacional))
+    if nivel is None:
+        nivel = model.get("nivel_calibrado", 95)
+    cola = (100 - nivel) / 2 / 100
+    return _percentil(diferencias, cola), _percentil(diferencias, 1 - cola)
 
 
 # 1,96: el z de una banda del 95% para la posición del percentil.

@@ -277,3 +277,142 @@ class TestPercentilValidaQ:
     def test_los_extremos_exactos_son_validos(self):
         assert _percentil([1, 2, 3], 0.0) == 1
         assert _percentil([1, 2, 3], 1.0) == 3
+
+
+class TestIntervaloDeLaBrecha:
+    """
+    La diferencia contra el promedio nacional se bootstrapea APAREADA.
+
+    Existe porque durante un tiempo el widget comparaba el intervalo del perfil
+    contra el promedio nacional tratado como un punto exacto, y el docstring
+    afirmaba que eso era "conservador de un solo lado" sin demostrarlo. La
+    varianza de la resta es Var(perfil) + Var(promedio) − 2·Cov, con covarianza
+    positiva; según cuánto valga, el chequeo viejo podía estar afirmando DE MÁS.
+    """
+
+    @staticmethod
+    def _modelo_sintetico(probs, nacional):
+        """Un JSON mínimo cuyas réplicas dan exactamente `probs`."""
+        from widgets.seguridad.config import PREDICTORES
+        import math
+        filas = []
+        for p in probs:
+            z = math.log(p / (100 - p))
+            filas.append([z] + [0.0] * len(PREDICTORES))
+        return {
+            "bootstrap": {"orden": ["intercept"] + list(PREDICTORES),
+                          "replicas": filas, "nacional": nacional},
+            "nivel_calibrado": 95,
+        }
+
+    def test_sin_la_tasa_por_replica_devuelve_none(self):
+        """Artefacto viejo: el llamador se cae al chequeo anterior, no rompe."""
+        from widgets.seguridad.model import intervalo_brecha
+        m = self._modelo_sintetico([40.0] * 10, None)
+        del m["bootstrap"]["nacional"]
+        assert intervalo_brecha(m, 1, 0, 1, 3, 0, 0) is None
+
+    def test_la_resta_va_replica_contra_replica(self):
+        """
+        Es lo que hace toda la diferencia: si perfil y promedio se movieran
+        juntos, la resta casi no varía aunque cada uno varíe mucho.
+        """
+        from widgets.seguridad.model import intervalo_brecha, intervalo_probabilidad
+        probs = [30.0, 40.0, 50.0, 60.0, 70.0] * 40
+        # el promedio acompaña al perfil: la resta es constante en 10
+        nacional = [p - 10 for p in probs]
+        m = self._modelo_sintetico(probs, nacional)
+        bajo, alto = intervalo_brecha(m, 1, 0, 1, 3, 0, 0)
+        assert abs(bajo - 10) < 1e-6 and abs(alto - 10) < 1e-6, (
+            "la resta apareada tiene que dar 10 exacto; si da un rango ancho, "
+            "se está comparando contra el promedio de todas las réplicas"
+        )
+        # y el intervalo del PERFIL sí es ancho: son dos cosas distintas
+        ilo, ihi = intervalo_probabilidad(m, 1, 0, 1, 3, 0, 0)
+        assert ihi - ilo > 20
+
+    def test_si_los_dos_se_mueven_en_contra_la_resta_se_ensancha(self):
+        """Control opuesto: covarianza negativa, la resta varía MÁS que el perfil."""
+        from widgets.seguridad.model import intervalo_brecha
+        probs = [30.0, 40.0, 50.0, 60.0, 70.0] * 40
+        nacional = [100 - p for p in probs]          # se mueven al revés
+        m = self._modelo_sintetico(probs, nacional)
+        bajo, alto = intervalo_brecha(m, 1, 0, 1, 3, 0, 0)
+        assert alto - bajo > 60, (alto - bajo)
+
+    def test_la_afirmacion_usa_el_intervalo_de_la_brecha_cuando_esta(self):
+        """
+        Si el intervalo de la DIFERENCIA contiene el cero, no se afirma la
+        diferencia — aunque el intervalo del perfil no contenga al promedio.
+        """
+        from widgets.seguridad.components import brecha_nacional
+        # el intervalo del perfil (27-45) NO contiene al promedio (67): con la
+        # regla vieja afirmaría. El de la brecha sí contiene el 0.
+        texto = brecha_nacional(36, 67, (27.0, 45.0), brecha_iv=(-8.0, 4.0))
+        assert "no permite afirmar" in texto
+        assert "este perfil está" not in texto
+
+    def test_y_afirma_cuando_el_cero_queda_afuera(self):
+        from widgets.seguridad.components import brecha_nacional
+        texto = brecha_nacional(36, 67, (27.0, 45.0), brecha_iv=(-40.0, -22.0))
+        assert "este perfil está" in texto
+        assert "31pp por debajo" in texto
+
+    def test_largos_distintos_no_se_truncan_en_silencio(self):
+        """
+        Un artefacto con la tasa nacional desalineada tiene que RECHAZARSE, no
+        truncarse. Con `min()` el sobrante se descartaba callado y la resta
+        quedaba contra réplicas que no eran las suyas: Codex lo mostró con un
+        ejemplo donde truncar convierte una abstención en una afirmación.
+        """
+        from widgets.seguridad.model import intervalo_brecha
+        m = self._modelo_sintetico([30.0, 70.0], [20.0, 80.0])
+        completo = intervalo_brecha(m, 1, 0, 1, 3, 0, 0)
+        assert completo is not None
+        assert round(completo[0]) <= 0 <= round(completo[1]), completo
+
+        m["bootstrap"]["nacional"] = [20.0]          # desalineado a propósito
+        assert intervalo_brecha(m, 1, 0, 1, 3, 0, 0) is None, (
+            "con largos distintos truncaba y devolvía un intervalo que no "
+            "contiene el cero, o sea una afirmación inventada"
+        )
+
+    def test_el_arranque_avisa_si_la_tasa_nacional_esta_desalineada(self):
+        """
+        Y no alcanza con que `intervalo_brecha` devuelva None: eso hace que el
+        widget se caiga al chequeo viejo EN SILENCIO. Tiene que gritar al
+        arrancar, como el resto de los problemas del artefacto.
+        """
+        from widgets.seguridad.model import problemas_de_calibracion
+        from widgets.seguridad import config
+        slug = next(s for s in config.SLUGS if s not in config.PREGUNTAS_A_RECALIBRAR)
+        m = self._modelo_sintetico([30.0, 70.0], [20.0])
+        assert any("apareadas" in p for p in problemas_de_calibracion(slug, m))
+
+    def test_respeta_el_nivel_calibrado(self):
+        """
+        El intervalo de la brecha usa el percentil CALIBRADO de la pregunta, no
+        el 95 a secas — igual que el del perfil. Los cinco tests anteriores
+        pasaban aunque se ignorara `nivel_calibrado`; lo marcó Codex.
+        """
+        from widgets.seguridad.model import intervalo_brecha
+        probs = [float(v) for v in range(10, 90)]
+        nacional = [50.0] * len(probs)
+        m = self._modelo_sintetico(probs, nacional)
+        m["nivel_calibrado"] = 99
+        ancho99 = (lambda iv: iv[1] - iv[0])(intervalo_brecha(m, 1, 0, 1, 3, 0, 0))
+        m["nivel_calibrado"] = 80
+        ancho80 = (lambda iv: iv[1] - iv[0])(intervalo_brecha(m, 1, 0, 1, 3, 0, 0))
+        assert ancho99 > ancho80 + 5, (ancho99, ancho80)
+
+    def test_la_comparacion_con_cero_es_inclusiva_y_redondeada(self):
+        """
+        Si el intervalo de la brecha redondeado toca el cero, no se afirma. Con
+        una comparación exclusiva o sin redondeo, un intervalo de -0,4 a 12,3
+        afirmaría — y en pantalla la brecha dice "0pp".
+        """
+        from widgets.seguridad.components import brecha_nacional
+        assert "no permite afirmar" in brecha_nacional(
+            60, 55, (40.0, 70.0), brecha_iv=(-0.4, 12.3))
+        assert "no permite afirmar" in brecha_nacional(
+            60, 55, (40.0, 70.0), brecha_iv=(0.0, 12.3))

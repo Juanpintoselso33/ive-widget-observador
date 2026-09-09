@@ -19,7 +19,7 @@ from shared.styles import get_observador_css
 from shared.config import OBSERVADOR_COLORS
 from widgets.seguridad.model import (
     load_modelos as _load_modelos, predict_probability, intervalo_probabilidad,
-    banda_decision, problemas_de_calibracion,
+    banda_decision, problemas_de_calibracion, intervalo_brecha,
 )
 from widgets.seguridad.components import (
     render_selector_pregunta, render_header, render_inputs,
@@ -138,6 +138,10 @@ intervalo = intervalo_probabilidad(MODEL, *inputs)
 # El que se muestra y el que decide sobre el 50% son distintos a propósito:
 # ver el docstring de model.banda_decision().
 banda = banda_decision(MODEL, *inputs)
+# El intervalo de la DIFERENCIA contra el promedio nacional, bootstrapeada
+# réplica a réplica. Reemplaza al chequeo que comparaba el intervalo del perfil
+# contra el promedio tratado como punto exacto — ver components.brecha_nacional.
+brecha_iv = intervalo_brecha(MODEL, *inputs)
 
 # LA BANDA GRIS DEL FIGMA. Desde el gradiente hasta el pie, el diseño va sobre
 # #EDEDED y no sobre blanco: es un tercio del área. No se puede hacer sólo con
@@ -147,7 +151,7 @@ banda = banda_decision(MODEL, *inputs)
 # `st-key-<key>`, que es la vía soportada para engancharle CSS.
 with st.container(key="banda_resultado"):
     render_probability_bar(prob)
-    render_result_card(MODEL, prob, colors, intervalo, banda)
+    render_result_card(MODEL, prob, colors, intervalo, banda, brecha_iv)
     render_comparisons(MODEL)
     render_methodology(MODEL)
     render_footer(MODEL)

@@ -305,6 +305,13 @@ def main():
                     help="para repartir las simulaciones entre procesos")
     ap.add_argument("--cronometrar", action="store_true",
                     help="corre UNA simulación y reporta cuánto tarda")
+    # POR QUÉ SE PUEDE ELEGIR LA CARPETA. `agregar_calibracion.py` exige que
+    # todas las corridas de una pregunta compartan B, y con razón: promediar
+    # coberturas medidas con distinto número de réplicas mezcla dos
+    # procedimientos. Una corrida con otro B tiene que ir a otro lado, no al
+    # lado de las que ya están.
+    ap.add_argument("--salidas", default=None,
+                    help="carpeta donde escribir (por defecto scripts/salidas)")
     args = ap.parse_args()
     slugs = args.preguntas or config.SLUGS
 
@@ -394,7 +401,8 @@ def main():
                   f"ancho {np.median(anchos_fac[f]):5.1f}pp")
 
         # A un directorio del repo, no a la carpeta temporal de una sesión.
-        destino = Path(__file__).parent / "salidas"
+        destino = (Path(args.salidas) if args.salidas
+                   else Path(__file__).parent / "salidas")
         destino.mkdir(exist_ok=True)
         salida = destino / f"cal-{slug}-{args.semilla}.json"
         salida.write_text(json.dumps({
