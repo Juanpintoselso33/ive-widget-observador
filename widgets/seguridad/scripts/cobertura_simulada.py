@@ -310,6 +310,8 @@ def main():
     # coberturas medidas con distinto número de réplicas mezcla dos
     # procedimientos. Una corrida con otro B tiene que ir a otro lado, no al
     # lado de las que ya están.
+    ap.add_argument("--cada", type=int, default=5,
+                    help="guardar un parcial cada N simulaciones (0 = nunca)")
     ap.add_argument("--salidas", default=None,
                     help="carpeta donde escribir (por defecto scripts/salidas)")
     args = ap.parse_args()
@@ -369,8 +371,76 @@ def main():
         dentro_fac = {f: np.zeros(len(perfiles)) for f in FACTORES}
         anchos_fac = {f: [] for f in FACTORES}
         validas = 0
+        desde = 0
+
+        # A un directorio del repo, no a la carpeta temporal de una sesión.
+        destino = (Path(args.salidas) if args.salidas
+                   else Path(__file__).parent / "salidas")
+        destino.mkdir(exist_ok=True)
+        salida = destino / f"cal-{slug}-{args.semilla}.json"
+        huella = huella_estudio(slug, publicado)
+
+        # REANUDAR. El 9/9/2026 se perdieron seis horas de ocho procesos porque
+        # el resultado se escribía recién al final y la máquina se reinició.
+        # Ahora se guarda un parcial cada `--cada` simulaciones, con el estado
+        # del generador, y si al arrancar hay uno compatible se sigue desde ahí.
+        # "Compatible" = misma huella del estudio, mismas réplicas, mismo
+        # objetivo de sims. Si algo de eso cambió, el parcial no sirve y se
+        # arranca de cero, diciéndolo.
+        if salida.exists():
+            previo = json.loads(salida.read_text(encoding="utf-8"))
+            if not previo.get("parcial"):
+                print(f"{slug}: ya hay una corrida COMPLETA en {salida.name}; "
+                      "borrala si querés repetirla", flush=True)
+                continue
+            compatible = (previo.get("huella") == huella
+                          and previo.get("replicas") == args.replicas
+                          and previo.get("sims_objetivo") == args.sims)
+            if compatible:
+                desde = int(previo["sims_hechas"])
+                validas = int(previo["sims_validas"])
+                for n in NIVELES:
+                    dentro_niv[n] = np.array(previo["niveles"][str(n)], float)
+                for f in FACTORES:
+                    dentro_fac[f] = np.array(previo["factores"][str(f)], float)
+                    anchos_fac[f] = list(previo["anchos_lista"][str(f)])
+                rng.bit_generator.state = previo["rng_state"]
+                print(f"{slug}: reanudando desde la simulación {desde} de "
+                      f"{args.sims} ({salida.name})", flush=True)
+            else:
+                print(f"{slug}: hay un parcial en {salida.name} pero NO es "
+                      "compatible (cambió la huella, las réplicas o el objetivo); "
+                      "se arranca de cero", flush=True)
+
+        def guardar(parcial, sims_hechas):
+            salida.write_text(json.dumps({
+                "slug": slug, "sims_validas": validas, "replicas": args.replicas,
+                "semilla": args.semilla,
+                "parcial": parcial,
+                "sims_hechas": sims_hechas, "sims_objetivo": args.sims,
+                # Ata la medición al modelo que se usó como verdad. Sin esto,
+                # una salida vieja sigue "respaldando" un nivel después de que
+                # cambió la especificación, y el test que compara ambos pasa
+                # igual. Lo marcó Codex el 8/9/2026.
+                "huella": huella,
+                "python": "%d.%d" % sys.version_info[:2],
+                "segundos": round(time.time() - arranque, 1),
+                # OJO: son ACIERTOS por perfil, no porcentajes. Quien los lea
+                # tiene que dividir por "sims_validas".
+                "niveles": {str(n): dentro_niv[n].tolist() for n in NIVELES},
+                "factores": {str(f): dentro_fac[f].tolist() for f in FACTORES},
+                "anchos": {str(f): (float(np.median(anchos_fac[f]))
+                                    if anchos_fac[f] else None) for f in FACTORES},
+                # La lista entera hace falta para reanudar; la mediana de
+                # arriba es lo que consume el agregador.
+                "anchos_lista": {str(f): anchos_fac[f] for f in FACTORES},
+                # El estado del generador, para que reanudar dé exactamente la
+                # misma secuencia que una corrida sin cortes.
+                "rng_state": rng.bit_generator.state if parcial else None,
+            }))
+
         t0 = time.time()
-        for s in range(args.sims):
+        for s in range(desde, args.sims):
             r = una_simulacion(d, X, w, p_true, Xp, estratos,
                                args.replicas, rng, recalibra)
             if r is None:
@@ -382,6 +452,8 @@ def main():
                 dentro_fac[f] += (lo <= verdad_perfil) & (verdad_perfil <= hi)
                 anchos_fac[f].append(float(np.median(hi - lo)))
             validas += 1
+            if args.cada and (s + 1) % args.cada == 0 and (s + 1) < args.sims:
+                guardar(parcial=True, sims_hechas=s + 1)
             if (s + 1) % 20 == 0:
                 cob = dentro_niv[NIVEL].sum() / (validas * len(perfiles))
                 print(f"  [{slug}] {s+1}/{args.sims} sims  cobertura al 95% "
@@ -400,29 +472,7 @@ def main():
                   f"bajo 90%: {(c_ < 0.90).sum():4d}   peor {c_.min()*100:5.1f}%   "
                   f"ancho {np.median(anchos_fac[f]):5.1f}pp")
 
-        # A un directorio del repo, no a la carpeta temporal de una sesión.
-        destino = (Path(args.salidas) if args.salidas
-                   else Path(__file__).parent / "salidas")
-        destino.mkdir(exist_ok=True)
-        salida = destino / f"cal-{slug}-{args.semilla}.json"
-        salida.write_text(json.dumps({
-            "slug": slug, "sims_validas": validas, "replicas": args.replicas,
-            "semilla": args.semilla,
-            # Ata la medición al modelo que se usó como verdad. Sin esto, una
-            # salida vieja sigue "respaldando" un nivel después de que cambió
-            # la especificación, y el test que compara ambos pasa igual. Lo
-            # marcó Codex el 8/9/2026; las ocho salidas de esa fecha son
-            # anteriores al sello y no lo traen.
-            "huella": huella_estudio(slug, publicado),
-            "python": "%d.%d" % sys.version_info[:2],
-            "segundos": round(time.time() - arranque, 1),
-            # OJO: son ACIERTOS por perfil, no porcentajes. Coinciden cuando la
-            # corrida tiene 100 simulaciones y no en otro caso; quien los lea
-            # tiene que dividir por "sims_validas".
-            "niveles": {str(n): dentro_niv[n].tolist() for n in NIVELES},
-            "factores": {str(f): dentro_fac[f].tolist() for f in FACTORES},
-            "anchos": {str(f): float(np.median(anchos_fac[f])) for f in FACTORES},
-        }))
+        guardar(parcial=False, sims_hechas=args.sims)
         print(f"  guardado en {salida.name}")
 
 
