@@ -235,7 +235,7 @@ def probabilidades_perfiles(d, cols, pares, w, y, Xp_dict, recalibra):
     return p * 100, c
 
 
-def analizar(slug, df0, verbose=True):
+def analizar(slug, df0, verbose=True, detalle=False):
     df = tm.preparar(df0, config.PREGUNTAS[slug])
     d = df[df["a_favor"].notna()].copy()
     y = d["a_favor"].values.astype(int)
@@ -426,6 +426,35 @@ def analizar(slug, df0, verbose=True):
         "cortes_por_soporte": cortes,
     }
 
+    # DETALLE POR PERFIL. El resumen dice CUÁNTOS perfiles se salen del
+    # intervalo, pero no CUÁLES ni por qué, y sin eso no se puede decidir qué
+    # hacer con ellos: no es lo mismo que se salgan perfiles que el widget no
+    # afirma nada, o que no existen en la muestra, que perfiles con casos
+    # detrás sobre los que además se publica una conclusión.
+    if detalle:
+        quien_min = np.array(admitidas, dtype=object)[M.argmin(axis=0)]
+        quien_max = np.array(admitidas, dtype=object)[M.argmax(axis=0)]
+        resumen["detalle"] = [
+            {
+                **{k: int(v) for k, v in perfiles[i].items()},
+                "soporte": float(soporte[i]),
+                "base": float(base_p[i]),
+                "iv_lo": float(ivs[i][0]),
+                "iv_hi": float(ivs[i][1]),
+                "spec_min": float(M[:, i].min()),
+                "spec_max": float(M[:, i].max()),
+                "quien_min": str(quien_min[i]),
+                "quien_max": str(quien_max[i]),
+                "exceso": float(exceso[i]),
+                "rango": float(rango[i]),
+                "afirma_mayoria": bool(afirma_mayoria[i]),
+                "afirma_brecha": bool(afirma_brecha[i]),
+                "vuelta_mayoria": bool(afirma_mayoria[i] and contradice_mayoria[i]),
+                "vuelta_brecha": bool(afirma_brecha[i] and contradice_brecha[i]),
+            }
+            for i in range(len(perfiles))
+        ]
+
     if verbose:
         print(f"\n  Especificaciones admitidas: {len(admitidas)} de {len(ll)}")
         print(f"  ({', '.join(admitidas)})\n")
@@ -463,13 +492,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--pregunta", action="append", dest="preguntas")
     ap.add_argument("--salida", default=None, help="archivo JSON con el resumen")
+    ap.add_argument("--detalle", action="store_true",
+                    help="incluir los 1.008 perfiles uno por uno en el JSON")
     args = ap.parse_args()
 
     df0 = pd.read_csv(config.DATA_FILE, encoding="utf-8-sig")
     salida = []
     for slug in (args.preguntas or config.SLUGS):
         if config.ruta_modelo(slug).exists():
-            salida.append(analizar(slug, df0))
+            salida.append(analizar(slug, df0, detalle=args.detalle))
 
     if args.salida:
         Path(args.salida).write_text(json.dumps(salida, indent=1,

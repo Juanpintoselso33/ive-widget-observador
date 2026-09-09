@@ -22,6 +22,7 @@ import math
 
 from widgets.seguridad.config import (
     PREDICTORES, ESPEC_CRUDA, SLUGS, ruta_modelo, PREGUNTAS_A_RECALIBRAR,
+    RUTA_ENVOLVENTE, clave_perfil, huella_contrato, ENVOLVENTE_REQUERIDA,
 )
 
 
@@ -42,6 +43,83 @@ def load_modelos():
     pregunta y ya está leyendo un número.
     """
     return {slug: load_model(slug) for slug in SLUGS}
+
+
+_ENVOLVENTE = None
+_ENVOLVENTE_CARGADA = False
+
+
+def load_envolvente():
+    """
+    La envolvente de especificación, o None si el archivo no está.
+
+    QUÉ ES. Para cada uno de los 1.008 perfiles de la UI, el mínimo y el máximo
+    que le asigna cualquiera de las especificaciones que la muestra NO logra
+    distinguir de la publicada —medidas por `scripts/error_especificacion.py`—.
+
+    POR QUÉ SE PUBLICA CON ELLA. El intervalo bootstrap remuestrea casos con la
+    FORMA FUNCIONAL FIJA, así que no contiene el desacuerdo entre formas
+    funcionales defendibles. En pena de muerte eso se notaba: 113 perfiles donde
+    alguna especificación admisible caía FUERA del intervalo publicado, con
+    hasta 12,2 pp de exceso. Y no eran perfiles raros —sólo el 31% no tenía
+    ningún caso detrás, contra el 47% del total—, ni las especificaciones eran
+    malas: las dos que empujaban afuera son las que PREDICEN MEJOR que la
+    publicada (`todas_2do_orden`, log-loss 0,532 contra 0,542, y `ideolxeduc`,
+    la única declarada mejor). O sea que el intervalo dejaba afuera justamente a
+    los modelos que la muestra prefiere.
+
+    ES UNA UNIÓN, NO UNA SUMA, y la distinción no es cosmética. El rango entre
+    especificaciones mezcla forma funcional con ruido de estimación, así que
+    sumarlo al ancho del bootstrap contaría dos veces el mismo ruido. Tomar el
+    máximo no: el intervalo publicado pasa a ser el más chico que contiene tanto
+    al bootstrap de la forma publicada como a lo que dicen las demás.
+
+    Devuelve None si el archivo no existe: el widget sigue andando con el
+    intervalo sin ensanchar, que es lo que había, y `problemas_de_envolvente()`
+    lo reporta al arrancar.
+    """
+    global _ENVOLVENTE, _ENVOLVENTE_CARGADA
+    if not _ENVOLVENTE_CARGADA:
+        _ENVOLVENTE_CARGADA = True
+        try:
+            with open(RUTA_ENVOLVENTE, "r", encoding="utf-8") as f:
+                _ENVOLVENTE = json.load(f)
+        except FileNotFoundError:
+            _ENVOLVENTE = None
+    return _ENVOLVENTE
+
+
+def envolvente_perfil(slug, tramo_edad, es_mujer, nivel_educ, ideologia,
+                      victima, es_montevideo):
+    """(mínimo, máximo) sobre las especificaciones admitidas, o None."""
+    env = load_envolvente()
+    if not env:
+        return None
+    pregunta = (env.get("preguntas") or {}).get(slug)
+    if not pregunta:
+        return None
+    par = (pregunta.get("perfiles") or {}).get(
+        clave_perfil(tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+                     es_montevideo))
+    if not par or len(par) != 2:
+        return None
+    return float(par[0]), float(par[1])
+
+
+def _ensanchar(intervalo, env, desplazamiento=0.0):
+    """
+    Estira `intervalo` hasta contener la envolvente, corrida por
+    `desplazamiento` (que es lo que hace falta para el intervalo de la BRECHA:
+    ahí la envolvente hay que llevarla a la escala de la resta).
+
+    Nunca angosta: si la envolvente cae adentro, devuelve el intervalo tal cual.
+    """
+    if intervalo is None:
+        return None
+    if env is None:
+        return intervalo
+    return (min(intervalo[0], env[0] - desplazamiento),
+            max(intervalo[1], env[1] - desplazamiento))
 
 
 def build_features(tramo_edad, es_mujer, nivel_educ, ideologia, victima,
@@ -98,6 +176,95 @@ def _z(coef, features):
 
 def _sigmoid_pct(z):
     return (1 / (1 + math.exp(-z))) * 100
+
+
+def problemas_de_envolvente(slug, model, perfiles=None):
+    """
+    Verifica que la envolvente de especificación corresponda a ESTOS modelos.
+
+    POR QUÉ HACE FALTA UN CHEQUEO PROPIO. La envolvente vive en su propio
+    archivo y se genera con un script aparte, así que puede quedar vieja sin que
+    nada más lo note: si se reentrena y no se regenera, el widget ensancharía
+    los intervalos usando números calculados sobre otros datos. Eso es peor que
+    no ensanchar, porque el intervalo parecería más honesto siendo falso.
+
+    EL CONTROL FUERTE ES EL DEL PUNTO PUBLICADO. La envolvente incluye a la
+    especificación base, que es la publicada, así que el punto que muestra el
+    widget tiene que caer DENTRO de la envolvente de su perfil. Medido sobre los
+    1.008 perfiles de pena de muerte, la base del estudio reproduce el punto
+    publicado con 2,8e-14 de diferencia. Si la envolvente fuera de otro
+    entrenamiento, esa contención se rompería en muchos perfiles. La huella del
+    contrato sola no lo agarra: cubre la configuración, no los coeficientes.
+
+    Devuelve una lista de problemas, vacía si está todo bien. Que el archivo no
+    exista NO es un problema: el widget publica sin ensanchar, que es lo que
+    hacía antes, y se avisa una sola vez.
+    """
+    env = load_envolvente()
+    if not env:
+        if not ENVOLVENTE_REQUERIDA:
+            return []
+        return [
+            f"falta {RUTA_ENVOLVENTE.name}: sin ese archivo los intervalos "
+            "salen SIN ensanchar por error de especificación, que es más "
+            "angosto de lo que se publica. Generalo con "
+            "`python widgets/seguridad/scripts/error_especificacion.py "
+            "--detalle --salida /tmp/espec.json` y después "
+            "`python widgets/seguridad/scripts/agregar_envolvente.py "
+            "/tmp/espec.json`"]
+    pregunta = (env.get("preguntas") or {}).get(slug)
+    if not pregunta:
+        return [f"«{slug}»: la envolvente no trae esta pregunta"]
+
+    problemas = []
+    esperado = huella_contrato(slug)
+    if pregunta.get("contrato") != esperado:
+        problemas.append(
+            f"«{slug}»: la envolvente se generó con el contrato "
+            f"{pregunta.get('contrato')} y ahora es {esperado} — regenerá con "
+            "`python widgets/seguridad/scripts/agregar_envolvente.py`")
+        return problemas
+
+    tabla = pregunta.get("perfiles") or {}
+    if perfiles is None:
+        return problemas if len(tabla) else [
+            f"«{slug}»: la envolvente no tiene ningún perfil"]
+
+    faltan, invertidos, fuera = [], 0, 0
+    for pf in perfiles:
+        par = tabla.get(clave_perfil(**pf))
+        if not par or len(par) != 2:
+            faltan.append(clave_perfil(**pf))
+            continue
+        lo, hi = float(par[0]), float(par[1])
+        if lo > hi:
+            invertidos += 1
+            continue
+        punto = predict_probability(model, **pf)
+        # 1e-6 y no 0: la envolvente se guarda redondeada y el punto se
+        # recalcula acá, así que hay ruido de coma flotante. La diferencia
+        # medida entre el estudio y producción es de orden 1e-14.
+        if not (lo - 1e-6 <= punto <= hi + 1e-6):
+            fuera += 1
+
+    if len(tabla) != len(perfiles):
+        problemas.append(
+            f"«{slug}»: la envolvente tiene {len(tabla)} perfiles y la UI "
+            f"ofrece {len(perfiles)}")
+    if faltan:
+        problemas.append(
+            f"«{slug}»: faltan {len(faltan)} perfiles en la envolvente "
+            f"(por ejemplo {faltan[0]})")
+    if invertidos:
+        problemas.append(
+            f"«{slug}»: {invertidos} perfiles con la envolvente al revés "
+            "(mínimo mayor que el máximo)")
+    if fuera:
+        problemas.append(
+            f"«{slug}»: el punto publicado cae FUERA de la envolvente en "
+            f"{fuera} perfiles — la envolvente no corresponde a estos "
+            "coeficientes, regenerala")
+    return problemas
 
 
 def problemas_de_calibracion(slug, model):
@@ -277,7 +444,8 @@ def _probabilidades_bootstrap(model, tramo_edad, es_mujer, nivel_educ, ideologia
 
 
 def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                           victima, es_montevideo, nivel=None):
+                           victima, es_montevideo, nivel=None,
+                           aplicar_envolvente=True):
     """
     Intervalo de confianza percentil para la probabilidad estimada. ES EL QUE SE
     MUESTRA: la decisión editorial sobre el 50% no se toma con éste, sino con
@@ -302,11 +470,20 @@ def intervalo_probabilidad(model, tramo_edad, es_mujer, nivel_educ, ideologia,
     if nivel is None:
         nivel = model.get("nivel_calibrado", 95)
     cola = (100 - nivel) / 2 / 100
-    return _percentil(probabilidades, cola), _percentil(probabilidades, 1 - cola)
+    iv = (_percentil(probabilidades, cola),
+          _percentil(probabilidades, 1 - cola))
+    if not aplicar_envolvente:
+        return iv
+    # Se estira hasta contener lo que dicen las especificaciones que la muestra
+    # no distingue de la publicada. Ver load_envolvente().
+    return _ensanchar(iv, envolvente_perfil(
+        model.get("pregunta_slug"), tramo_edad, es_mujer, nivel_educ,
+        ideologia, victima, es_montevideo))
 
 
 def intervalo_brecha(model, tramo_edad, es_mujer, nivel_educ, ideologia,
-                     victima, es_montevideo, nivel=None):
+                     victima, es_montevideo, nivel=None,
+                     aplicar_envolvente=True):
     """
     Intervalo de la DIFERENCIA entre el perfil y el promedio nacional.
 
@@ -360,7 +537,18 @@ def intervalo_brecha(model, tramo_edad, es_mujer, nivel_educ, ideologia,
     if nivel is None:
         nivel = model.get("nivel_calibrado", 95)
     cola = (100 - nivel) / 2 / 100
-    return _percentil(diferencias, cola), _percentil(diferencias, 1 - cola)
+    iv = (_percentil(diferencias, cola), _percentil(diferencias, 1 - cola))
+    if not aplicar_envolvente:
+        return iv
+    # La envolvente está en escala de probabilidad y esto es una resta, así que
+    # hay que llevarla a la escala de la diferencia restándole el promedio
+    # nacional. El promedio NO depende de la especificación —es la proporción
+    # ponderada observada, no una predicción—, así que la resta es exacta y no
+    # hace falta una envolvente propia para él.
+    return _ensanchar(iv, envolvente_perfil(
+        model.get("pregunta_slug"), tramo_edad, es_mujer, nivel_educ,
+        ideologia, victima, es_montevideo),
+        desplazamiento=model.get("prob_favor_nacional", 0.0))
 
 
 # 1,96: el z de una banda del 95% para la posición del percentil.
@@ -368,7 +556,7 @@ _Z_MC = 1.959964
 
 
 def banda_decision(model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
-                   es_montevideo, nivel=None):
+                   es_montevideo, nivel=None, aplicar_envolvente=True):
     """
     Extremos CONSERVADORES del intervalo, para decidir si se afirma de qué lado
     está la mayoría. No se muestran: sólo gobiernan esa decisión.
@@ -434,8 +622,16 @@ def banda_decision(model, tramo_edad, es_mujer, nivel_educ, ideologia, victima,
     q_bajo, q_alto = cola, 1 - cola
     holgura_bajo = _Z_MC * math.sqrt(q_bajo * (1 - q_bajo) / b)
     holgura_alto = _Z_MC * math.sqrt(q_alto * (1 - q_alto) / b)
-    return (_percentil(probabilidades, max(0.0, q_bajo - holgura_bajo)),
-            _percentil(probabilidades, min(1.0, q_alto + holgura_alto)))
+    banda = (_percentil(probabilidades, max(0.0, q_bajo - holgura_bajo)),
+             _percentil(probabilidades, min(1.0, q_alto + holgura_alto)))
+    if not aplicar_envolvente:
+        return banda
+    # La banda decide si se afirma de qué lado está la mayoría, así que también
+    # tiene que contener a las otras especificaciones: si una admisible pone al
+    # perfil del otro lado del 50, el widget no puede afirmar el lado.
+    return _ensanchar(banda, envolvente_perfil(
+        model.get("pregunta_slug"), tramo_edad, es_mujer, nivel_educ,
+        ideologia, victima, es_montevideo))
 
 
 def _percentil(ordenados, q):

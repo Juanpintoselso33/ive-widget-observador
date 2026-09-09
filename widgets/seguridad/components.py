@@ -301,7 +301,7 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None,
     if intervalo:
         bajo, alto = intervalo
         intervalo_html = (
-            f'<div class="result-intervalo">Intervalo estimado del modelo: '
+            f'<div class="result-intervalo">Intervalo estimado: '
             f'entre <strong>{formato_pct(bajo)}</strong> y '
             f'<strong>{formato_pct(alto)}</strong></div>'
         )
@@ -624,10 +624,21 @@ ancho, calibrado por esa simulación, y el promedio llega al 95%.
 
 Pero el promedio es sobre todos los perfiles, y **el lector recibe el de su
 perfil**: hay combinaciones poco frecuentes donde la cobertura sigue siendo
-bastante menor. Por eso el rótulo dice "intervalo estimado del modelo" y no
-promete un 95% que no se puede sostener perfil por perfil. Sigue siendo la mejor
-medida disponible de cuánta incertidumbre hay detrás del número, y sigue siendo
-ancha a propósito.
+bastante menor. Por eso el rótulo dice "intervalo estimado" a secas y no promete
+un 95% que no se puede sostener perfil por perfil. Sigue siendo la mejor medida
+disponible de cuánta incertidumbre hay detrás del número, y sigue siendo ancha a
+propósito.
+
+**El intervalo también cubre el desacuerdo entre modelos, no sólo el de la
+muestra.** Esa simulación mide cuánto se movería el número con otra muestra,
+suponiendo que la forma del modelo es la correcta. Pero la forma no está dada:
+se probaron nueve maneras razonables de escribirlo —agregando interacciones
+entre ideología y educación, entre educación y edad, y así— y la encuesta no
+alcanza para decidir cuál es mejor. Distintas maneras dan números distintos para
+un mismo perfil. El intervalo que se muestra se estira hasta contener lo que
+dicen todas ellas, así que si dos modelos igual de defendibles discrepan, esa
+discrepancia está adentro. En tres de las cuatro preguntas casi no cambia nada;
+en pena de muerte movió 113 de los 1.008 perfiles.
 
 **Por qué a veces el intervalo no llega al 50% y aun así no se afirma de qué
 lado está la mayoría.** El intervalo no se calcula con una fórmula cerrada: se

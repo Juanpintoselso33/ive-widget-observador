@@ -36,6 +36,39 @@ def ruta_modelo(slug):
     """Ruta del JSON de coeficientes de una pregunta."""
     return MODELOS_DIR / f"model_{slug}.json"
 
+
+# La envolvente de especificación NO va adentro de los JSON de modelo. Es una
+# propiedad de los DATOS y del conjunto de formas funcionales que se probaron,
+# no de los coeficientes publicados, y calcularla exige refitear nueve
+# especificaciones con validación cruzada anidada: meterla en `train_model`
+# multiplicaría por diez lo que tarda entrenar. Va en su propio archivo, lo
+# genera `scripts/agregar_envolvente.py`, y `model.problemas_de_envolvente()`
+# verifica al arrancar que corresponda a los modelos que se están sirviendo.
+RUTA_ENVOLVENTE = MODELOS_DIR / "envolvente_espec.json"
+
+# Que el archivo FALTE tiene que ser un error ruidoso, no una degradación
+# silenciosa. Sin él la aritmética sigue funcionando y devuelve el intervalo sin
+# ensanchar —que es lo que se publicaba antes—, pero eso es publicar intervalos
+# más angostos sin que nada lo diga, que es la clase de error más difícil de
+# notar: la pantalla se ve idéntica y los números están mal.
+#
+# NO se agregó a `huella_contrato` a propósito: la huella está guardada dentro de
+# los cuatro JSON entrenados, así que sumarle un campo los invalidaría a todos y
+# obligaría a reentrenar con 10.000 réplicas para un cambio que no toca ningún
+# coeficiente. El chequeo va aparte, en `model.problemas_de_envolvente()`.
+ENVOLVENTE_REQUERIDA = True
+
+# Los seis códigos del perfil, en el orden de PREDICTORES de la UI. Es la clave
+# del diccionario de la envolvente. Vive acá y no en cada lado porque si el
+# generador y el lector la arman distinto, el lookup falla en silencio y el
+# widget publicaría el intervalo sin ensanchar sin que nada avise.
+def clave_perfil(tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+                 es_montevideo):
+    """Clave canónica de un perfil de la UI, para tablas por perfil."""
+    return "-".join(str(int(v)) for v in
+                    (tramo_edad, es_mujer, nivel_educ, ideologia, victima,
+                     es_montevideo))
+
 # La base vive en el repo de encuestas, no en éste (son datos del cliente y
 # el .gitignore excluye *.csv). Se puede pisar con la variable de entorno
 # SEGURIDAD_DATA_FILE para correr desde otra máquina.
@@ -242,7 +275,7 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #   cadena perpetua 99 → media 96,8%, peor perfil 88,0%, 11 bajo 90%
 #   pena de muerte 97 → media 95,7%, peor perfil 91,5%, ninguno bajo 90%
 #   humillación 98 → media 95,8%, peor perfil 89,0%, 5 bajo 90%
-# El promedio tapa la cola, y por eso la UI dice "intervalo estimado del modelo"
+# El promedio tapa la cola, y por eso la UI dice "intervalo estimado" a secas
 # y no promete un 95% que no se sostiene perfil por perfil.
 #
 # DOS COSAS QUE ESTOS NÚMEROS NO RESUELVEN:
@@ -288,12 +321,49 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #    (Eran 1.736 y 4.298 antes de bootstrapear la diferencia; el estudio se
 #    quedó midiendo la regla vieja cuando el widget cambió y lo marcó Codex.)
 #
-#    Y EL INTERVALO YA ABSORBE CASI TODO: contiene lo que dicen todas las
+#    Y EL INTERVALO YA ABSORBÍA CASI TODO: contenía lo que dicen todas las
 #    especificaciones admitidas en el 100% de los perfiles de mano dura, el
-#    99,3% de cadena perpetua y el 98,1% de humillación. La excepción es PENA DE
-#    MUERTE, con 113 perfiles (11,2%) donde alguna especificación cae afuera y
-#    un exceso máximo de 12,2 pp. Si alguna vez se ensancha un intervalo por
-#    esto, es el de esa pregunta y no el de las cuatro.
+#    99,3% de cadena perpetua y el 98,1% de humillación. La excepción era PENA
+#    DE MUERTE, con 113 perfiles (11,2%) donde alguna caía afuera y un exceso
+#    máximo de 12,2 pp.
+#
+#    ESO SE CERRÓ EL 9/9/2026 ENSANCHANDO HASTA LA ENVOLVENTE. El intervalo que
+#    se publica es ahora el más chico que contiene al bootstrap de la forma
+#    publicada Y a lo que dicen las demás especificaciones admitidas. La tabla
+#    por perfil vive en `modelos/envolvente_espec.json`, la genera
+#    `scripts/agregar_envolvente.py` y `model.load_envolvente()` la aplica.
+#
+#    ES UNA UNIÓN, NO UNA SUMA, y por eso no contradice lo que dice más abajo
+#    sobre no poder sumar este rango al ancho del bootstrap: sumarlos contaría
+#    dos veces el ruido de estimación que los dos comparten; tomar el máximo no
+#    supone independencia de nada.
+#
+#    POR QUÉ VALÍA LA PENA, más allá de los 113. Las dos especificaciones que
+#    empujaban afuera en pena de muerte son las que PREDICEN MEJOR que la
+#    publicada: `todas_2do_orden` con log-loss 0,532 contra 0,542 (t = −2,69,
+#    que no llega al umbral de 2,776 y por eso entra como "indistinguible" en
+#    vez de como mejor) e `ideolxeduc`, la única declarada mejor. O sea que el
+#    intervalo dejaba afuera justamente a los modelos que la muestra prefiere.
+#    Y no eran perfiles marginales: sólo el 31% de los 113 no tiene ningún caso
+#    detrás, contra el 47% del total, y 79 de ellos llevan una afirmación de
+#    mayoría y 68 una de brecha.
+#
+#    LO QUE COSTÓ: se retiran 2 afirmaciones de mayoría sobre 2.562 y 5 de
+#    brecha sobre 1.742, todas de pena de muerte. El ancho mediano del intervalo
+#    mostrado no se mueve en ninguna pregunta (mano dura 34,34; cadena 32,82;
+#    humillación 15,00) y en pena de muerte pasa de 32,38 a 32,43 pp. Cambian
+#    139 perfiles de los 4.032: 0, 7, 113 y 19.
+#
+#    Y ADEMÁS DESAPARECEN LAS CONTRADICCIONES: las 2 afirmaciones de mayoría y
+#    las 4 de brecha que alguna especificación daba vuelta ahora no se afirman.
+#    Es por construcción, no por suerte: si una especificación admisible cae del
+#    otro lado del 50, el intervalo ensanchado contiene al 50 y el widget se
+#    abstiene.
+#
+#    LO QUE NO ARREGLA. La envolvente cubre la dispersión DENTRO de las nueve
+#    formas que se probaron, bajo un criterio de admisión que este mismo bloque
+#    describe como poco confiable al pie de la letra. Si la verdad tiene una
+#    forma que no está en la lista, esto no la alcanza.
 #
 #    DOS DEFECTOS QUE TUVO ESTE ESTUDIO Y QUE ENCONTRÓ CODEX, porque los números
 #    de arriba son los de después de arreglarlos y los de antes estaban inflados:
