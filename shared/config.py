@@ -98,21 +98,46 @@ def get_interpretation(prob, mode="light"):
 # Es una paleta CLARA y sin variante oscura, porque el Figma no la tiene. El
 # widget que la use queda en claro pase lo que pase con el tema del lector.
 OBSERVADOR_COLORS = {
-    # Verde profundo: titular, número del resultado, botones y pill activa.
-    # Ajustado de #14392C: a tamaño de titular leía negro, no verde.
-    "primary": "#1B5E3F",
-    # Naranja: extremo "en contra" del gradiente y las diferencias negativas.
-    "accent": "#E07B39",
-    # Azul del extremo "a favor" del gradiente y de las diferencias positivas.
-    "azul": "#4A63C8",
+    # LEÍDOS DEL PANEL DE INSPECCIÓN DE FIGMA el 8/9/2026, no muestreados de una
+    # captura. La versión anterior salía de promediar píxeles de una imagen y
+    # tenía los tres colores de marca mal. Ver docs/diseno/figma-producto-uy.md.
+
+    # SON DOS VERDES, no uno. Muestrear una captura los promediaba y daba un
+    # tercer verde que no existe en el diseño.
+    # Acento: titular y filete superior de 2px.
+    "primary": "#006B36",
+    # Superficies sólidas: botón, pastilla activa y el número grande.
+    "solid": "#0D443B",
+
+    # El naranja y el azul son los MISMOS del gradiente y de las diferencias:
+    # el extremo "en contra" y una diferencia negativa comparten color, y lo
+    # mismo del lado "a favor". En el mobile del Figma se ve explícito.
+    "accent": "#F57F00",
+    "azul": "#93B6EE",
+
+    # LOS MISMOS DOS COLORES, OSCURECIDOS, PARA CUANDO SON TEXTO.
+    #
+    # No es libertad creativa: los del Figma no se leen. Sobre blanco, el naranja
+    # da 2,65:1 de contraste y el azul 2,07:1, contra el 4,5:1 que pide WCAG AA
+    # para texto normal. En una barra o un relleno eso da igual —son formas, no
+    # letras—, pero la diferencia contra el promedio se publica COMO TEXTO, y en
+    # celeste claro sobre blanco no la lee nadie.
+    #
+    # Se conserva el tono y se baja la luminosidad hasta el mínimo que pasa AA,
+    # así que siguen leyéndose como el mismo naranja y el mismo azul.
+    "accent_texto": "#B55E00",   # 4,60:1
+    "azul_texto": "#2F73DE",     # 4,54:1
+
     "background": "#FFFFFF",
-    # Gris cálido del bloque de resultado, distinto del blanco de la tarjeta.
-    "secondary_bg": "#F4F4F1",
-    "text": "#1A1A1A",
-    "text_muted": "#6B6B6B",
-    "border": "#E2E2DE",
+    # Banda de la zona de resultado y comparación: un tercio del área del
+    # diseño. Ver el pendiente anotado en get_observador_css().
+    "secondary_bg": "#EDEDED",
+    "text": "#1B1B19",
+    # El gris tenue del Figma (#999998) da 2,85:1 y tampoco pasa AA; mismo
+    # criterio que arriba, mismo tono, apenas más oscuro.
+    "text_muted": "#767675",
+    "border": "#D0CFCF",
     "card_bg": "#FFFFFF",
-    "card_shadow": "rgba(0,0,0,0.08)",
-    # Relleno de los selectores.
-    "input_bg": "#F0F0EE",
+    "card_shadow": "rgba(0,0,0,0.15)",
+    "input_bg": "#F2F2F2",
 }

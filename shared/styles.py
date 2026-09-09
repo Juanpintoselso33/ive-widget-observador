@@ -326,7 +326,7 @@ def get_custom_css(mode="light"):
         font-weight: 600;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: {c['text_muted']};
+        color: {c['text']};
         margin-bottom: 0.4rem;
     }}
 
@@ -472,18 +472,45 @@ def get_observador_css():
       · Los grupos se comparan con solapas por dimensión y una fila de números
         grandes, en vez de una lista larga de barras.
 
-    Las tipografías son las que ya estaban (IBM Plex Serif/Sans): el Figma usa
-    otras, pero sin acceso de inspección no se puede saber cuáles, y adivinar
-    una familia de marca es peor que usar uno cercano y decirlo.
+    TIPOGRAFÍAS Y COLORES SALEN DEL PANEL DE INSPECCIÓN, desde el 8/9/2026.
+    Antes de esa fecha decía acá que sin acceso no se podían saber y usaba IBM
+    Plex; con acceso resultó que las DOS familias estaban mal —el diseño usa
+    Libre Baskerville para titulares e Instrument Sans para todo lo demás— y que
+    donde había un verde hay dos. Los valores están en
+    `docs/diseno/figma-producto-uy.md`, junto a los dos frames exportados.
+
+    QUÉ FALTA PARA QUE SEA EL DISEÑO COMPLETO: la banda gris `#EDEDED` que en el
+    Figma cubre la zona de resultado y comparación, un tercio del área. Acá todo
+    va sobre blanco. No es CSS: esa zona son varios bloques sueltos de Streamlit
+    —markdown, `st.tabs`, más markdown— y envolverlos en un solo div pide tocar
+    `components.py`, no esta hoja.
     """
     c = OBSERVADOR_COLORS
 
     return f"""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600;700&display=swap');
+    /* Instrument Sans es variable y trae eje de ANCHO: la bajada del Figma usa
+       la variante Condensed, que sale de la misma familia con `wdth: 75`. Por
+       eso el rango 75..100 en la URL. */
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Libre+Baskerville:wght@400;700&display=swap');
 
     html, body, [class*="css"] {{
-        font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-size: 19px;
+    }}
+
+    /* FIJAR LA FAMILIA EN body NO ALCANZA. Streamlit pone su propia Source Sans
+       en los contenedores de markdown y de los widgets, así que todo lo que
+       escribe el widget la hereda de ahí y no de body: medido, la mitad de los
+       nodos con texto seguía en Source Sans después de cambiar body. Esta regla
+       la fuerza hacia abajo.
+       Va ANTES que las de Libre Baskerville a propósito: el titular y el título
+       de sección las pisan porque tienen más especificidad, no por orden. */
+    [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] *,
+    [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
+    [data-baseweb="select"], [data-baseweb="select"] *,
+    [data-testid="stTab"], [data-testid="stTab"] * {{
+        font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }}
 
     /* El Figma es claro. Se fija el fondo en vez de heredar el tema del
@@ -496,41 +523,67 @@ def get_observador_css():
 
     #MainMenu, footer, header {{visibility: hidden;}}
 
-    .main > div {{
-        max-width: 720px;
+    /* El marco del Figma: 698px de ancho, filete superior de 2px y sombra.
+       VA CONTRA `stMainBlockContainer`, no contra `.main > div`: ese selector
+       es de una versión vieja de Streamlit y acá no existe ningún nodo que lo
+       matchee, así que la regla entera no se aplicaba —el ancho lo seguía
+       fijando el default de 736px—. Verificado contra el DOM. */
+    [data-testid="stMainBlockContainer"], .block-container {{
+        max-width: 698px !important;
         margin: 0 auto;
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
+        border-top: 2px solid {c['primary']};
+        box-shadow: 0 5px 6px {c['card_shadow']};
+        padding: 1.5rem 0.8rem 2rem 0.8rem !important;
     }}
 
     /* ---------- Titulares ---------- */
-    .main-title {{
-        font-family: 'IBM Plex Serif', Georgia, serif;
-        font-size: 2.1rem;
-        font-weight: 700;
+    /* Titular: Libre Baskerville 700, 30/42px, en el verde de acento.
+       TODO VA CON `!important`. Streamlit dibuja esto como encabezado y su
+       propia regla es más específica: sin esto el titular salía en Source Sans
+       a 52px, o sea ni la familia ni el tamaño del diseño. El color sí entraba
+       porque ya lo llevaba. Verificado leyendo el estilo computado. */
+    /* EL TEXTO NO VIVE EN EL h1, VIVE EN UN span ADENTRO. Streamlit envuelve el
+       contenido del encabezado en `<span data-heading-text>` con su propia clase
+       de emotion, así que estilar sólo `.main-title` deja el h1 con la regla
+       correcta y el texto visible con la de Streamlit. Por eso el span también.
+       Verificado leyendo el outerHTML del nodo. */
+    .main-title, .main-title span {{
+        font-family: 'Libre Baskerville', Georgia, serif !important;
+        font-size: 30px !important;
+        font-weight: 700 !important;
         color: {c['primary']} !important;
         margin: 0.5rem 0 0.6rem 0;
-        line-height: 1.15;
-        letter-spacing: -0.015em;
+        line-height: 42px !important;
+        letter-spacing: 0 !important;
+    }}
+
+    /* La bajada va en la variante CONDENSED, con interlineado igual al cuerpo
+       (23/23), que es lo que la hace verse compacta en el Figma. */
+    /* El botoncito de ancla que Streamlit cuelga del encabezado no tiene que
+       heredar los 30px del titular. */
+    .main-title [data-testid="stHeaderActionElement"] {{
+        font-size: 14px !important;
     }}
 
     .subtitle {{
-        font-size: 0.95rem;
-        color: {c['text_muted']} !important;
+        font-family: 'Instrument Sans', sans-serif !important;
+        font-size: 23px !important;
+        font-stretch: 75% !important;
+        color: {c['text']} !important;
         margin-bottom: 1rem;
-        line-height: 1.55;
+        line-height: 23px !important;
     }}
 
-    .section-header {{
-        font-family: 'IBM Plex Serif', Georgia, serif;
-        font-size: 1.05rem;
-        font-weight: 600;
+    .section-header, .section-header span {{
+        font-family: 'Libre Baskerville', Georgia, serif !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
         color: {c['text']} !important;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0;
         margin: 0 0 0.75rem 0;
         padding-bottom: 0.5rem;
-        border-bottom: 1px solid {c['border']};
+        border-bottom: 1px solid {c['text']};
     }}
 
     /* ---------- Controles ---------- */
@@ -541,13 +594,14 @@ def get_observador_css():
        versiones y quedaban radios negros y valores ilegibles. */
     [data-testid="stSelectbox"] [data-baseweb="select"] > div {{
         background: {c['input_bg']} !important;
-        border: none !important;
-        border-radius: 8px !important;
+        border: 1px solid {c['border']} !important;
+        border-radius: 9px !important;
+        min-height: 37px !important;
     }}
 
     .stSelectbox label, .stRadio label {{
-        font-size: 0.9rem !important;
-        font-weight: 500 !important;
+        font-size: 19px !important;
+        font-weight: 400 !important;
         color: {c['text']} !important;
     }}
 
@@ -574,17 +628,19 @@ def get_observador_css():
     }}
 
     .prob-endpoint {{
-        font-size: 0.85rem;
-        font-weight: 500;
+        font-size: 19px;
+        font-weight: 400;
         color: {c['text']};
         text-transform: none;
         letter-spacing: 0;
     }}
 
+    /* Gradiente de dos paradas, naranja a azul, como el del Figma. La versión
+       anterior metía un gris cálido en el medio que no existe en el diseño. */
     .prob-container {{
-        background: linear-gradient(90deg, {c['accent']} 0%, #C9C6C0 50%, #A8B4E0 100%);
+        background: linear-gradient(90deg, {c['accent']} 0%, {c['azul']} 100%);
         border-radius: 6px;
-        height: 30px;
+        height: 31px;
         position: relative;
     }}
 
@@ -606,29 +662,32 @@ def get_observador_css():
         margin-top: 6px;
         background: {c['text']};
         color: #FFFFFF;
-        font-size: 0.85rem;
-        font-weight: 600;
+        font-size: 19px;
+        font-weight: 400;
         padding: 3px 10px;
-        border-radius: 999px;
+        border-radius: 7px;
         white-space: nowrap;
     }}
 
     /* ---------- Tarjeta de resultado ---------- */
+    /* Sin borde: en el Figma la tarjeta se separa sólo por la sombra. */
     .result-card {{
         background: {c['card_bg']};
-        border: 1px solid {c['border']};
-        border-radius: 12px;
+        border: none;
+        border-radius: 10px;
         padding: 1.5rem 1.5rem 1.25rem 1.5rem;
-        box-shadow: 0 2px 10px {c['card_shadow']};
+        box-shadow: 0 5px 6px {c['card_shadow']};
         margin-bottom: 1rem;
     }}
 
+    /* El número grande NO va en el verde del titular: va en el sólido, más
+       oscuro. Son dos verdes distintos. */
     .result-number {{
-        font-family: 'IBM Plex Serif', Georgia, serif;
-        font-size: 3.25rem;
-        font-weight: 700;
-        line-height: 1;
-        color: {c['primary']} !important;
+        font-family: 'Instrument Sans', sans-serif !important;
+        font-size: 50px !important;
+        font-weight: 600 !important;
+        line-height: 1 !important;
+        color: {c['solid']} !important;
         margin-bottom: 0.35rem;
     }}
 
@@ -644,7 +703,7 @@ def get_observador_css():
         line-height: 1.6;
     }}
 
-    .result-text strong {{ color: {c['primary']} !important; }}
+    .result-text strong {{ color: {c['solid']} !important; }}
 
     .result-nacional {{
         margin-top: 1rem;
@@ -656,9 +715,11 @@ def get_observador_css():
 
     .result-nacional-value {{ font-weight: 700; }}
 
-    /* El Figma pinta la diferencia contra el promedio en naranja. */
+    /* El Figma pinta la diferencia contra el promedio en naranja, pero con el
+       naranja del gradiente, que sobre blanco da 2,65:1 y no se lee. Acá va la
+       variante oscurecida; el tono es el mismo. Ver shared/config.py. */
     .result-nacional-diff {{
-        color: {c['accent']} !important;
+        color: {c['accent_texto']} !important;
         font-weight: 500;
     }}
 
@@ -683,21 +744,29 @@ def get_observador_css():
     [data-testid="stTab"] {{
         background: {c['background']};
         border: 1px solid {c['border']};
-        border-radius: 6px;
-        padding: 0.4rem 0.85rem !important;
-        font-size: 0.85rem;
+        border-radius: 7px;
+        padding: 9px !important;
+        font-size: 16px;
         color: {c['text']} !important;
         height: auto !important;
         white-space: nowrap;
     }}
 
     [data-testid="stTab"][aria-selected="true"] {{
-        background: {c['primary']} !important;
-        border-color: {c['primary']} !important;
+        background: {c['solid']} !important;
+        border-color: {c['solid']} !important;
         color: #FFFFFF !important;
     }}
 
     [data-testid="stTab"][aria-selected="true"] p {{ color: #FFFFFF !important; }}
+
+    /* El anillo de foco lo pinta `primaryColor` del config compartido, que es
+       el azul del widget IVE: sobre la pastilla verde quedaba un halo azul. */
+    [data-testid="stTab"]:focus, [data-testid="stTab"]:focus-visible,
+    [data-testid="stTab"]:active {{
+        outline-color: {c['primary']} !important;
+        box-shadow: none !important;
+    }}
 
     [data-testid="stTabs"] [data-baseweb="tab-highlight"],
     [data-testid="stTabs"] [data-baseweb="tab-border"] {{
@@ -729,7 +798,7 @@ def get_observador_css():
         font-weight: 600;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: {c['text_muted']};
+        color: {c['text']};
         margin-bottom: 0.4rem;
         line-height: 1.35;
         min-height: 2.7em;
@@ -740,9 +809,9 @@ def get_observador_css():
     }}
 
     .grupo-celda-valor {{
-        font-family: 'IBM Plex Serif', Georgia, serif;
-        font-size: 1.7rem;
-        font-weight: 700;
+        font-family: 'Instrument Sans', sans-serif !important;
+        font-size: 1.7rem !important;
+        font-weight: 400 !important;
         color: {c['text']} !important;
         line-height: 1;
     }}
@@ -753,8 +822,9 @@ def get_observador_css():
         margin-top: 0.2rem;
     }}
 
-    .grupo-celda-delta--sube {{ color: {c['azul']}; }}
-    .grupo-celda-delta--baja {{ color: {c['accent']}; }}
+    /* Mismo criterio: las variantes legibles, no las del gradiente. */
+    .grupo-celda-delta--sube {{ color: {c['azul_texto']}; }}
+    .grupo-celda-delta--baja {{ color: {c['accent_texto']}; }}
 
     .grupo-nota-ref {{
         margin-top: 1rem;
@@ -785,14 +855,16 @@ def get_observador_css():
     }}
 
     /* ---------- Móvil ---------- */
+    /* EL MÓVIL DEL FIGMA MANTIENE DOS COLUMNAS DE CAMPOS. La versión anterior
+       las apilaba en una, que es el reflejo automático y no lo que pide el
+       diseño: el frame de 331px muestra Edad/Religiosidad, Sexo/Región y así
+       hasta abajo, en dos columnas. Sólo se achica la tipografía. */
     @media (max-width: 640px) {{
-        [data-testid="stHorizontalBlock"] {{ flex-direction: column !important; }}
-        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {{
-            width: 100% !important;
-            flex: 1 1 100% !important;
-        }}
-        .main-title {{ font-size: 1.6rem; }}
-        .result-number {{ font-size: 2.6rem; }}
+        html, body, [class*="css"] {{ font-size: 16px; }}
+        .stSelectbox label, .stRadio label {{ font-size: 16px !important; }}
+        .main-title {{ font-size: 24px !important; line-height: 32px !important; }}
+        .subtitle {{ font-size: 19px !important; line-height: 20px !important; }}
+        .result-number {{ font-size: 40px !important; }}
         .grupo-cifras {{ grid-template-columns: repeat(2, 1fr); gap: 0.75rem 1rem; }}
         .grupo-celda {{ border-left: none; padding: 0 0 0.25rem 0; }}
         .grupo-celda-label {{ min-height: 0; }}
