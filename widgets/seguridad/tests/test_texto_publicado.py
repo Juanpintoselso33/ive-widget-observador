@@ -28,7 +28,9 @@ import json
 import pytest
 
 from widgets.seguridad import config
-from widgets.seguridad.components import brecha_nacional, formato_pct
+from widgets.seguridad.components import (
+    MARCA_ABSTENCION, brecha_nacional, formato_pct,
+)
 from widgets.seguridad.model import predict_probability, intervalo_probabilidad
 
 
@@ -73,8 +75,10 @@ class TestBrechaNacional:
         promedio 67%. El punto está 12 pp abajo; el intervalo no lo sostiene.
         """
         texto = brecha_nacional(55, 67, (27.0, 77.0))
-        assert "no permite afirmar" in texto
-        assert "estimación puntual" in texto
+        assert MARCA_ABSTENCION in texto.lower()
+        # Lo que importa es a QUIÉN se le atribuye la brecha: a la estimación,
+        # no al perfil. Las dos assertions de abajo son las que lo prueban.
+        assert "la estimación" in texto
         assert "12pp" in texto, "el número se sigue mostrando, es información"
         assert "este perfil está" not in texto
 
@@ -88,7 +92,7 @@ class TestBrechaNacional:
         Es el que ve el lector. Con 66,6% el intervalo se muestra como «67%», y
         afirmar una diferencia contra un promedio de 67 contradice la pantalla.
         """
-        assert "no permite afirmar" in brecha_nacional(50, 67, (30.0, 66.6))
+        assert MARCA_ABSTENCION in brecha_nacional(50, 67, (30.0, 66.6))
 
     def test_sin_intervalo_afirma_como_antes(self):
         """Compatibilidad: un modelo sin bootstrap no debería romper la tarjeta."""

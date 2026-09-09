@@ -742,12 +742,6 @@ def get_observador_css():
         margin-bottom: 0.35rem;
     }}
 
-    .result-intervalo {{
-        font-size: 17px;
-        color: {c['text_muted']};
-        margin-bottom: 0.75rem;
-    }}
-
     .result-text {{
         font-size: 19px;
         color: {c['text']};

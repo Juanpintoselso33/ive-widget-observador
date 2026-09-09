@@ -46,6 +46,18 @@ INTENSIDAD = [
 ]
 
 
+# LAS DOS FRASES CON LAS QUE EL WIDGET SE ABSTIENE ARRANCAN IGUAL, y los tests
+# verifican la ABSTENCIÓN por esta constante y no por la redacción entera. Si se
+# afinara el texto, un test pegado a la frase literal se pondría rojo por un
+# cambio de estilo, o —peor— alguien lo "arreglaría" copiando la frase nueva y
+# el test dejaría de probar lo que importa sin que se note.
+#
+# No nombra "margen de error" a propósito: desde que el intervalo dejó de
+# mostrarse, esa expresión mandaba al lector a mirar algo que no está en la
+# pantalla.
+MARCA_ABSTENCION = "con estos datos no se puede afirmar"
+
+
 def interpretar(prob, colors, intervalo=None, banda=None):
     """
     Devuelve (color, texto) sin cargar valoración moral en el color.
@@ -64,12 +76,18 @@ def interpretar(prob, colors, intervalo=None, banda=None):
     anterior, menos prudente.
     """
     decisorio = banda or intervalo
-    # La comparación va sobre los extremos REDONDEADOS, que son los que ve el
-    # lector, y es inclusiva: si en pantalla dice "entre 25% y 50%", afirmar que
-    # la mayoría está en contra contradice lo que el propio intervalo muestra.
+    # La comparación va sobre los extremos REDONDEADOS y es inclusiva. Antes el
+    # motivo era no contradecir el intervalo que se mostraba en pantalla; ya no
+    # se muestra, pero el redondeo se queda igual: una regla binaria que resuelve
+    # más fino que el porcentaje que la acompaña afirma con una precisión que el
+    # número visible no tiene.
     if decisorio and round(decisorio[0]) <= 50 <= round(decisorio[1]):
+        # NO SE NOMBRA EL "MARGEN DE ERROR". Desde que el intervalo dejó de
+        # mostrarse, esa frase mandaba al lector a mirar algo que no está en la
+        # pantalla — y era la mitad de la queja de Tomer, la de que cuesta
+        # entenderlo. Se dice qué pasa, no con qué se calculó.
         return colors["primary"], (
-            "El margen de error no permite afirmar de qué lado está la mayoría "
+            MARCA_ABSTENCION.capitalize() + " de qué lado está la mayoría "
             "en este perfil"
         )
     for umbral, texto in INTENSIDAD:
@@ -265,8 +283,11 @@ def brecha_nacional(prob_r, nacional_r, intervalo, brecha_iv=None):
             and round(intervalo[0]) <= nacional_r <= round(intervalo[1])
         )
     if promedio_dentro:
-        return (f"{arrow} la estimación puntual queda {abs(diff)}pp {posicion}, "
-                "pero el margen de error no permite afirmar la diferencia")
+        # Misma razón que en `interpretar()`: se dejó de nombrar el margen de
+        # error, que el lector ya no ve. La brecha se sigue mostrando, atribuida
+        # a la estimación y no al perfil, que es la distinción que importa.
+        return (f"{arrow} la estimación da {abs(diff)}pp {posicion}, "
+                f"pero {MARCA_ABSTENCION} la diferencia")
     return f"{arrow} este perfil está {abs(diff)}pp {posicion}"
 
 
@@ -294,17 +315,25 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None,
             f'posición clara sobre el tema y quedan fuera de este cálculo.</div>'
         )
 
-    # El intervalo va junto al número, no escondido en la metodología: con 571
-    # casos efectivos y perfiles que muchas veces no existen en la muestra, la
-    # amplitud es parte del dato.
-    intervalo_html = ""
-    if intervalo:
-        bajo, alto = intervalo
-        intervalo_html = (
-            f'<div class="result-intervalo">Intervalo estimado: '
-            f'entre <strong>{formato_pct(bajo)}</strong> y '
-            f'<strong>{formato_pct(alto)}</strong></div>'
-        )
+    # EL INTERVALO YA NO SE MUESTRA, y sigue decidiendo todo. Decisión
+    # editorial de Tomer (El Observador) el 9/9/2026: "a la gente no le sirve de
+    # nada y es difícil de entender". Tiene razón en el diagnóstico y no es un
+    # problema de presentación — el ancho es irreducible. Medido: incluso en los
+    # perfiles con 10 o más casos ponderados detrás, la mediana del intervalo es
+    # de 26,8 / 21,0 / 28,0 / 13,1 pp según la pregunta, porque la muestra
+    # efectiva son unos 600 casos repartidos en 1.008 celdas. No se achica con
+    # más diseño ni con más datos de los que hay.
+    #
+    # QUÉ SE PIERDE, dicho sin maquillar: se publica un número preciso sin
+    # señal visible de cuánto se puede mover. Es la menos honesta de las
+    # opciones que se evaluaron.
+    #
+    # QUÉ SE CONSERVA, que es el mecanismo que de verdad protege al lector: el
+    # intervalo se sigue calculando y sigue gobernando lo que el widget AFIRMA.
+    # Si cruza el 50%, `interpretar()` no dice de qué lado está la mayoría; si
+    # el de la brecha contiene al cero, `brecha_nacional()` no afirma la
+    # diferencia. La prudencia dejó de verse, no de aplicarse. Y el desplegable
+    # de metodología sigue explicando que el número es impreciso.
 
     brecha = brecha_nacional(prob_r, nacional_r, intervalo, brecha_iv)
     # EL COLOR SIGUE AL SIGNO, como en las diferencias por grupo: azul para el
@@ -320,7 +349,6 @@ def render_result_card(model, prob, colors, intervalo=None, banda=None,
     st.markdown(f"""
     <div class="result-card">
         <div class="result-number" style="color: {color};">{formato_pct(prob)}</div>
-        {intervalo_html}
         <div class="result-text">
             El modelo estima que, entre quienes tienen estas características y
             <em>postura definida</em>, ese es el porcentaje que declara
@@ -615,37 +643,36 @@ información de perfiles parecidos, no observándolas: cuanto más inusual sea l
 combinación elegida, más extrapolación hay detrás del número y más ancho es
 su intervalo.
 
-**Qué es el intervalo, y por qué ya no dice "de confianza del 95%".** Se midió
-cuánto cubre de verdad: se tomó el modelo como si fuera el mundo, se simularon
-resultados desde él y se rehízo todo el procedimiento doscientas veces por
-pregunta. Pidiendo el 95% clásico, el intervalo contenía el valor verdadero
-entre el 90% y el 93% de las veces, no el 95%. Ahora se pide un percentil más
-ancho, calibrado por esa simulación, y el promedio llega al 95%.
+**El porcentaje es una estimación, y es imprecisa.** Conviene leerlo como una
+orientación —"este perfil se inclina bastante en contra"— y no como una medición
+exacta. El margen real es amplio: con unas 600 respuestas efectivas repartidas
+entre más de mil combinaciones posibles, para un perfil típico el número podría
+moverse alrededor de diez o quince puntos para cada lado. No es un defecto que
+se pueda corregir con un modelo mejor; es lo que da una encuesta de este tamaño
+cuando se la parte en tantos grupos.
 
-Pero el promedio es sobre todos los perfiles, y **el lector recibe el de su
-perfil**: hay combinaciones poco frecuentes donde la cobertura sigue siendo
-bastante menor. Por eso el rótulo dice "intervalo estimado" a secas y no promete
-un 95% que no se puede sostener perfil por perfil. Sigue siendo la mejor medida
-disponible de cuánta incertidumbre hay detrás del número, y sigue siendo ancha a
-propósito.
+Ese margen se calcula para cada perfil y **es el que decide qué dice esta
+página**, aunque no se muestre. Cuando es tan ancho que el perfil podría estar de
+cualquiera de los dos lados, el widget no dice de qué lado está la mayoría; y
+cuando no alcanza para sostener que el perfil difiere del promedio nacional, lo
+dice en vez de afirmar la diferencia. O sea que las frases que sí aparecen ya
+están filtradas por la incertidumbre.
 
-**El intervalo también cubre el desacuerdo entre modelos, no sólo el de la
-muestra.** Esa simulación mide cuánto se movería el número con otra muestra,
-suponiendo que la forma del modelo es la correcta. Pero la forma no está dada:
-se probaron nueve maneras razonables de escribirlo —agregando interacciones
-entre ideología y educación, entre educación y edad, y así— y la encuesta no
-alcanza para decidir cuál es mejor. Distintas maneras dan números distintos para
-un mismo perfil. El intervalo que se muestra se estira hasta contener lo que
-dicen todas ellas, así que si dos modelos igual de defendibles discrepan, esa
-discrepancia está adentro. En tres de las cuatro preguntas casi no cambia nada;
+**El margen no es sólo el de la muestra: también cubre el desacuerdo entre
+modelos.** Cuánto se movería el número con otra muestra es una parte. La otra es
+que la forma del modelo no está dada: se probaron nueve maneras razonables de
+escribirlo —agregando interacciones entre ideología y educación, entre educación
+y edad, y así— y la encuesta no alcanza para decidir cuál es mejor. Distintas
+maneras dan números distintos para un mismo perfil, y el margen se estira hasta
+contener lo que dicen todas. En tres de las cuatro preguntas casi no cambia nada;
 en pena de muerte movió 113 de los 1.008 perfiles.
 
-**Por qué a veces el intervalo no llega al 50% y aun así no se afirma de qué
-lado está la mayoría.** El intervalo no se calcula con una fórmula cerrada: se
-simula, remuestreando la encuesta mil veces. Un extremo que cae en 49% podría
-haber caído en 51% con otra simulación, así que para afirmar que la mayoría está
-de un lado se exige un margen un poco más ancho que el que se muestra. Cuando el
-extremo queda pegado al 50%, el widget prefiere no afirmar.
+**Y está calibrado contra su propia cobertura.** Se tomó el modelo como si fuera
+el mundo, se simularon resultados desde él y se rehízo todo el procedimiento
+doscientas veces por pregunta. Con el 95% clásico, el margen contenía el valor
+verdadero entre el 90% y el 93% de las veces, no el 95%. Ahora se pide un
+percentil más ancho, calibrado por esa simulación. El promedio llega al 95%, pero
+es un promedio: hay combinaciones poco frecuentes donde sigue quedando corto.
 
 **Sobre la escala ideológica.** La pregunta fue: *"en una escala donde cero es
 la extrema izquierda y 10 es la extrema derecha, ¿dónde se ubicaría usted?"*.
