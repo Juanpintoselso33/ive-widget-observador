@@ -43,9 +43,14 @@ claramente MEJOR que la base, que es un hallazgo aparte y no un empate.
 
 DOS CAVEATS QUE HAY QUE DECIR IGUAL.
 
-1. Esto acota el error de especificación DENTRO de la familia que se probó. Si
-   la verdad tiene una forma que no está en la lista, el número la subestima. No
-   hay forma de medir eso sin conocer el mundo.
+1. Esto NO ES UNA COTA del error de especificación, ni por arriba ni por abajo.
+   Mide la dispersión DENTRO de la familia que se probó. Si la verdad tiene una
+   forma que no está en la lista, el rango observado puede quedar corto o largo
+   —decía "la subestima" y eso era afirmar de más—. Y aunque la logística
+   aditiva fuera la verdad, las interacciones estimadas sobre una muestra finita
+   producirían un rango positivo sólo por ruido: acá se mezclan forma funcional,
+   estimación, regularización y selección. No hay forma de separarlos sin
+   conocer el mundo.
 
 2. EL TEST DE "MEJOR QUE LA BASE" NO ES DE FIAR AL PIE DE LA LETRA, y conviene
    no titular con él. El error estándar apareado se calcula sobre 5 particiones
@@ -58,9 +63,18 @@ DOS CAVEATS QUE HAY QUE DECIR IGUAL.
    —ideología x educación en dos, ideología x región en otra, ninguna en la
    cuarta—, que es justo lo que se ve cuando se está minando ruido.
 
-   LO QUE SÍ ES SÓLIDO no depende de ese test: son especificaciones defendibles,
-   la muestra no las ordena con claridad, y DISCREPAN. Esa discrepancia es el
-   número que interesa.
+   Y NO VALE DECIR que lo demás no depende de ese test: sí depende. Escribí eso
+   —"lo sólido no depende de ese test"— y hasta dije en un mensaje de commit que
+   lo había sacado, sin sacarlo; lo marcó Codex las dos veces. El mismo test
+   decide qué especificaciones ENTRAN, y por lo tanto decide los rangos, los
+   excesos contra el intervalo y los conteos de contradicciones. No se puede
+   desconfiar de él para declarar una interacción "mejor" y apoyarse en él para
+   declarar a otra "admisible".
+
+   Lo que queda en pie es más modesto y hay que decirlo así: bajo ESTE criterio
+   de admisión, con sus limitaciones, especificaciones defendibles discrepan
+   entre sí por varios puntos porcentuales. Es un resultado condicionado al
+   criterio, no independiente de él.
 
 Uso:
     python widgets/seguridad/scripts/error_especificacion.py
@@ -84,7 +98,7 @@ from sklearn.model_selection import StratifiedKFold
 
 from widgets.seguridad import config, train_model as tm
 from widgets.seguridad.model import (build_features, intervalo_probabilidad,
-                                     banda_decision, _interp)
+                                     banda_decision, intervalo_brecha, _interp)
 
 SEMILLAS = (1, 2, 3, 4, 5)
 
@@ -349,8 +363,11 @@ def analizar(slug, df0, verbose=True):
     # con sus reglas:
     #   · mayoría: `components.interpretar()` decide con la BANDA de decisión
     #     —no con el intervalo mostrado—, redondeada y de forma inclusiva.
-    #   · brecha: `components.brecha_nacional()` decide con el intervalo
-    #     MOSTRADO, redondeado y de forma inclusiva.
+    #   · brecha: `components.brecha_nacional()` decide con el intervalo de la
+    #     DIFERENCIA perfil menos promedio —`model.intervalo_brecha()`—,
+    #     redondeado y de forma inclusiva. Antes decidía con el intervalo del
+    #     perfil contra el promedio tratado como punto; este script se quedó
+    #     midiendo la regla vieja cuando el widget cambió, y lo marcó Codex.
     #
     # QUÉ NO SE PUEDE HACER CON ESTO, y hay que decirlo: no se bootstrapea cada
     # especificación alternativa, así que no se sabe qué afirmaría ELLA. Lo que
@@ -365,8 +382,11 @@ def analizar(slug, df0, verbose=True):
     contradice_mayoria = ((M > 50).any(axis=0) & (M < 50).any(axis=0))
     vuelta_mayoria = int((afirma_mayoria & contradice_mayoria).sum())
 
+    brechas = [intervalo_brecha(modelo, **pf) for pf in perfiles]
     afirma_brecha = np.array([
-        not (round(iv[0]) <= nacional_r <= round(iv[1])) for iv in ivs])
+        (not (round(b[0]) <= 0 <= round(b[1]))) if b is not None
+        else (not (round(iv[0]) <= nacional_r <= round(iv[1])))
+        for b, iv in zip(brechas, ivs)])
     Mr = np.round(M)
     contradice_brecha = ((Mr > nacional_r).any(axis=0)
                          & (Mr < nacional_r).any(axis=0))

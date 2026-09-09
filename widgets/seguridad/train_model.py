@@ -465,9 +465,11 @@ def bootstrap_coeficientes(d, X, y, w, n_replicas=1000):
     # LA TASA NACIONAL DE CADA RÉPLICA, del MISMO remuestreo que los
     # coeficientes. Es lo que permite bootstrapear la DIFERENCIA perfil menos
     # promedio en vez de comparar un intervalo contra un punto: la covarianza
-    # entre los dos —que es positiva, porque salen de la misma muestra— sólo se
-    # captura si se calculan dentro de la misma réplica. Sale gratis, es un
-    # promedio ponderado sobre índices que ya están sorteados.
+    # entre los dos sólo se captura si se calculan dentro de la misma réplica.
+    # No se le puede suponer el signo —medida perfil por perfil hay covarianzas
+    # negativas de hasta −1,45 pp²—, y ése es justamente el motivo de calcularla
+    # en vez de razonarla. Sale gratis: es un promedio ponderado sobre índices
+    # que ya están sorteados.
     nacional = []
 
     for i in range(n_replicas):

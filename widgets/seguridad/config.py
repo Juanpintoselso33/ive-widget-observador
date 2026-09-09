@@ -283,8 +283,10 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #    a 10,7), que es lo esperable porque ahí toda especificación extrapola.
 #
 #    LAS AFIRMACIONES, EN CAMBIO, NO SE MUEVEN. De las 2.562 veces que el widget
-#    afirma de qué lado está la mayoría, cambiarían DOS. De las 1.736 veces que
-#    afirma una diferencia contra el promedio nacional, CUATRO. Seis de 4.298.
+#    afirma de qué lado está la mayoría, cambiarían DOS. De las 1.742 veces que
+#    afirma una diferencia contra el promedio nacional, CUATRO. Seis de 4.304.
+#    (Eran 1.736 y 4.298 antes de bootstrapear la diferencia; el estudio se
+#    quedó midiendo la regla vieja cuando el widget cambió y lo marcó Codex.)
 #
 #    Y EL INTERVALO YA ABSORBE CASI TODO: contiene lo que dicen todas las
 #    especificaciones admitidas en el 100% de los perfiles de mano dura, el

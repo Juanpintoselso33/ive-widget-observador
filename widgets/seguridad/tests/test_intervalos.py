@@ -357,3 +357,62 @@ class TestIntervaloDeLaBrecha:
         texto = brecha_nacional(36, 67, (27.0, 45.0), brecha_iv=(-40.0, -22.0))
         assert "este perfil está" in texto
         assert "31pp por debajo" in texto
+
+    def test_largos_distintos_no_se_truncan_en_silencio(self):
+        """
+        Un artefacto con la tasa nacional desalineada tiene que RECHAZARSE, no
+        truncarse. Con `min()` el sobrante se descartaba callado y la resta
+        quedaba contra réplicas que no eran las suyas: Codex lo mostró con un
+        ejemplo donde truncar convierte una abstención en una afirmación.
+        """
+        from widgets.seguridad.model import intervalo_brecha
+        m = self._modelo_sintetico([30.0, 70.0], [20.0, 80.0])
+        completo = intervalo_brecha(m, 1, 0, 1, 3, 0, 0)
+        assert completo is not None
+        assert round(completo[0]) <= 0 <= round(completo[1]), completo
+
+        m["bootstrap"]["nacional"] = [20.0]          # desalineado a propósito
+        assert intervalo_brecha(m, 1, 0, 1, 3, 0, 0) is None, (
+            "con largos distintos truncaba y devolvía un intervalo que no "
+            "contiene el cero, o sea una afirmación inventada"
+        )
+
+    def test_el_arranque_avisa_si_la_tasa_nacional_esta_desalineada(self):
+        """
+        Y no alcanza con que `intervalo_brecha` devuelva None: eso hace que el
+        widget se caiga al chequeo viejo EN SILENCIO. Tiene que gritar al
+        arrancar, como el resto de los problemas del artefacto.
+        """
+        from widgets.seguridad.model import problemas_de_calibracion
+        from widgets.seguridad import config
+        slug = next(s for s in config.SLUGS if s not in config.PREGUNTAS_A_RECALIBRAR)
+        m = self._modelo_sintetico([30.0, 70.0], [20.0])
+        assert any("apareadas" in p for p in problemas_de_calibracion(slug, m))
+
+    def test_respeta_el_nivel_calibrado(self):
+        """
+        El intervalo de la brecha usa el percentil CALIBRADO de la pregunta, no
+        el 95 a secas — igual que el del perfil. Los cinco tests anteriores
+        pasaban aunque se ignorara `nivel_calibrado`; lo marcó Codex.
+        """
+        from widgets.seguridad.model import intervalo_brecha
+        probs = [float(v) for v in range(10, 90)]
+        nacional = [50.0] * len(probs)
+        m = self._modelo_sintetico(probs, nacional)
+        m["nivel_calibrado"] = 99
+        ancho99 = (lambda iv: iv[1] - iv[0])(intervalo_brecha(m, 1, 0, 1, 3, 0, 0))
+        m["nivel_calibrado"] = 80
+        ancho80 = (lambda iv: iv[1] - iv[0])(intervalo_brecha(m, 1, 0, 1, 3, 0, 0))
+        assert ancho99 > ancho80 + 5, (ancho99, ancho80)
+
+    def test_la_comparacion_con_cero_es_inclusiva_y_redondeada(self):
+        """
+        Si el intervalo de la brecha redondeado toca el cero, no se afirma. Con
+        una comparación exclusiva o sin redondeo, un intervalo de -0,4 a 12,3
+        afirmaría — y en pantalla la brecha dice "0pp".
+        """
+        from widgets.seguridad.components import brecha_nacional
+        assert "no permite afirmar" in brecha_nacional(
+            60, 55, (40.0, 70.0), brecha_iv=(-0.4, 12.3))
+        assert "no permite afirmar" in brecha_nacional(
+            60, 55, (40.0, 70.0), brecha_iv=(0.0, 12.3))

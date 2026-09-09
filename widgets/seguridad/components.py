@@ -229,9 +229,12 @@ def brecha_nacional(prob_r, nacional_r, intervalo, brecha_iv=None):
     estima con la misma muestra y tiene su propia incertidumbre. En el docstring
     anterior yo había escrito que ignorarla era "conservador de un solo lado":
     NO ESTABA DEMOSTRADO. La varianza de la resta es Var(perfil) + Var(promedio)
-    − 2·Cov, con la covarianza positiva porque los dos salen de la misma
-    muestra; si esa covarianza es chica, el chequeo viejo afirma DE MÁS, que es
-    justo la clase de error del que ya se sacaron 1.883 casos.
+    − 2·Cov, y el signo del efecto depende de esa covarianza, que nadie había
+    calculado. Tampoco es siempre positiva —eso también lo escribí y era falso:
+    medida perfil por perfil, hay covarianzas negativas de hasta −1,45 pp² en
+    tres de las cuatro preguntas—. Si es chica o negativa, el chequeo viejo
+    afirma DE MÁS, que es justo la clase de error del que ya se sacaron 1.883
+    casos.
 
     Ahora `train_model` guarda, junto a cada réplica de coeficientes, la tasa
     nacional de ESE mismo remuestreo, y `model.intervalo_brecha()` bootstrapea
@@ -249,8 +252,12 @@ def brecha_nacional(prob_r, nacional_r, intervalo, brecha_iv=None):
     posicion = "por encima" if diff > 0 else "por debajo"
 
     if brecha_iv is not None:
-        # La comparación va sobre los extremos REDONDEADOS y es inclusiva, por
-        # el mismo motivo que abajo: es lo que ve el lector.
+        # Redondeo inclusivo, pero NO por el motivo que decía este comentario:
+        # el intervalo de la resta no se muestra, así que "es lo que ve el
+        # lector" era falso —la tarjeta muestra el intervalo del perfil—. El
+        # motivo es el otro: la brecha que se publica va redondeada a enteros, y
+        # una regla binaria que resuelve más fino que el número que acompaña
+        # afirma con una precisión que el texto no tiene. Lo marcó Codex.
         promedio_dentro = round(brecha_iv[0]) <= 0 <= round(brecha_iv[1])
     else:
         promedio_dentro = (

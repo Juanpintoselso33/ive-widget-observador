@@ -254,17 +254,29 @@ Firmes (≥95% de las réplicas): extrema izquierda → izquierda en mano dura
   Y la advertencia que había acá era una suposición sin verificar: decía que
   ignorar la incertidumbre del promedio era "conservador de un solo lado". La
   varianza de la resta es Var(perfil) + Var(promedio) − 2·Cov, y sin calcular
-  esa covarianza el signo no se sabe. Medido, **va para los dos lados según la
-  pregunta**: en mano dura y cadena perpetua el intervalo de la resta sale más
-  angosto que el del perfil (36,9 contra 37,9 y 33,5 contra 33,8), o sea que el
-  chequeo viejo era conservador; en pena de muerte y sobre todo en humillación
-  sale más ANCHO (33,0 contra 32,5 y 23,8 contra 21,9), o sea que el chequeo
-  viejo **afirmaba de más**.
+  esa covarianza el signo no se sabe. Tampoco es cierto —como también llegué a
+  escribir— que esa covarianza sea positiva por venir de la misma muestra: hay
+  covarianzas negativas de hasta −1,45 pp² en tres de las cuatro preguntas.
+
+  Medido, el efecto **va para los dos lados y depende del perfil**, así que no
+  se puede etiquetar una pregunta entera. Anchos del intervalo, en pp:
+
+  | | media perfil → resta | mediana perfil → resta |
+  |---|---|---|
+  | Mano dura | 37,95 → 36,91 | 34,34 → 33,45 |
+  | Cadena perpetua | 33,83 → 33,49 | 32,82 → 32,34 |
+  | Pena de muerte | 32,51 → **33,00** | 32,38 → 32,03 |
+  | Humillación | 21,89 → **23,76** | 15,00 → **16,90** |
+
+  Sólo humillación se ensancha por las dos medidas. En pena de muerte la media
+  sube pero la mediana baja: llamarla "anti-conservadora" a secas era falso, y
+  lo marcó Codex.
 
   Efecto sobre lo que se publica, sobre los 4.032 resultados: 46 perfiles pasan
   a afirmar una diferencia que antes no afirmaban y 40 dejan de afirmarla, 28 de
   ellos en humillación. Esos 40 eran afirmaciones sin el respaldo que decían
-  tener.
+  tener. También cadena perpetua pierde cuatro, así que ni siquiera las dos
+  preguntas "conservadoras" lo son en todos los perfiles.
 - **`stats_by_group` sólo guarda los tramos de edad extremos** (18-29 y 60+),
   así que las dos inversiones internas de edad no se pueden clasificar como "del
   dato" o "del ajuste" sin volver a la base.
