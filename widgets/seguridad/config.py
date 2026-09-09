@@ -275,8 +275,16 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 #   cadena perpetua 99 → media 96,8%, peor perfil 88,0%, 11 bajo 90%
 #   pena de muerte 97 → media 95,7%, peor perfil 91,5%, ninguno bajo 90%
 #   humillación 98 → media 95,8%, peor perfil 89,0%, 5 bajo 90%
-# El promedio tapa la cola, y por eso la UI dice "intervalo estimado" a secas
-# y no promete un 95% que no se sostiene perfil por perfil.
+# El promedio tapa la cola, y por eso la UI nunca prometió un 95% que no se
+# sostiene perfil por perfil.
+#
+# DESDE EL 9/9/2026 LA UI TAMPOCO MUESTRA EL INTERVALO. Decisión editorial de
+# Tomer: "a la gente no le sirve de nada y es difícil de entender". El ancho es
+# irreducible —aun en los perfiles con 10 o más casos ponderados detrás la
+# mediana es de 26,8 / 21,0 / 28,0 / 13,1 pp según la pregunta— así que no era
+# un problema de presentación. Todo lo que sigue en este bloque vale igual: el
+# intervalo se calcula, se calibra y GOBIERNA lo que el widget afirma; lo que
+# se sacó es su exhibición. Ver el comentario en `components.render_result_card`.
 #
 # DOS COSAS QUE ESTOS NÚMEROS NO RESUELVEN:
 #

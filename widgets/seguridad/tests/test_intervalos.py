@@ -23,7 +23,9 @@ import json
 import pytest
 
 from widgets.seguridad import config
-from widgets.seguridad.components import interpretar
+from widgets.seguridad.components import (
+    MARCA_ABSTENCION, brecha_nacional, interpretar,
+)
 from widgets.seguridad.model import (
     _percentil, banda_decision, intervalo_probabilidad, predict_probability,
 )
@@ -69,17 +71,17 @@ class TestReglaDelCincuenta:
 
     def test_intervalo_que_cruza_no_afirma_mayoria(self):
         _, texto = interpretar(43, self.COLORES, (31.0, 58.0))
-        assert "no permite afirmar" in texto
+        assert MARCA_ABSTENCION in texto.lower()
 
     def test_intervalo_que_toca_50_tampoco_afirma(self):
         _, texto = interpretar(36, self.COLORES, (25.0, 50.0))
-        assert "no permite afirmar" in texto, (
+        assert MARCA_ABSTENCION in texto.lower(), (
             "un extremo que se muestra como 50% no puede afirmar mayoría"
         )
 
     def test_extremo_que_redondea_a_50_tampoco_afirma(self):
         _, texto = interpretar(36, self.COLORES, (25.0, 49.6))
-        assert "no permite afirmar" in texto
+        assert MARCA_ABSTENCION in texto.lower()
 
     def test_intervalo_claramente_de_un_lado_si_afirma(self):
         _, texto = interpretar(20, self.COLORES, (12.0, 29.0))
@@ -220,7 +222,7 @@ class TestBandaDeDecision:
                 _, texto = interpretar(prob, self.COLORES, iv, bd)
 
                 if cruza_banda:
-                    assert "no permite afirmar" in texto, (
+                    assert MARCA_ABSTENCION in texto.lower(), (
                         f"[{slug}] la banda {bd} cruza el 50 y el widget igual "
                         f"afirmó: {perfil}"
                     )
@@ -236,7 +238,7 @@ class TestBandaDeDecision:
     def test_la_banda_manda_sobre_el_intervalo(self):
         """Sin tocar el modelo: si la banda cruza el 50, no se afirma."""
         _, texto = interpretar(20, self.COLORES, (12.0, 29.0), (11.0, 51.0))
-        assert "no permite afirmar" in texto
+        assert MARCA_ABSTENCION in texto.lower()
 
     def test_sin_banda_decide_el_intervalo(self):
         """Compatibilidad: el llamado viejo de dos argumentos sigue andando."""
@@ -255,13 +257,13 @@ class TestBordeSimetricoDelCincuenta:
 
     def test_extremo_inferior_que_se_muestra_como_50(self):
         _, texto = interpretar(65, self.COLORES, (50.4, 80.0))
-        assert "no permite afirmar" in texto, (
+        assert MARCA_ABSTENCION in texto.lower(), (
             'en pantalla dice "50% a 80%": no se puede afirmar mayoría a favor'
         )
 
     def test_extremo_inferior_que_redondea_a_50(self):
         _, texto = interpretar(65, self.COLORES, (50.0, 80.0))
-        assert "no permite afirmar" in texto
+        assert MARCA_ABSTENCION in texto.lower()
 
     def test_extremo_inferior_apenas_por_encima_si_afirma(self):
         _, texto = interpretar(65, self.COLORES, (50.6, 80.0))
@@ -349,7 +351,7 @@ class TestIntervaloDeLaBrecha:
         # el intervalo del perfil (27-45) NO contiene al promedio (67): con la
         # regla vieja afirmaría. El de la brecha sí contiene el 0.
         texto = brecha_nacional(36, 67, (27.0, 45.0), brecha_iv=(-8.0, 4.0))
-        assert "no permite afirmar" in texto
+        assert MARCA_ABSTENCION in texto.lower()
         assert "este perfil está" not in texto
 
     def test_y_afirma_cuando_el_cero_queda_afuera(self):
@@ -412,7 +414,7 @@ class TestIntervaloDeLaBrecha:
         afirmaría — y en pantalla la brecha dice "0pp".
         """
         from widgets.seguridad.components import brecha_nacional
-        assert "no permite afirmar" in brecha_nacional(
+        assert MARCA_ABSTENCION in brecha_nacional(
             60, 55, (40.0, 70.0), brecha_iv=(-0.4, 12.3))
-        assert "no permite afirmar" in brecha_nacional(
+        assert MARCA_ABSTENCION in brecha_nacional(
             60, 55, (40.0, 70.0), brecha_iv=(0.0, 12.3))
