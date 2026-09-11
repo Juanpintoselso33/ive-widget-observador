@@ -255,28 +255,49 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 # se apoya en una sola corrida buena; no para afirmar que el nivel elegido
 # cubre.
 #
-# QUÉ CAMBIÓ AL ARREGLAR EL SIMULADOR: nada en lo que se publica. El simulador
-# viejo no reproducía el apareamiento entre réplicas de coeficientes y de mapa
-# que usa producción; arreglado eso y remedido de cero, el criterio recupera
-# TRES de los cuatro niveles —cadena perpetua 99, pena de muerte 97, humillación
-# 98—. El cuarto no: en mano dura el criterio ahora da 97 (95,65% y 96,62% en
-# las dos semillas) y se publica 98.
+# MEDIDO A B=10.000, QUE ES CON LO QUE SE PUBLICA (11/9/2026). Ésta era la
+# deuda vieja: el nivel se había elegido midiendo con 1.000 réplicas y se
+# publica con 10.000, y el signo de esa diferencia no se conocía. Ya se conoce,
+# y fue para el lado favorable: el intervalo cubre un poco MÁS de lo que decía
+# la medición barata, así que tres de los cuatro niveles bajan un punto.
 #
-# Se deja en 98 A PROPÓSITO, y es una decisión editorial declarada, no lo que
-# dice el criterio mecánico. Lo que se gana está medido: pasar de 97 a 98 sube
-# la cobertura media de 96,13% a 97,19%, sube el peor perfil de 71,5% a 73,5% y
-# baja de 53 a 22 los perfiles con cobertura bajo 90%. Lo que se paga —cuánto se
-# ensancha el intervalo que ve el lector— NO está medido acá, así que "sale
-# barato" es un juicio, no un número. Y ni el 97 ni el 98 arreglan la cola: es
-# la pregunta con el peor perfil de las cuatro por lejos.
+#   pregunta            antes   ahora   semilla 601   semilla 602
+#   mano dura              98      97        95,88%        95,38%
+#   cadena perpetua        99      98        95,84%        95,88%
+#   pena de muerte         97      97        96,58%        95,52%
+#   humillación            98      97        95,09%        96,22%
+#
+# 800 simulaciones, 100 por pregunta y semilla, unas 40 horas de máquina. Las
+# salidas están en `scripts/salidas/` y REEMPLAZARON a las de B=1.000: el test
+# compara contra lo que hay ahí, y mezclar dos estudios con distinto B daría un
+# promedio que no es de ningún procedimiento.
+#
+# MANO DURA VOLVIÓ AL CRITERIO, y conviene decir por qué estaba afuera. Entre el
+# 8/9 y el 11/9 publicó 98 cuando el criterio decía 97, y este comentario lo
+# llamaba "decisión editorial declarada". NO LO ERA: la tomé yo, por la cola de
+# esa pregunta, sin consultarlo con nadie, y el rótulo "editorial" le dio un
+# peso que no tenía. Al preguntarlo, la respuesta fue que vale lo que dicen las
+# simulaciones. Hoy las cuatro publican lo que dice el criterio.
+#
+# EL ARGUMENTO DE LA COLA SIGUE SIENDO CIERTO, y por eso queda escrito acá en
+# vez de borrado: mano dura es la pregunta con la peor cola por lejos, y bajar
+# de 98 a 97 duplica los perfiles mal cubiertos.
 #
 # LA COLA EN EL NIVEL PUBLICADO, que es lo que recibe el lector de SU perfil:
-#   mano dura 98 → media 97,2%, peor perfil 73,5%, 22 perfiles bajo 90%
-#   cadena perpetua 99 → media 96,8%, peor perfil 88,0%, 11 bajo 90%
-#   pena de muerte 97 → media 95,7%, peor perfil 91,5%, ninguno bajo 90%
-#   humillación 98 → media 95,8%, peor perfil 89,0%, 5 bajo 90%
+#   mano dura 97 → media 95,6%, peor perfil 74,0%, 68 perfiles bajo 90%
+#   cadena perpetua 98 → media 95,9%, peor perfil 90,0%, ninguno bajo 90%
+#   pena de muerte 97 → media 96,1%, peor perfil 92,0%, ninguno bajo 90%
+#   humillación 97 → media 95,7%, peor perfil 87,0%, 5 bajo 90%
 # El promedio tapa la cola, y por eso la UI nunca prometió un 95% que no se
-# sostiene perfil por perfil.
+# sostiene perfil por perfil. En mano dura la distancia entre el promedio y el
+# peor perfil es de más de veinte puntos: si alguna vez se revisa un nivel, es
+# ése, y con el dato a la vista en vez de con un rótulo inventado.
+#
+# APLICARLO NO EXIGE REENTRENAR. El nivel entra en `huella_contrato`, así que
+# cambiarlo invalida la huella guardada en los cuatro JSON y en la envolvente;
+# pero no participa del ajuste, se aplica al leer. `scripts/aplicar_nivel.py`
+# re-sella los artefactos, y sólo lo hace tras probar que entre los JSON y la
+# configuración no difiere nada más que el nivel.
 #
 # DESDE EL 9/9/2026 LA UI TAMPOCO MUESTRA EL INTERVALO. Decisión editorial de
 # Tomer: "a la gente no le sirve de nada y es difícil de entender". El ancho es
@@ -401,11 +422,14 @@ PREGUNTAS_A_RECALIBRAR = ("politico_mano_dura",)
 # ni ahora: en esta medición el nivel 99 da 96,75% y el factor x1,30 da 95,84%,
 # casi un punto de diferencia. La ventaja del nivel sobre el factor sigue sin
 # demostrarse limpiamente.
+# Los cuatro salen del criterio sobre el estudio a B=10.000; el comentario de
+# arriba tiene la tabla. Al lado va la cobertura que da el 95% nominal, que es
+# lo que justifica pedir un percentil más ancho.
 NIVEL_CALIBRADO = {
-    "politico_mano_dura": 98,   # 95% nominal da 94,1%; el criterio da 97, va 98
-    "cadena_perpetua": 99,      # da 91,3%, la peor de las cuatro
-    "pena_muerte": 97,          # da 93,4%
-    "humillacion_presos": 98,   # da 91,9%
+    "politico_mano_dura": 97,   # el 95% nominal da 93,4%
+    "cadena_perpetua": 98,      # da 92,0%, la peor de las cuatro
+    "pena_muerte": 97,          # da 93,7%
+    "humillacion_presos": 97,   # da 93,3%
 }
 
 # ============================================================

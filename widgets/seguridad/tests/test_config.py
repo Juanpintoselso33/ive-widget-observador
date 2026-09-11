@@ -340,8 +340,11 @@ class TestNivelCalibradoContraLaMedicion:
     "porque el intervalo se ve muy ancho". Acá el criterio queda atado a las
     salidas de `cobertura_simulada.py` que viven en `scripts/salidas/`.
 
-    Que quede MÁS ancho sí se permite, y de hecho pasa: mano dura publica 98
-    cuando el criterio ya se cumple en 97, a propósito, por su cola.
+    Que quede MÁS ancho sí se permite. Durante un tiempo pasaba: mano dura
+    publicaba 98 cuando el criterio ya se cumplía en 97. Yo había escrito en
+    `config.py` que era una "decisión editorial declarada" y NO lo era —la tomé
+    yo sin consultar, y al preguntarlo el 11/9/2026 Juan pidió el nivel que
+    dicen las simulaciones—. Hoy las cuatro publican lo que dice el criterio.
 
     ESTE TEST SE DEJÓ ENGAÑAR DOS VECES, las dos encontradas por Codex con
     control negativo, y cada versión pasaba los 148 tests:
@@ -355,8 +358,10 @@ class TestNivelCalibradoContraLaMedicion:
         aceptaba que una salida nueva omitiera la huella.
 
     Ahora se exige: las cuatro preguntas, al menos dos SEMILLAS distintas por
-    pregunta, el mismo B en todas las corridas de una pregunta, y huella en toda
-    salida que no esté en la lista de las ocho históricas.
+    pregunta, el mismo B en todas las corridas de una pregunta, y huella en
+    TODA salida, sin excepciones. La lista de ocho hashes históricos que eximía
+    a las corridas del 8/9/2026 se borró junto con ellas: el estudio que rige
+    desde el 11/9/2026 es el de B=10.000, y sus ocho salidas traen sello.
 
     Y LA HUELLA CAMBIÓ DE DEFINICIÓN. Era `huella_contrato`, que es el contrato
     de codificación: Codex verificó que sobrevive intacta a cambiar `C_GRID`,
@@ -365,27 +370,6 @@ class TestNivelCalibradoContraLaMedicion:
     del procedimiento, el modelo que hace de verdad y el AST —sin docstrings—
     de las funciones que definen el pipeline.
     """
-
-    # Las ocho corridas del 8/9/2026, anteriores al sello, IDENTIFICADAS POR EL
-    # CONTENIDO DEL ARCHIVO.
-    #
-    # La versión anterior las identificaba por (pregunta, semilla), o sea por
-    # una etiqueta que el archivo se pone solo. Codex copió dos veces la corrida
-    # 402 de cadena perpetua, rotuló una copia como 401, y el test volvió a
-    # aceptar bajarle el nivel a 98. Con el hash del contenido, una copia
-    # rotulada distinto no está en la lista y tiene que traer huella.
-    #
-    # No agregar nada acá: una salida nueva sin huella tiene que fallar.
-    SIN_SELLO = {
-        "e08e75d268463fa17d8c6ec8ba1188fbb55d0b00f1fdc06eea64c5eface13815",
-        "e30ad305d6b9e2b37890bde70b2cddad87a66e3f0ccb4d9e32d03946d5bf8afa",
-        "429b82d7f4048be245f6339144b61614f72015bef99b268ee8b89d1e7a4818bc",
-        "1410965c0c4141d533590dfcc56f28da787825d208a8401de68c03951f946526",
-        "4df0bd5fb3e773cbf5b43b22f411f25d399428c8c3aba4a82f5cb35942ef89d4",
-        "e89ca3a58a688ba289aa0b469bfae2adda7e9f252d6d7d2c7b0ab7f44e91548c",
-        "1cef669bfa22292e22db83f37c45b21df32dc05fcc871f4e107b0e2b25900b3f",
-        "cdcbc07c18c1af837d3c6f25e7b1bd64b6bbe5740d5a7fad3c0581315a1904f3",
-    }
 
     @staticmethod
     def _modulos():
@@ -417,15 +401,7 @@ class TestNivelCalibradoContraLaMedicion:
             )
             return
 
-        import hashlib
         por_slug = agg._cargar()
-        # hash del archivo, indexado por (pregunta, semilla) tal como los rotula
-        hashes = {}
-        for ruta in sorted(salidas.glob("cal-*.json")):
-            crudo = ruta.read_bytes()
-            j = _json.loads(crudo)
-            hashes[(j["slug"], j.get("semilla"))] = \
-                hashlib.sha256(crudo).hexdigest()
 
         faltan = [s for s in config.SLUGS if s not in por_slug]
         assert not faltan, (
@@ -446,8 +422,7 @@ class TestNivelCalibradoContraLaMedicion:
                 clave = (slug, c.get("semilla"))
                 huella = c.get("huella")
                 if huella is None:
-                    if hashes.get(clave) not in self.SIN_SELLO:
-                        sin_sello.append(clave)
+                    sin_sello.append(clave)
                     continue
                 ruta = config.ruta_modelo(slug)
                 if not ruta.exists():
@@ -466,8 +441,7 @@ class TestNivelCalibradoContraLaMedicion:
             f"promedio no es de un solo procedimiento: {mezcladas}"
         )
         assert not sin_sello, (
-            f"estas salidas no traen huella del estudio y no son de las ocho "
-            f"históricas: {sin_sello}"
+            f"estas salidas no traen huella del estudio: {sin_sello}"
         )
         assert not desfasadas, (
             "estas salidas se midieron con otro procedimiento o contra otra "
