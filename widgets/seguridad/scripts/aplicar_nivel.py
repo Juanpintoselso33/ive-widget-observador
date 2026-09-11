@@ -13,12 +13,16 @@ re-sella la huella cada vez que cambia la configuración vuelve inútil el chequ
 que la huella existe para hacer: pasaría siempre. Acá el re-sellado está
 condicionado a una prueba.
 
-Para cada pregunta se recalcula la huella SUSTITUYENDO el nivel que el JSON trae
-guardado. Si esa huella reproduce exactamente la que el JSON tiene, entonces lo
-único que cambió entre el modelo entrenado y la configuración actual es el
-nivel, y re-sellar es legítimo. Si no la reproduce, cambió algo más —un mapeo,
-una categoría, el colapso educativo— y el script ABORTA pidiendo un
-reentrenamiento, que es lo correcto.
+Se recalculan las huellas SUSTITUYENDO EL DICCIONARIO ENTERO de niveles por el
+que traen los propios JSON. Si esas huellas reproducen exactamente las que los
+JSON tienen, entonces lo único que cambió entre los modelos entrenados y la
+configuración actual es el nivel, y re-sellar es legítimo. Si no, cambió algo
+más —un mapeo, una categoría, el colapso educativo— y el script ABORTA pidiendo
+un reentrenamiento, que es lo correcto.
+
+La envolvente pasa por la MISMA prueba antes de que se le toque el contrato:
+que los modelos estén al día no dice nada sobre su procedencia, y re-sellarla a
+ciegas borraría el chequeo de arranque que la habría rechazado.
 
 QUÉ TOCA:
   · `config.NIVEL_CALIBRADO`
@@ -51,14 +55,27 @@ from widgets.seguridad.config import (NIVEL_CALIBRADO, RUTA_ENVOLVENTE, SLUGS,
 CONFIG_PY = Path(config.__file__)
 
 
-def huella_con(slug, nivel):
-    """La huella del contrato como si `slug` publicara en `nivel`."""
-    guardado = NIVEL_CALIBRADO[slug]
-    NIVEL_CALIBRADO[slug] = nivel
+def huellas_historicas(modelos):
+    """
+    Las huellas que corresponderían a los niveles que traen los propios JSON.
+
+    SE SUSTITUYE EL DICCIONARIO ENTERO, no la entrada de una pregunta.
+    `huella_contrato` hashea TODO `NIVEL_CALIBRADO`, así que reponer sólo el
+    nivel de la pregunta que se está mirando deja las otras tres con el valor
+    nuevo y la huella no reproduce la histórica. La versión anterior hacía eso:
+    funcionaba de casualidad mientras la configuración todavía coincidía con los
+    JSON, y rechazaba las cuatro preguntas en cuanto alguien editaba config.py
+    antes de correr el script — mandándolo a un reentrenamiento innecesario.
+    Lo marcó Codex.
+    """
+    guardado = dict(NIVEL_CALIBRADO)
+    NIVEL_CALIBRADO.update({s: m["nivel_calibrado"] for s, m in modelos.items()
+                            if m.get("nivel_calibrado") is not None})
     try:
-        return huella_contrato(slug)
+        return {s: huella_contrato(s) for s in modelos}
     finally:
-        NIVEL_CALIBRADO[slug] = guardado
+        NIVEL_CALIBRADO.clear()
+        NIVEL_CALIBRADO.update(guardado)
 
 
 def niveles_desde_estudio(salidas):
@@ -69,23 +86,39 @@ def niveles_desde_estudio(salidas):
             for slug, corridas in _cargar(salidas).items()}
 
 
-def verificar_que_solo_cambia_el_nivel(modelos):
+def verificar_que_solo_cambia_el_nivel(modelos, envolvente=None):
     """
-    El control que hace legítimo el re-sellado. Devuelve la lista de problemas.
+    El control que hace legítimo el re-sellado. Devuelve (problemas, huellas).
+
+    Verifica los cuatro JSON y, si hay envolvente, TAMBIÉN su contrato. Que los
+    modelos estén al día no dice nada sobre la procedencia de la envolvente: si
+    quedó de una codificación anterior, re-sellarla a ciegas borraría el chequeo
+    de arranque que la habría rechazado. Lo marcó Codex.
     """
     problemas = []
+    faltan = [s for s, m in modelos.items() if m.get("nivel_calibrado") is None]
+    for s in faltan:
+        problemas.append(f"«{s}»: el JSON no trae nivel_calibrado")
+    if faltan:
+        return problemas, {}
+
+    huellas = huellas_historicas(modelos)
     for slug, m in modelos.items():
-        guardado = m.get("nivel_calibrado")
-        if guardado is None:
-            problemas.append(f"«{slug}»: el JSON no trae nivel_calibrado")
-            continue
-        esperada = huella_con(slug, guardado)
-        if m.get("contrato") != esperada:
+        if m.get("contrato") != huellas[slug]:
             problemas.append(
-                f"«{slug}»: con su propio nivel ({guardado}) la huella da "
-                f"{esperada} y el JSON dice {m.get('contrato')} — cambió algo "
-                "MÁS que el nivel, hay que reentrenar")
-    return problemas
+                f"«{slug}»: con los niveles que traen los JSON la huella da "
+                f"{huellas[slug]} y el JSON dice {m.get('contrato')} — cambió "
+                "algo MÁS que el nivel, hay que reentrenar")
+
+    for slug, bloque in (envolvente or {}).get("preguntas", {}).items():
+        if slug not in huellas:
+            problemas.append(f"«{slug}»: la envolvente trae una pregunta que no existe")
+        elif bloque.get("contrato") != huellas[slug]:
+            problemas.append(
+                f"«{slug}»: la envolvente dice {bloque.get('contrato')} y la "
+                f"histórica es {huellas[slug]} — la envolvente NO es de esta "
+                "codificación, regenerala con agregar_envolvente.py")
+    return problemas, huellas
 
 
 def escribir_config(nuevos):
@@ -122,7 +155,9 @@ def main():
     modelos = {s: json.loads(ruta_modelo(s).read_text(encoding="utf-8"))
                for s in SLUGS}
 
-    problemas = verificar_que_solo_cambia_el_nivel(modelos)
+    env = (json.loads(RUTA_ENVOLVENTE.read_text(encoding="utf-8"))
+           if RUTA_ENVOLVENTE.exists() else None)
+    problemas, _ = verificar_que_solo_cambia_el_nivel(modelos, env)
     if problemas:
         print("NO se puede re-sellar:")
         for p in problemas:
@@ -154,8 +189,7 @@ def main():
         ruta_modelo(slug).write_text(
             json.dumps(m, ensure_ascii=False), encoding="utf-8")
 
-    if RUTA_ENVOLVENTE.exists():
-        env = json.loads(RUTA_ENVOLVENTE.read_text(encoding="utf-8"))
+    if env is not None:
         for slug, bloque in env.get("preguntas", {}).items():
             bloque["contrato"] = huellas[slug]
         RUTA_ENVOLVENTE.write_text(
