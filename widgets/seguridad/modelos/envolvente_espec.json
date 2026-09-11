@@ -4,7 +4,7 @@
  "origen": "widgets/seguridad/scripts/error_especificacion.py --detalle",
  "preguntas": {
   "politico_mano_dura": {
-   "contrato": "8c8600c261355d2c",
+   "contrato": "25fa71ee0063d0ed",
    "admitidas": [
     "ideolxeduc",
     "educxedad",
@@ -4056,7 +4056,7 @@
    }
   },
   "cadena_perpetua": {
-   "contrato": "99ebb503f7f21751",
+   "contrato": "13e0743f2b6c356e",
    "admitidas": [
     "ideolxregion",
     "base",
@@ -8108,7 +8108,7 @@
    }
   },
   "pena_muerte": {
-   "contrato": "1a5b543bb90b368f",
+   "contrato": "9c1e95230c663842",
    "admitidas": [
     "todas_2do_orden",
     "ideolxeduc",
@@ -12159,7 +12159,7 @@
    }
   },
   "humillacion_presos": {
-   "contrato": "c5a3a3d4a6b2c3c8",
+   "contrato": "35a93a24599a4314",
    "admitidas": [
     "educxedad",
     "base",
