@@ -119,6 +119,11 @@ def test_no_quedan_clases_de_la_hoja_vieja(render, synthetic_model):
     components.render_result_card(81.0, 76.5, prob_neutral=19.0)
 
     usadas = _clases_usadas(render.html)
+    # SIN ESTO EL TEST ES DECORATIVO: si la captura fallara y `usadas` quedara
+    # vacío, "ninguna clase vieja está presente" sería verdad y el test pasaría
+    # con el widget sin renderizar nada.
+    assert "result-card" in usadas
+
     vivas = [c for c in CLASES_MUERTAS if c in usadas]
     assert not vivas, (
         f"siguen emitiéndose clases que la hoja del Figma no estila: {vivas}"
@@ -152,6 +157,42 @@ def test_toda_clase_propia_que_emite_existe_en_la_hoja(render, synthetic_model):
     assert not huerfanas, (
         f"el widget emite clases que la hoja no estila: {sorted(huerfanas)}"
     )
+
+
+# ----------------------------------------------------------------------
+# Los entry points
+# ----------------------------------------------------------------------
+
+def test_el_entry_carga_la_hoja_del_figma_y_arma_la_banda():
+    """
+    El fallo que este archivo viene a prevenir NO estaba en los componentes:
+    la hoja del Figma existía hacía días y el widget IVE simplemente no la
+    cargaba. Todo el resto de la suite pasaba igual.
+
+    Y la banda gris tampoco sale de la hoja: `get_observador_css()` engancha
+    `.st-key-banda_resultado`, que sólo existe si el entry envuelve esa parte en
+    `st.container(key="banda_resultado")`. Sin el contenedor la hoja entra igual
+    y la zona del resultado queda blanca, que es un defecto mudo.
+    """
+    entry = (Path(__file__).parent.parent / "app.py").read_text(encoding="utf-8")
+
+    assert "get_observador_css" in entry
+    assert "get_custom_css" not in entry
+    assert 'st.container(key="banda_resultado")' in entry
+
+
+def test_el_entry_del_deploy_no_duplica_el_widget():
+    """
+    `app.py` de la raíz era una copia casi literal del entry del IVE, y esa
+    copia es la razón de que el estilo viviera en dos lados y sólo uno se
+    actualizara. Tiene que delegar, no repetir.
+    """
+    raiz = (Path(__file__).parent.parent.parent.parent / "app.py").read_text(encoding="utf-8")
+
+    assert "widgets" in raiz and "ive" in raiz and "app.py" in raiz
+    # Si vuelve a renderizar por su cuenta, volvió la duplicación.
+    assert "render_result_card" not in raiz
+    assert "get_custom_css" not in raiz
 
 
 # ----------------------------------------------------------------------
@@ -243,4 +284,13 @@ def test_el_componente_no_elige_colores(render, synthetic_model):
     components.render_result_card(81.0, 76.5, prob_neutral=19.0)
     components.render_probability_bar(81.0)
 
-    assert "color:" not in render.html.replace("color: ", "color:").lower()
+    estilos = re.findall(r'style="([^"]*)"', render.html)
+    # El control de que esto no pasa por vacío: el indicador de la barra SÍ
+    # lleva un `style` —la posición, `left: …%`—, así que si no aparece ningún
+    # atributo de estilo es que no se renderizó nada y el test no probó nada.
+    assert any("left:" in e for e in estilos), (
+        "no se emitió ni el `style` de posición del indicador: la captura falló"
+    )
+
+    con_color = [e for e in estilos if "color" in e.lower()]
+    assert not con_color, f"colores elegidos en línea: {con_color}"
