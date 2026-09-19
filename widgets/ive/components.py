@@ -40,16 +40,20 @@ def texto_interpretacion(prob):
 
 
 def render_header():
-    """Renderiza título y subtítulo."""
+    """
+    Título y bajada, con los textos que mandó Tomer Urwicz el 19/9/2026.
+
+    La bajada quedó en una sola línea a pedido suyo: decía "Basado en la
+    encuesta de El Observador a uruguayos *con opinión formada* sobre el tema",
+    y la aclaración metodológica se mudó al desplegable del modelo.
+    """
     st.markdown(
         '<h1 class="main-title">¿Cuál es tu probabilidad de apoyar '
-        'el derecho a decidir sobre el embarazo?</h1>',
+        'el derecho a la interrupción voluntaria del embarazo?</h1>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<p class="subtitle">Basado en la encuesta de El Observador a uruguayos '
-        '<em>con opinión formada</em> sobre el tema. '
-        'Seleccioná tus características:</p>',
+        '<p class="subtitle">Seleccioná tus características:</p>',
         unsafe_allow_html=True,
     )
 
@@ -156,69 +160,36 @@ def render_probability_bar(prob):
     st.markdown(bar_html, unsafe_allow_html=True)
 
 
-def render_result_card(prob, prob_nacional, prob_neutral=None):
+def render_result_card(prob):
     """
-    La tarjeta de resultado: número grande, interpretación y promedio nacional.
+    La tarjeta de resultado: el número grande y una sola frase.
 
-    SIN COLORES EN LÍNEA. Los ponía todos el llamador con la paleta semántica
-    vieja; ahora el número y el énfasis los pinta la hoja con el verde sólido
-    del Figma, y el único color que varía es el de la diferencia contra el
-    promedio, que sigue al SIGNO y no a una valoración: azul si el perfil queda
-    por encima del promedio, naranja si queda por debajo. Son los mismos dos
-    colores que los extremos del gradiente, y se aplican con las mismas clases
-    que las diferencias por grupo.
+    ADELGAZADA A PEDIDO DE TOMER el 19/9/2026: *"el bloque que te resume es muy
+    técnico, yo lo dejaría solo con"* la frase de abajo. Salieron tres cosas:
+
+    - la línea "Probabilidad de apoyar… *entre quienes tienen postura definida*",
+    - el promedio nacional con la brecha del perfil,
+    - y el "Además, X% no toma posición clara…".
+
+    Lo que se pierde es la referencia inmediata: el número queda sin con qué
+    compararse ahí mismo. NO se pierde del widget: el bloque de comparación
+    sigue diciendo el promedio nacional —"La diferencia es contra el promedio
+    nacional, 76%"— y el desplegable del modelo sigue explicando que el cálculo
+    excluye a quienes no tienen postura definida. Queda dicho porque la decisión
+    es editorial y suya, no un descuido.
+
+    SIN COLORES EN LÍNEA: el número y el énfasis los pinta la hoja.
     """
     texto = texto_interpretacion(prob)
 
-    # La diferencia se calcula sobre los valores YA REDONDEADOS que ve el
-    # lector: si en pantalla dicen 81% y 77%, la brecha tiene que decir 4pp.
-    # Restar primero y redondear después da 5pp y la cuenta no cierra a la
-    # vista, que en una pieza periodística se lee como un error. Es el mismo
-    # criterio que en el widget de seguridad.
-    prob_r = round(prob)
-    nacional_r = round(prob_nacional)
-    diff = prob_r - nacional_r
-
-    # El formato sale del Figma, que lo muestra como "↓2pp por debajo". Dice
-    # DÓNDE CAE TU PERFIL respecto del promedio: la versión anterior decía
-    # "↑ 4pp vs. tu" colgando de la línea del promedio nacional, que además de
-    # quedar cortada se leía al revés —como si el que estuviera por encima fuera
-    # el promedio— porque la resta es perfil menos nacional.
-    if diff > 0:
-        brecha = f"↑{abs(diff)}pp por encima"
-        clase_brecha = "grupo-celda-delta--sube"
-    elif diff < 0:
-        brecha = f"↓{abs(diff)}pp por debajo"
-        clase_brecha = "grupo-celda-delta--baja"
-    else:
-        brecha = "igual al promedio"
-        clase_brecha = ""
-
-    neutral_html = ""
-    if prob_neutral is not None:
-        neutral_html = (
-            f'<div class="result-neutral">'
-            f'Además, <strong>{prob_neutral:.0f}%</strong> de las personas con tu perfil '
-            f'no toma posición clara sobre el tema y queda fuera de este cálculo.'
-            f'</div>'
-        )
-
     st.markdown(f"""
     <div class="result-card">
-        <div class="result-number">{prob_r}%</div>
+        <div class="result-number">{round(prob)}%</div>
         <div class="result-text">
-            Probabilidad de apoyar el derecho a decidir sobre el embarazo
-            <em>entre quienes tienen postura definida</em>.<br>
-            <strong>Es {texto}</strong> al IVE según tus características.
+            <strong>Es {texto}</strong> al IVE según tus características, pero
+            esto es un ejercicio de probabilidades y no una confirmación de tus
+            posiciones.
         </div>
-        <div class="result-nacional">
-            Promedio nacional:
-            <span class="result-nacional-value">{nacional_r}%</span>
-            <span class="result-nacional-diff {clase_brecha}">
-                {brecha}
-            </span>
-        </div>
-        {neutral_html}
     </div>
     """, unsafe_allow_html=True)
 
@@ -294,8 +265,8 @@ def render_comparisons(model, prob_nacional):
         unsafe_allow_html=True,
     )
     st.markdown(
-        '<p class="subtitle">Porcentaje que se declaró a favor en cada grupo de '
-        'la encuesta, sin ajustar por las demás características.</p>',
+        '<p class="subtitle">A continuación puedes compararte con otras '
+        'características de la población:</p>',
         unsafe_allow_html=True,
     )
 
@@ -352,8 +323,10 @@ def render_methodology(model):
     """Renderiza el expander con la explicación metodológica."""
     with st.expander("¿Cómo funciona este modelo?"):
         st.markdown("""
-        Este widget utiliza un **modelo de regresión logística** entrenado con datos de la encuesta de
-        El Observador realizada en Uruguay.
+        Este widget utiliza un **modelo de regresión logística** entrenado con
+        datos de la encuesta realizada en Uruguay por El Observador, la UMAD y
+        Juan Pablo Ferreira. Y contó con la colaboración en la programación de
+        Juan Ignacio Pintos.
 
         **Variables más influyentes:**
 
@@ -376,8 +349,22 @@ def render_methodology(model):
         """.format(model['model_info']['pseudo_r2']))
 
 
-def render_footer(model):
-    """Renderiza el pie de página."""
+def render_footer(model, resumido=False):
+    """
+    El pie de página.
+
+    En la versión de caja va la línea de crédito y nada más: el resto de la
+    ficha técnica vive en el desplegable del modelo, que en esa versión no se
+    muestra, pero la caja siempre linkea al widget completo.
+    """
+    if resumido:
+        st.markdown(
+            '<div class="footer-text"><strong>El Observador</strong> | '
+            'Encuesta realizada en Uruguay 2025/2026</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
     st.markdown("""
     <div class="footer-text">
         <strong>El Observador</strong> | Encuesta realizada en Uruguay 2025/2026<br>

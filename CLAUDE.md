@@ -74,6 +74,7 @@ ive_widget/                         # Raíz del repo (plataforma multi-widget)
 | Quiero... | Comando |
 |-----------|---------|
 | Correr el IVE widget (actual deploy) | `streamlit run app.py` |
+| Ver la versión de caja del IVE | abrir con `?resumen=1` |
 | Correr el IVE widget standalone | `streamlit run widgets/ive/app.py` |
 | Correr el widget de seguridad | `streamlit run widgets/seguridad/app.py` |
 | Correr widget nuevo | `streamlit run widgets/<nombre>/app.py` |

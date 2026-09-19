@@ -20,7 +20,11 @@ if str(_ROOT) not in sys.path:
 
 import streamlit as st
 from shared.styles import get_observador_css
-from widgets.ive.model import load_model as _load_model, predict_probability, predict_probability_neutral
+# Sin `predict_probability_neutral`: la tasa de "no toma posición" salió de la
+# tarjeta por pedido editorial (ver render_result_card). El modelo auxiliar se
+# sigue entrenando y viajando en el JSON, así que volver a mostrarla es sumar la
+# llamada de nuevo, no reentrenar nada.
+from widgets.ive.model import load_model as _load_model, predict_probability
 from widgets.ive.components import (
     render_header, render_inputs, render_probability_bar,
     render_result_card, render_comparisons, render_methodology, render_footer,
@@ -30,6 +34,28 @@ from widgets.ive.components import (
 @st.cache_data
 def load_model():
     return _load_model()
+
+
+# La versión de caja se pide por query param: `?resumen=1`. Va por URL y no por
+# un control en pantalla porque quien la elige es quien arma el embebido en la
+# nota, no el lector. Tomer lo pidió el 18/9/2026: "ver si puede haber una
+# versión resumida para que entre en una caja".
+PARAM_RESUMEN = "resumen"
+_VERDADEROS = {"1", "true", "si", "sí"}
+
+
+def modo_resumen():
+    """
+    Si el embebido pidió la versión de caja.
+
+    Tolera que el parámetro venga repetido (`?resumen=1&resumen=0`): Streamlit
+    devuelve una lista y quedarse con la primera es lo mismo que hace él para
+    el valor escalar.
+    """
+    valor = st.query_params.get(PARAM_RESUMEN)
+    if isinstance(valor, (list, tuple)):
+        valor = valor[0] if valor else None
+    return str(valor).strip().lower() in _VERDADEROS
 
 
 def main():
@@ -71,13 +97,11 @@ def main():
         )
         st.stop()
 
+    resumen = modo_resumen()
+
     render_header()
     inputs = render_inputs(MODEL)
     prob = predict_probability(MODEL, *inputs)
-
-    prob_neutral = None
-    if 'coefficients_neutral' in MODEL:
-        prob_neutral = predict_probability_neutral(MODEL, *inputs)
 
     # LA BANDA GRIS DEL FIGMA. Desde el gradiente hasta el pie, el diseño va
     # sobre #EDEDED y no sobre blanco: es un tercio del área. No se puede hacer
@@ -88,10 +112,16 @@ def main():
     # CSS.
     with st.container(key="banda_resultado"):
         render_probability_bar(prob)
-        render_result_card(prob, prob_nacional, prob_neutral=prob_neutral)
-        render_comparisons(MODEL, prob_nacional)
-        render_methodology(MODEL)
-        render_footer(MODEL)
+        render_result_card(prob)
+        # En la caja entran el formulario y el resultado. Lo que se saca es lo
+        # que hace scroll: la comparación por grupos y el desplegable del
+        # modelo. El promedio nacional queda dicho en la comparación, así que
+        # en la caja no aparece en ningún lado — es el costo de la versión
+        # corta, y por eso la caja tiene que linkear al widget completo.
+        if not resumen:
+            render_comparisons(MODEL, prob_nacional)
+            render_methodology(MODEL)
+        render_footer(MODEL, resumido=resumen)
 
 
 if __name__ == "__main__":

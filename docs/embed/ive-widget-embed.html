@@ -1,63 +1,104 @@
 <!--
   Código de embed para el widget IVE — El Observador
-  Funciona en desktop y mobile, se adapta al ancho disponible.
-  Reemplazá WIDGET_URL por la URL pública del widget en Streamlit Cloud.
+
+  La URL ya está puesta: https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/
+
+  HAY DOS VERSIONES:
+
+    · COMPLETA — formulario, resultado, comparación por grupos y el desplegable
+      del modelo. Es la de la nota.
+    · CAJA (`?resumen=1`) — formulario y resultado, nada más. Es la que pidió
+      Tomer el 18/9/2026 para que entre en una caja; no muestra la comparación
+      ni la metodología, así que **conviene que la caja linkee a la completa**,
+      que es donde está el promedio nacional y la ficha del modelo.
+
+  LAS ALTURAS ESTÁN MEDIDAS, no estimadas (19/9/2026, Chrome, con las fuentes
+  ya cargadas y habiendo scrolleado hasta el fondo):
+
+      versión    ancho 700px   ancho 400px
+      completa      1638           1721
+      caja          1098           1035
+
+  La completa CRECE en móvil —el titular y los textos ocupan más líneas— y la
+  caja se achica. Si se cambia un texto, volver a medir: un iframe corto no
+  avisa, sólo recorta.
 -->
 
-<!-- EMBED CODE - Copiar desde aquí -->
+<!-- ============================================================
+     1) VERSIÓN COMPLETA — para la nota
+     ============================================================ -->
 <div style="width:100%;max-width:700px;margin:0 auto;">
   <iframe
-    src="WIDGET_URL"
-    title="¿Apoyás el IVE? Construí tu perfil — El Observador"
+    src="https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/?embed=true"
+    title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
     width="100%"
-    height="900"
+    height="1660"
     frameborder="0"
-    scrolling="yes"
+    scrolling="no"
     style="display:block;border:none;"
     loading="lazy"
-    allow="clipboard-write"
   ></iframe>
 </div>
-<!-- FIN EMBED CODE -->
 
-
-<!--
-  INSTRUCCIONES:
-  1. Reemplazá WIDGET_URL por la URL del widget (ej: https://tu-app.streamlit.app)
-  2. Pegá el bloque entre los comentarios en el HTML del artículo
-  3. El div externo centra el widget y lo limita a 700px en pantallas anchas
-  4. En mobile el iframe ocupa el 100% del ancho disponible automáticamente
-  5. Si el contenido se corta en altura, ajustá el valor height="900" (en px)
-
-  VERSIÓN RESPONSIVE CON ALTURA AUTOMÁTICA (requiere JS):
-  Usá el snippet de abajo si el CMS permite JavaScript inline.
--->
-
-<!-- EMBED CON ALTURA AUTOMÁTICA (opcional, requiere JS) -->
-<div id="ive-widget-container" style="width:100%;max-width:700px;margin:0 auto;">
+<!-- ============================================================
+     2) VERSIÓN CAJA — formulario y resultado
+     ============================================================ -->
+<div style="width:100%;max-width:700px;margin:0 auto;">
   <iframe
-    id="ive-widget"
-    src="WIDGET_URL"
-    title="¿Apoyás el IVE? Construí tu perfil — El Observador"
+    src="https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/?resumen=1&amp;embed=true"
+    title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
     width="100%"
-    height="900"
+    height="1120"
     frameborder="0"
-    scrolling="yes"
+    scrolling="no"
     style="display:block;border:none;"
     loading="lazy"
-    allow="clipboard-write"
+  ></iframe>
+</div>
+
+<!-- ============================================================
+     3) ALTURA SEGÚN EL ANCHO — si el CMS permite JavaScript
+     ============================================================
+     Las dos versiones se comportan al revés entre sí, así que el salto va en
+     el sentido que corresponda a cada una. Los números salen de la tabla de
+     arriba, con un margen de ~25px.
+-->
+<div style="width:100%;max-width:700px;margin:0 auto;">
+  <iframe
+    id="ive-widget"
+    src="https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/?embed=true"
+    data-version="completa"
+    title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
+    width="100%"
+    height="1660"
+    frameborder="0"
+    scrolling="no"
+    style="display:block;border:none;"
+    loading="lazy"
   ></iframe>
 </div>
 <script>
-  (function() {
+  (function () {
     var iframe = document.getElementById('ive-widget');
-    function setHeight() {
-      var w = iframe.offsetWidth;
-      // En mobile (< 480px) usar más altura; en desktop menos
-      iframe.height = w < 480 ? 1100 : 900;
+    if (!iframe) return;
+    // alto = [angosto (<480px), ancho]
+    var ALTURAS = { completa: [1750, 1660], caja: [1060, 1120] };
+    function ajustar() {
+      var alturas = ALTURAS[iframe.dataset.version] || ALTURAS.completa;
+      iframe.height = iframe.offsetWidth < 480 ? alturas[0] : alturas[1];
     }
-    setHeight();
-    window.addEventListener('resize', setHeight);
+    ajustar();
+    window.addEventListener('resize', ajustar);
   })();
 </script>
-<!-- FIN EMBED CON ALTURA AUTOMÁTICA -->
+
+<!--
+  NOTAS
+
+  · `?embed=true` es de Streamlit: saca su barra superior y el menú.
+  · `scrolling="no"` va junto con la altura completa. Si se prefiere un iframe
+    más bajo con scroll interno, poner `scrolling="yes"` — pero en móvil el
+    scroll anidado se pelea con el de la nota.
+  · El widget ya es responsive y mantiene sus dos columnas de campos hasta
+    400px, como el frame móvil del Figma.
+-->

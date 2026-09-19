@@ -16,6 +16,11 @@ con *Main file path* `app.py` — que desde el 19/9/2026 no repite el widget: ej
 19/9/2026. Es el widget que la diseñadora dibujó: el frame de `Producto UY` tiene
 sus campos. Ver `docs/diseno/figma-producto-uy.md`.
 
+Tiene **dos versiones**: la completa y la de caja, que se pide con **`?resumen=1`**
+y deja sólo el formulario y el resultado —sin comparación ni metodología— para
+entrar en una caja dentro de una nota. Código de embed y alturas medidas de las
+dos en `docs/embed/ive-widget-embed.html`.
+
 ## Widgets en desarrollo
 
 | Widget | Slug | Tema | Entry point | Estado |

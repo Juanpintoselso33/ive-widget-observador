@@ -28,11 +28,14 @@ from shared.styles import get_observador_css  # noqa: E402
 from widgets.ive import components  # noqa: E402
 
 
-# Las que tiene que emitir, escritas a mano.
+# Las que tiene que emitir, escritas a mano. Sin `result-nacional`: el promedio
+# nacional salió de la tarjeta por pedido editorial del 19/9/2026 y ahora vive
+# sólo en el bloque de comparación. La regla sigue en la hoja porque la usa el
+# widget de seguridad.
 CLASES_FIGMA = [
     "grupo-cifras", "grupo-celda", "grupo-celda-label", "grupo-celda-valor",
     "grupo-celda-delta", "result-card", "result-number", "result-text",
-    "result-nacional", "prob-container", "prob-label", "section-header",
+    "prob-container", "prob-label", "section-header",
 ]
 
 # Las de la hoja vieja, que ninguna regla de la nueva toca.
@@ -108,7 +111,7 @@ def _clases_usadas(html):
 
 def test_emite_las_clases_del_figma(render, synthetic_model):
     components.render_comparisons(synthetic_model, synthetic_model["prob_nacional"])
-    components.render_result_card(81.0, 76.5, prob_neutral=19.0)
+    components.render_result_card(81.0)
     components.render_probability_bar(81.0)
 
     usadas = _clases_usadas(render.html)
@@ -118,7 +121,7 @@ def test_emite_las_clases_del_figma(render, synthetic_model):
 
 def test_no_quedan_clases_de_la_hoja_vieja(render, synthetic_model):
     components.render_comparisons(synthetic_model, synthetic_model["prob_nacional"])
-    components.render_result_card(81.0, 76.5, prob_neutral=19.0)
+    components.render_result_card(81.0)
 
     usadas = _clases_usadas(render.html)
     # SIN ESTO EL TEST ES DECORATIVO: si la captura fallara y `usadas` quedara
@@ -142,7 +145,7 @@ def test_toda_clase_propia_que_emite_existe_en_la_hoja(render, synthetic_model):
     las pone el framework y no tienen por qué estar en esta hoja.
     """
     components.render_comparisons(synthetic_model, synthetic_model["prob_nacional"])
-    components.render_result_card(81.0, 76.5, prob_neutral=19.0)
+    components.render_result_card(81.0)
     components.render_probability_bar(81.0)
     components.render_header()
     components.render_footer(synthetic_model)
@@ -219,6 +222,92 @@ def test_el_entry_carga_la_hoja_del_figma_y_arma_la_banda():
         and kw.arg == "key" and isinstance(kw.value, ast.Constant)
     ]
     assert "banda_resultado" in claves
+
+
+@pytest.mark.parametrize("valor, esperado", [
+    ("1", True), ("true", True), ("si", True), ("sí", True), ("SÍ", True),
+    ("0", False), ("false", False), ("", False), (None, False),
+    ("cualquiera", False),
+])
+def test_el_modo_caja_se_pide_por_query_param(monkeypatch, valor, esperado):
+    """
+    `?resumen=1` es lo que elige la versión de caja. Se prueban también los
+    valores que NO la activan: sin el control negativo, una implementación que
+    devolviera siempre True pasaría igual.
+    """
+    from widgets.ive import app as entry
+
+    params = {} if valor is None else {entry.PARAM_RESUMEN: valor}
+    monkeypatch.setattr(entry.st, "query_params", params)
+
+    assert entry.modo_resumen() is esperado
+
+
+def test_el_modo_caja_tolera_el_parametro_repetido(monkeypatch):
+    """`?resumen=1&resumen=0` llega como lista; no puede explotar."""
+    from widgets.ive import app as entry
+
+    monkeypatch.setattr(entry.st, "query_params", {entry.PARAM_RESUMEN: ["1", "0"]})
+    assert entry.modo_resumen() is True
+
+
+def _correr_entry(monkeypatch, synthetic_model, query_params):
+    """
+    Ejecuta `main()` con Streamlit doblado y devuelve qué secciones se dibujaron.
+
+    EJECUTA DE VERDAD en vez de leer el AST. La primera versión de este test
+    miraba si las llamadas estaban dentro de algún `ast.If`, y eso no
+    discriminaba: cambiar `if not resumen:` por `if True:` seguía siendo un
+    `If`, el widget quedaba mostrando todo siempre y el test pasaba igual.
+    """
+    from widgets.ive import app as entry
+
+    dibujadas = []
+
+    class _Ctx:
+        def __enter__(self): return self
+        def __exit__(self, *e): return False
+
+    monkeypatch.setattr(entry.st, "query_params", query_params)
+    monkeypatch.setattr(entry.st, "set_page_config", lambda **k: None)
+    monkeypatch.setattr(entry.st, "markdown", lambda *a, **k: None)
+    monkeypatch.setattr(entry.st, "container", lambda **k: _Ctx())
+    monkeypatch.setattr(entry, "load_model", lambda: synthetic_model)
+    monkeypatch.setattr(entry, "predict_probability", lambda *a, **k: 75.0)
+    monkeypatch.setattr(entry, "render_inputs", lambda m: (2, 0, 2, 2, 0, 0, 2, "otros"))
+
+    for nombre in ("render_header", "render_probability_bar", "render_result_card",
+                   "render_comparisons", "render_methodology", "render_footer"):
+        monkeypatch.setattr(entry, nombre,
+                            lambda *a, _n=nombre, **k: dibujadas.append(_n))
+
+    entry.main()
+    return dibujadas
+
+
+def test_la_caja_saca_la_comparacion_y_la_metodologia(monkeypatch, synthetic_model):
+    """Lo que define la versión de caja es qué NO dibuja."""
+    from widgets.ive import app as entry
+
+    dibujadas = _correr_entry(monkeypatch, synthetic_model,
+                              {entry.PARAM_RESUMEN: "1"})
+
+    assert "render_comparisons" not in dibujadas
+    assert "render_methodology" not in dibujadas
+    # Y lo que SÍ es la caja, para que el test no pase por no dibujar nada.
+    assert "render_result_card" in dibujadas
+    assert "render_probability_bar" in dibujadas
+    assert "render_header" in dibujadas
+    assert "render_footer" in dibujadas
+
+
+def test_la_version_completa_dibuja_todo(monkeypatch, synthetic_model):
+    """El otro lado del control: sin el parámetro no se saca nada."""
+    dibujadas = _correr_entry(monkeypatch, synthetic_model, {})
+
+    assert "render_comparisons" in dibujadas
+    assert "render_methodology" in dibujadas
+    assert "render_result_card" in dibujadas
 
 
 def test_el_entry_del_deploy_no_duplica_el_widget():
@@ -347,45 +436,73 @@ def test_una_dimension_sin_datos_no_genera_solapa(render, synthetic_model):
 
 
 # ----------------------------------------------------------------------
-# El color sigue al signo, y no lo pone el componente
+# Los textos que pidió Tomer (19/9/2026)
 # ----------------------------------------------------------------------
 
-@pytest.mark.parametrize("prob, nacional, clase_esperada, clase_prohibida", [
-    (81.0, 76.5, "grupo-celda-delta--sube", "grupo-celda-delta--baja"),
-    (60.0, 76.5, "grupo-celda-delta--baja", "grupo-celda-delta--sube"),
-])
-def test_la_brecha_contra_el_nacional_lleva_la_clase_del_signo(
-    render, prob, nacional, clase_esperada, clase_prohibida
-):
-    components.render_result_card(prob, nacional)
-
-    assert clase_esperada in render.html
-    assert clase_prohibida not in render.html
-
-
-def test_un_perfil_igual_al_promedio_no_lleva_clase_de_signo(render):
-    components.render_result_card(76.5, 76.5)
-
-    assert "igual al promedio" in render.html
-    assert "grupo-celda-delta--sube" not in render.html
-    assert "grupo-celda-delta--baja" not in render.html
-
-
-def test_la_brecha_dice_de_que_lado_cae_el_perfil(render):
+def test_la_tarjeta_quedo_sin_el_bloque_tecnico(render):
     """
-    La resta es perfil menos nacional, pero la frase cuelga de la línea del
-    promedio nacional: decir "↑4pp" a secas ahí se leía como si el que estuviera
-    por encima fuera el promedio. Tiene que decir dónde cae el perfil.
-    """
-    components.render_result_card(81.0, 76.5)
-    assert "↑5pp por encima" in render.html
+    Pedido editorial de Tomer: el bloque de resultado "es muy técnico" y queda
+    sólo con el número y la frase. Salen la línea "entre quienes tienen postura
+    definida", el promedio nacional con su brecha, y el % de neutrales.
 
-    # 60 contra 76,5 da 16pp y no 17: los dos valores se redondean ANTES de
-    # restar, y `round(76.5)` es 76 —Python redondea al par, no hacia arriba—,
-    # que es también lo que se muestra como promedio nacional. La cuenta cierra
-    # con lo que se ve, que es de lo que se trata.
-    components.render_result_card(60.0, 76.5)
-    assert "↓16pp por debajo" in render.html
+    Se asertan las AUSENCIAS y también la presencia, porque un render que
+    fallara dejaría pasar las tres ausencias sin probar nada.
+    """
+    components.render_result_card(81.0)
+
+    assert "81%" in render.html
+    assert "ejercicio de probabilidades y no una confirmación" in render.html
+
+    assert "postura definida" not in render.html
+    assert "Promedio nacional" not in render.html
+    assert "result-nacional" not in render.html
+    assert "no toma posición clara" not in render.html
+
+
+def test_la_tarjeta_no_recibe_el_promedio_nacional():
+    """
+    El promedio salió de la tarjeta, así que tampoco tiene que seguir
+    entrando por la firma: un parámetro que nadie usa vuelve a aparecer en
+    pantalla solo.
+    """
+    import inspect
+
+    assert list(inspect.signature(components.render_result_card).parameters) == ["prob"]
+
+
+def test_los_textos_del_titulo_y_la_bajada(render):
+    components.render_header()
+
+    assert "interrupción voluntaria del embarazo" in render.html
+    assert "Seleccioná tus características:" in render.html
+    # La bajada quedó en una línea: la aclaración metodológica se fue al
+    # desplegable del modelo.
+    assert "con opinión formada" not in render.html
+
+
+def test_los_creditos_de_la_encuesta(render, synthetic_model, monkeypatch):
+    """
+    Los créditos que pidió Tomer, con las tres instituciones y la persona.
+    Van juntos y en el mismo lugar, así que se verifican los cuatro.
+    """
+    class _Exp:
+        def __enter__(self): return self
+        def __exit__(self, *e): return False
+
+    monkeypatch.setattr(components.st, "expander", lambda *a, **k: _Exp())
+    components.render_methodology(synthetic_model)
+
+    for credito in ("El Observador", "UMAD", "Juan Pablo Ferreira",
+                    "Juan Ignacio Pintos"):
+        assert credito in render.html, f"falta el crédito: {credito}"
+    # El typo del mensaje original ("por de El Observador") no se copia.
+    assert "por de El Observador" not in render.html
+
+
+def test_la_bajada_de_la_comparacion(render, synthetic_model):
+    components.render_comparisons(synthetic_model, synthetic_model["prob_nacional"])
+
+    assert "A continuación puedes compararte con otras características" in render.html
 
 
 def test_el_componente_no_elige_colores(render, synthetic_model):
@@ -395,7 +512,7 @@ def test_el_componente_no_elige_colores(render, synthetic_model):
     la hoja.
     """
     components.render_comparisons(synthetic_model, synthetic_model["prob_nacional"])
-    components.render_result_card(81.0, 76.5, prob_neutral=19.0)
+    components.render_result_card(81.0)
     components.render_probability_bar(81.0)
 
     estilos = re.findall(r'style="([^"]*)"', render.html)
