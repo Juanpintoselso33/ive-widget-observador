@@ -12,6 +12,24 @@
   se ve como un error, y el menú deja al lector reiniciar la app. Con
   `embed=true` queda sólo el contenido.
 
+  ⚠️ PROBABLEMENTE ESTE EMBED ESTÉ CORTADO Y NADIE LO HAYA MIRADO. El 19/9/2026,
+  probando el del IVE dentro de un iframe de verdad, apareció esto: pedida a
+  secas, Streamlit Cloud no devuelve la app sino un envoltorio que la carga en
+  OTRO iframe adentro. Ese iframe anidado sólo se redimensiona cuando la página
+  está arriba de todo; dentro del iframe de una nota se queda en ~150px y el
+  widget se ve **cortado a la altura del título**, con el resto en blanco y una
+  barra "Built with Streamlit / Fullscreen" al pie. La solución es apuntar a
+  `/~/+/`, que es la ruta del iframe interno: entra entero y sin la barra.
+  En el IVE está medido y corregido — ver `ive-widget-embed.html`.
+
+  ACÁ NO SE CAMBIÓ porque no se pudo comprobar: la app de seguridad estaba
+  dormida y no responde hasta que alguien la despierte, y cambiar la URL de un
+  embed publicado sin verla funcionar es justo el tipo de arreglo a ciegas que
+  no corresponde. Para cerrarlo: despertar la app, armar una página con este
+  iframe, mirar si el widget entra entero, y si está cortado cambiar las dos
+  URLs de abajo a
+  `https://observador-seguridad.streamlit.app/~/+/?embed=true`.
+
   ============================================================
   ALTURAS — medidas, no estimadas
   ============================================================
