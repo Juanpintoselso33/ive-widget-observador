@@ -8,6 +8,14 @@ Registro de widgets disponibles en la plataforma.
 |--------|------|------|-------------|--------|
 | ¿Apoyás el IVE? | `ive` | IVE / aborto | `widgets/ive/app.py` | ✅ Activo |
 
+Desplegado en **https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/**,
+con *Main file path* `app.py` — que desde el 19/9/2026 no repite el widget: ejecuta
+`widgets/ive/app.py`, que es el entry real.
+
+**Usa la hoja del Figma** (`get_observador_css`), la misma que seguridad, desde el
+19/9/2026. Es el widget que la diseñadora dibujó: el frame de `Producto UY` tiene
+sus campos. Ver `docs/diseno/figma-producto-uy.md`.
+
 ## Widgets en desarrollo
 
 | Widget | Slug | Tema | Entry point | Estado |

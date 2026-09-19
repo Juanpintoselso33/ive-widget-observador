@@ -1,7 +1,12 @@
 """
 Componentes UI del widget IVE.
 Cada función renderiza una sección del widget usando Streamlit.
-Diseño editorial inspirado en The Economist + El Observador.
+
+Sigue el Figma "Producto UY", página **Widget IVE** — que es literalmente el
+mock de este widget: el frame tiene "¿Tienes hijos?", "Balotaje 2019" y
+"Religiosidad". Los valores están en `docs/diseno/figma-producto-uy.md` y la
+hoja de estilos es `shared.styles.get_observador_css()`, la misma que ya usaba
+el widget de seguridad.
 """
 
 import sys
@@ -11,7 +16,27 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import streamlit as st
-from widgets.ive.config import BALOTAJE_UI_TO_CODE, get_interpretation, get_colors
+# Sin la paleta: desde que la hoja del Figma pinta el número, el énfasis y las
+# diferencias, ningún componente de acá elige un color. El único que queda es el
+# `style="left: …%"` del indicador de la barra, que es posición y no color.
+from shared.config import PROB_THRESHOLDS
+from widgets.ive.config import BALOTAJE_UI_TO_CODE
+
+
+def texto_interpretacion(prob):
+    """
+    El texto de interpretación, SIN color.
+
+    `shared.config.get_interpretation()` devuelve además una clave de color
+    semántica —verde, ámbar, rojo— que la paleta del Figma no tiene: la
+    diseñadora resolvió el widget con dos verdes, un naranja y un azul, y
+    ninguno codifica "bueno" o "malo". Acá se recorren los mismos umbrales y se
+    descarta esa clave a propósito; el color del resultado lo pone la hoja.
+    """
+    for umbral, _clave_color, texto in PROB_THRESHOLDS:
+        if prob >= umbral:
+            return texto
+    return PROB_THRESHOLDS[-1][2]
 
 
 def render_header():
@@ -103,17 +128,23 @@ def render_inputs(model):
     return tramo_edad, es_mujer, nivel_educ, religiosidad_num, es_montevideo, tiene_hijos, hogar, balotaje
 
 
-def render_probability_bar(prob, colors=None):
-    """Renderiza la barra visual de probabilidad con gradiente editorial."""
-    if colors is None:
-        colors = get_colors()
+def render_probability_bar(prob):
+    """
+    La barra de probabilidad con el gradiente naranja → azul del Figma.
 
-    st.markdown('<hr class="editorial-divider">', unsafe_allow_html=True)
+    SIN LÍNEA DIVISORIA ACÁ. La había, y ahora el corte entre el formulario y el
+    resultado lo hace el borde de la banda gris, que empieza justo en este
+    punto: dejar las dos era una raya suelta sobre el gris.
+
+    Los extremos van en capitalización normal, no en versalitas: el Figma los
+    tiene como cuerpo —"A favor" / "En contra"— y la hoja no les pone
+    `text-transform`, así que en mayúsculas quedaban gritando.
+    """
     bar_html = f"""
     <div class="prob-bar-wrapper">
         <div class="prob-endpoints">
-            <span class="prob-endpoint prob-endpoint--contra">EN CONTRA</span>
-            <span class="prob-endpoint prob-endpoint--favor">A FAVOR</span>
+            <span class="prob-endpoint prob-endpoint--contra">En contra</span>
+            <span class="prob-endpoint prob-endpoint--favor">A favor</span>
         </div>
         <div class="prob-container">
             <div class="prob-indicator" style="left: {prob}%;">
@@ -125,40 +156,66 @@ def render_probability_bar(prob, colors=None):
     st.markdown(bar_html, unsafe_allow_html=True)
 
 
-def render_result_card(prob, prob_nacional, colors=None, mode="light", prob_neutral=None):
-    """Renderiza la tarjeta de resultado con promedio nacional y % de neutrales."""
-    if colors is None:
-        colors = get_colors(mode)
+def render_result_card(prob, prob_nacional, prob_neutral=None):
+    """
+    La tarjeta de resultado: número grande, interpretación y promedio nacional.
 
-    color, texto = get_interpretation(prob, mode)
+    SIN COLORES EN LÍNEA. Los ponía todos el llamador con la paleta semántica
+    vieja; ahora el número y el énfasis los pinta la hoja con el verde sólido
+    del Figma, y el único color que varía es el de la diferencia contra el
+    promedio, que sigue al SIGNO y no a una valoración: azul si el perfil queda
+    por encima del promedio, naranja si queda por debajo. Son los mismos dos
+    colores que los extremos del gradiente, y se aplican con las mismas clases
+    que las diferencias por grupo.
+    """
+    texto = texto_interpretacion(prob)
 
-    diff = prob - prob_nacional
-    arrow = "↑" if diff > 0 else "↓" if diff < 0 else "="
-    diff_color = colors["success"] if diff > 0 else colors["danger"] if diff < 0 else colors["text_muted"]
+    # La diferencia se calcula sobre los valores YA REDONDEADOS que ve el
+    # lector: si en pantalla dicen 81% y 77%, la brecha tiene que decir 4pp.
+    # Restar primero y redondear después da 5pp y la cuenta no cierra a la
+    # vista, que en una pieza periodística se lee como un error. Es el mismo
+    # criterio que en el widget de seguridad.
+    prob_r = round(prob)
+    nacional_r = round(prob_nacional)
+    diff = prob_r - nacional_r
+
+    # El formato sale del Figma, que lo muestra como "↓2pp por debajo". Dice
+    # DÓNDE CAE TU PERFIL respecto del promedio: la versión anterior decía
+    # "↑ 4pp vs. tu" colgando de la línea del promedio nacional, que además de
+    # quedar cortada se leía al revés —como si el que estuviera por encima fuera
+    # el promedio— porque la resta es perfil menos nacional.
+    if diff > 0:
+        brecha = f"↑{abs(diff)}pp por encima"
+        clase_brecha = "grupo-celda-delta--sube"
+    elif diff < 0:
+        brecha = f"↓{abs(diff)}pp por debajo"
+        clase_brecha = "grupo-celda-delta--baja"
+    else:
+        brecha = "igual al promedio"
+        clase_brecha = ""
 
     neutral_html = ""
     if prob_neutral is not None:
         neutral_html = (
-            f'<div class="result-neutral" '
-            f'style="margin-top:8px;font-size:0.85em;color:{colors["text_muted"]};">'
-            f'Además, <strong>{prob_neutral:.0f}%</strong> de personas con tu perfil '
-            f'no toma posición clara sobre el tema.'
+            f'<div class="result-neutral">'
+            f'Además, <strong>{prob_neutral:.0f}%</strong> de las personas con tu perfil '
+            f'no toma posición clara sobre el tema y queda fuera de este cálculo.'
             f'</div>'
         )
 
     st.markdown(f"""
     <div class="result-card">
-        <div class="result-number" style="color: {color};">{prob:.0f}%</div>
+        <div class="result-number">{prob_r}%</div>
         <div class="result-text">
             Probabilidad de apoyar el derecho a decidir sobre el embarazo
             <em>entre quienes tienen postura definida</em>.<br>
-            <strong style="color: {color};">Es {texto}</strong> al IVE según tus características.
+            <strong>Es {texto}</strong> al IVE según tus características.
         </div>
         <div class="result-nacional">
             Promedio nacional:
-            <span class="result-nacional-value">{prob_nacional:.0f}%</span>
-            <span class="result-nacional-diff" style="color: {diff_color};">
-                {arrow} {abs(diff):.0f}pp vs. tu
+            <span class="result-nacional-value">{nacional_r}%</span>
+            <span class="result-nacional-diff {clase_brecha}">
+                {brecha}
             </span>
         </div>
         {neutral_html}
@@ -166,71 +223,116 @@ def render_result_card(prob, prob_nacional, colors=None, mode="light", prob_neut
     """, unsafe_allow_html=True)
 
 
-def render_comparisons(model, prob, colors=None):
-    """Renderiza las comparaciones por grupo en tabs."""
-    if colors is None:
-        colors = get_colors()
+# Las dimensiones del bloque comparativo y la etiqueta de cada grupo. Declarado
+# acá y no cableado en el render para que agregar o sacar un grupo no obligue a
+# tocar también el reparto de columnas — que es justo lo que había antes, con un
+# `st.columns(n)` distinto por solapa.
+GRUPOS_ORDEN = [
+    ("Por religiosidad", ["religiosidad_nada", "religiosidad_poco",
+                          "religiosidad_bastante", "religiosidad_mucho"]),
+    ("Por balotaje 2024", ["balotaje_martinez", "balotaje_lacalle"]),
+    ("Por educación", ["educacion_primaria", "educacion_secundaria",
+                       "educacion_ter_incomp", "educacion_ter_comp"]),
+    ("Por edad", ["edad_18-24", "edad_25-34", "edad_35-44",
+                  "edad_45-54", "edad_55+"]),
+]
 
+GRUPOS_LABEL = {
+    "religiosidad_nada": "Nada religioso",
+    "religiosidad_poco": "Poco religioso",
+    "religiosidad_bastante": "Bastante religioso",
+    "religiosidad_mucho": "Muy religioso",
+    "balotaje_martinez": "Orsi (FA)",
+    "balotaje_lacalle": "Delgado (Coalición)",
+    "educacion_primaria": "Primaria o menos",
+    "educacion_secundaria": "Secundaria",
+    "educacion_ter_incomp": "Terciaria incompleta",
+    "educacion_ter_comp": "Terciaria completa+",
+    "edad_18-24": "18-24",
+    "edad_25-34": "25-34",
+    "edad_35-44": "35-44",
+    "edad_45-54": "45-54",
+    "edad_55+": "55+",
+}
+
+
+def render_comparisons(model, prob_nacional):
+    """
+    Comparación por grupos con el formato del Figma: una solapa por dimensión y
+    adentro una fila de números grandes con su diferencia contra el promedio.
+
+    Antes era una `metric-card` por columna de `st.columns`. El Figma lo resuelve
+    con una grilla de cuatro columnas fijas —dos en móvil— y celdas separadas por
+    un filete, que es lo que estila `.grupo-cifras` / `.grupo-celda`. La grilla
+    también arregla lo que el reparto por columnas hacía mal con la solapa de
+    edad: cinco `st.columns` en una fila dejaban las celdas más angostas que las
+    de las otras solapas; en la grilla, la quinta baja a una segunda fila
+    alineada con la primera.
+
+    LA DIFERENCIA ES CONTRA EL PROMEDIO NACIONAL, no contra la predicción de tu
+    perfil, y es un cambio de qué se está midiendo. Restarla contra el perfil
+    mezclaba dos cosas distintas: estas son tasas OBSERVADAS por grupo en la
+    encuesta, sin ajustar, y la del perfil es una predicción que controla por
+    todo lo demás. El widget de seguridad ya lo había corregido por ese motivo.
+    """
     st.markdown('<hr class="editorial-divider">', unsafe_allow_html=True)
     st.markdown(
         '<div class="section-header">Comparación con otros grupos</div>',
         unsafe_allow_html=True,
     )
+    st.markdown(
+        '<p class="subtitle">Porcentaje que se declaró a favor en cada grupo de '
+        'la encuesta, sin ajustar por las demás características.</p>',
+        unsafe_allow_html=True,
+    )
 
     stats = model['stats_by_group']
 
-    tab1, tab2, tab3, tab4 = st.tabs(
-        ["Por religiosidad", "Por balotaje 2024", "Por educación", "Por edad"]
+    # Se arma primero y se dibuja después: una dimensión sin ningún grupo con
+    # dato no debe generar una solapa vacía.
+    dimensiones = []
+    for titulo, claves in GRUPOS_ORDEN:
+        celdas = [(k, stats[k]) for k in claves if stats.get(k) is not None]
+        if celdas:
+            dimensiones.append((titulo, celdas))
+
+    if not dimensiones:
+        return
+
+    nacional_r = round(prob_nacional)
+
+    for solapa, (_, celdas) in zip(st.tabs([t for t, _ in dimensiones]), dimensiones):
+        with solapa:
+            html = []
+            for clave, valor in celdas:
+                # Sobre los valores YA redondeados, que son los que se ven:
+                # restar antes y redondear después deja cuentas que no cierran
+                # a la vista.
+                d = round(valor) - nacional_r
+                if d:
+                    signo = "+" if d > 0 else "−"
+                    clase = "sube" if d > 0 else "baja"
+                    delta_html = (
+                        f'<div class="grupo-celda-delta '
+                        f'grupo-celda-delta--{clase}">{signo}{abs(d)}pp</div>'
+                    )
+                else:
+                    delta_html = ('<div class="grupo-celda-delta">'
+                                  'igual al promedio</div>')
+                html.append(
+                    f'<div class="grupo-celda">'
+                    f'<div class="grupo-celda-label">{GRUPOS_LABEL[clave]}</div>'
+                    f'<div class="grupo-celda-valor">{round(valor)}%</div>'
+                    f'{delta_html}</div>'
+                )
+            st.markdown(f'<div class="grupo-cifras">{"".join(html)}</div>',
+                        unsafe_allow_html=True)
+
+    st.markdown(
+        f'<div class="grupo-nota-ref">La diferencia es contra el promedio '
+        f'nacional, {nacional_r}%.</div>',
+        unsafe_allow_html=True,
     )
-
-    with tab1:
-        col1, col2, col3, col4 = st.columns(4)
-        _group_metric(col1, stats, 'religiosidad_nada', "Nada religioso", prob, colors)
-        _group_metric(col2, stats, 'religiosidad_poco', "Poco religioso", prob, colors)
-        _group_metric(col3, stats, 'religiosidad_bastante', "Bastante religioso", prob, colors)
-        _group_metric(col4, stats, 'religiosidad_mucho', "Muy religioso", prob, colors)
-
-    with tab2:
-        col1, col2 = st.columns(2)
-        _group_metric(col1, stats, 'balotaje_martinez', "Orsi (FA)", prob, colors)
-        _group_metric(col2, stats, 'balotaje_lacalle', "Delgado (Coalición)", prob, colors)
-
-    with tab3:
-        col1, col2, col3, col4 = st.columns(4)
-        _group_metric(col1, stats, 'educacion_primaria', "Primaria o menos", prob, colors)
-        _group_metric(col2, stats, 'educacion_secundaria', "Secundaria", prob, colors)
-        _group_metric(col3, stats, 'educacion_ter_incomp', "Terciaria incompleta", prob, colors)
-        _group_metric(col4, stats, 'educacion_ter_comp', "Terciaria completa+", prob, colors)
-
-    with tab4:
-        col1, col2, col3, col4, col5 = st.columns(5)
-        _group_metric(col1, stats, 'edad_18-24', "18-24", prob, colors)
-        _group_metric(col2, stats, 'edad_25-34', "25-34", prob, colors)
-        _group_metric(col3, stats, 'edad_35-44', "35-44", prob, colors)
-        _group_metric(col4, stats, 'edad_45-54', "45-54", prob, colors)
-        _group_metric(col5, stats, 'edad_55+', "55+", prob, colors)
-
-
-def _group_metric(col, stats, key, label, prob, colors=None, show_delta=True):
-    """Helper: renderiza una metric card HTML para una estadística de grupo."""
-    if colors is None:
-        colors = get_colors()
-
-    val = stats.get(key, 0)
-    with col:
-        delta_html = ""
-        if show_delta and val != prob:
-            diff = val - prob
-            diff_color = colors["success"] if diff > 0 else colors["danger"]
-            delta_html = f'<div class="metric-delta" style="color: {diff_color};">{diff:+.0f}pp</div>'
-
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">{label}</div>
-            <div class="metric-value">{val}%</div>
-            {delta_html}
-        </div>
-        """, unsafe_allow_html=True)
 
 
 def render_methodology(model):

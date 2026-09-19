@@ -458,10 +458,14 @@ def get_observador_css():
     """
     Hoja de estilos del Figma "Producto UY", página **Widget IVE**.
 
-    SEPARADA de get_custom_css() a propósito. Esa la comparten el widget IVE
-    —que está publicado y sirviendo— y el de seguridad; cambiarla habría
-    re-diseñado de rebote una app en producción que nadie pidió tocar. Esta es
-    opt-in: la usa el widget que la importe.
+    LA USAN LOS DOS WIDGETS PUBLICADOS: seguridad desde el principio y el IVE
+    desde el 19/9/2026. Nació separada de get_custom_css() porque esa la
+    compartían los dos y estrenarla en seguridad habría re-diseñado de rebote
+    una app en producción que nadie había pedido tocar; ahora el pedido está y
+    el IVE es, además, el widget que la diseñadora dibujó en el Figma.
+
+    get_custom_css() queda para `widgets/_template`, que todavía la importa.
+    Un widget nuevo de El Observador debería arrancar con ÉSTA.
 
     LOS VALORES SALEN DEL PANEL DE INSPECCIÓN, uno por uno, no de muestrear una
     captura. Están escritos en `docs/diseno/figma-producto-uy.md` junto a los
@@ -633,15 +637,18 @@ def get_observador_css():
         color: {c['text']} !important;
     }}
 
-    /* EL PUNTO DEL RADIO QUEDA AZUL, no verde, y es a propósito.
+    /* EL PUNTO DEL RADIO NO SE ESTILA DESDE ACÁ, y ya no hace falta.
        Streamlit lo dibuja en un div anidado sin testid, sin role y sin
        aria-checked, y a la misma profundidad que la caja del texto de la
        etiqueta. Toda regla estructural que agarraba el punto agarraba también
        esa caja y pintaba un rectángulo verde detrás del texto — que es mucho
        peor que un punto del color equivocado. Se probaron cinco selectores
-       contra el DOM real; ninguno separa los dos.
-       Si alguna vez hace falta, la vía limpia es un componente propio, no CSS.
-       Toma `primaryColor` de .streamlit/config.toml. */
+       contra el DOM real; ninguno separa los dos, así que quedó en el azul del
+       tema y esta nota decía que era a propósito.
+       Desde que el widget IVE también usa esta hoja, `primaryColor` en
+       .streamlit/config.toml pasó a ser el verde del Figma —ya no lo usaba
+       nadie más— y el punto sale verde sin que ninguna regla lo toque. El
+       camino era el tema, no el CSS. */
 
     /* ---------- La banda gris ---------- */
     /* Del gradiente al pie, el Figma va sobre gris y no sobre blanco: un tercio
