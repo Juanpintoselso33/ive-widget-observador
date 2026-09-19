@@ -1,11 +1,24 @@
 """
-Widget Interactivo: \u00bfCu\u00e1l es tu probabilidad de apoyar el IVE?
-El Observador - Encuesta Uruguay 2025/2026
+Entry point del deploy: sirve el widget IVE.
 
-Basado en el modelo "Build a Voter" de The Economist
-Adaptado para medir apoyo a la interrupci\u00f3n voluntaria del embarazo
+El Observador — encuesta Uruguay 2025/2026. Inspirado en el "Build a Voter" de
+The Economist y adaptado para medir apoyo a la interrupción voluntaria del
+embarazo.
 
-Autor: El Observador / Equipo de Datos
+ACÁ NO VA LÓGICA. Este archivo era una copia casi literal de
+`widgets/ive/app.py` —mismos imports, mismo orden de render, mismos textos de
+error— y las dos copias se separaron: cuando el widget de seguridad estrenó la
+hoja del Figma hubo que acordarse de tocar dos entry points para una sola app, y
+un cambio aplicado en uno solo no se nota hasta que alguien abre el otro.
+
+Streamlit Cloud apunta su *Main file path* a este archivo, así que tiene que
+seguir existiendo; lo que no tiene que hacer es repetir el widget.
+
+Va por IMPORT y no por `runpy.run_path()`: las dos formas ejecutan el widget,
+pero runpy lo corre en un `__main__` temporal que después sale de `sys.modules`,
+y el watcher de Streamlit arma la lista de archivos a vigilar recorriendo
+`sys.modules` — así que editar `widgets/ive/app.py` no recargaba la app. Con el
+import queda registrado y se recarga como cualquier otro módulo.
 """
 
 import sys
@@ -15,69 +28,6 @@ _ROOT = Path(__file__).parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-import streamlit as st
-from shared.styles import get_custom_css
-from shared.config import get_colors
-from widgets.ive.model import load_model as _load_model, predict_probability, predict_probability_neutral
-from widgets.ive.components import (
-    render_header,
-    render_inputs,
-    render_probability_bar,
-    render_result_card,
-    render_comparisons,
-    render_methodology,
-    render_footer,
-)
+from widgets.ive.app import main  # noqa: E402
 
-# ============================================================
-# CONFIGURACI\u00d3N DE P\u00c1GINA
-# ============================================================
-st.set_page_config(
-    page_title="\u00bfApoyas el IVE? | El Observador",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
-
-# ============================================================
-# DETECCI\u00d3N DE TEMA + ESTILOS
-# ============================================================
-try:
-    theme_mode = st.context.theme.type
-except AttributeError:
-    theme_mode = "light"
-
-colors = get_colors(theme_mode)
-st.markdown(get_custom_css(theme_mode), unsafe_allow_html=True)
-
-# ============================================================
-# CARGAR MODELO (con cache de Streamlit)
-# ============================================================
-@st.cache_data
-def load_model():
-    return _load_model()
-
-try:
-    MODEL = load_model()
-except FileNotFoundError:
-    st.error("Error: No se encontr\u00f3 el archivo de coeficientes. "
-             "Ejecuta primero `train_model.py`")
-    st.stop()
-
-# ============================================================
-# RENDERIZAR WIDGET
-# ============================================================
-render_header()
-
-inputs = render_inputs(MODEL)
-prob = predict_probability(MODEL, *inputs)
-prob_nacional = MODEL.get('prob_nacional', 78.6)
-
-prob_neutral = None
-if 'coefficients_neutral' in MODEL:
-    prob_neutral = predict_probability_neutral(MODEL, *inputs)
-
-render_probability_bar(prob, colors)
-render_result_card(prob, prob_nacional, colors, theme_mode, prob_neutral=prob_neutral)
-render_comparisons(MODEL, prob, colors)
-render_methodology(MODEL)
-render_footer(MODEL)
+main()

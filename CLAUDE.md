@@ -19,7 +19,9 @@ El widget estima la **probabilidad de que una persona apoye el derecho de la muj
 ```
 ive_widget/                         # Raíz del repo (plataforma multi-widget)
 ├── shared/                         # Código editorial compartido
-│   ├── styles.py                   # CSS (IBM Plex, Economist-style)
+│   ├── styles.py                   # get_observador_css() — la hoja del Figma,
+│   │                               #   la usan IVE y seguridad
+│   │                               # get_custom_css() — la vieja, sólo _template
 │   └── config.py                   # Paleta de colores + umbrales
 ├── widgets/
 │   ├── ive/                        # Widget IVE — el original
@@ -38,7 +40,8 @@ ive_widget/                         # Raíz del repo (plataforma multi-widget)
 │   └── _template/                  # Scaffold para nuevos widgets
 │       ├── app.py / model.py / components.py / config.py
 │       └── WIDGET_README.md        # Guía para crear widget nuevo
-├── app.py                          # Entry del deploy actual (→ IVE via shared/ + widgets/ive/)
+├── app.py                          # Entry del deploy: ejecuta widgets/ive/app.py
+│                                   #   con runpy. NO duplicar el widget acá
 ├── scripts/                        # Scripts de análisis (sin cambios)
 ├── docs/
 │   ├── widget-catalog.md           # Registro de widgets
@@ -71,11 +74,34 @@ ive_widget/                         # Raíz del repo (plataforma multi-widget)
 | Quiero... | Comando |
 |-----------|---------|
 | Correr el IVE widget (actual deploy) | `streamlit run app.py` |
+| Ver la versión de caja del IVE | abrir con `?resumen=1` |
 | Correr el IVE widget standalone | `streamlit run widgets/ive/app.py` |
 | Correr el widget de seguridad | `streamlit run widgets/seguridad/app.py` |
 | Correr widget nuevo | `streamlit run widgets/<nombre>/app.py` |
 | Correr tests IVE | `pytest widgets/ive/tests/ -v` |
 | Correr tests de seguridad | `pytest widgets/seguridad/tests -q` |
+
+## Diseño: los dos widgets publicados van con la hoja del Figma
+
+`shared.styles.get_observador_css()` — valores leídos del panel de inspección de
+`Producto UY`, no muestreados de una captura; están en
+`docs/diseno/figma-producto-uy.md`. La usa seguridad desde el principio y el IVE
+desde el 19/9/2026.
+
+Tres cosas que NO son obvias al tocar un widget que la use:
+
+- **La banda gris no sale sola.** Del gradiente al pie el diseño va sobre
+  `#EDEDED`, y eso exige envolver esa parte en `st.container(key="banda_resultado")`
+  desde el `app.py`: la hoja engancha `.st-key-banda_resultado`. Sin el
+  contenedor, la hoja entra igual y esa parte queda blanca.
+- **Ningún componente elige un color.** El número, el énfasis y las diferencias
+  los pinta la hoja; un `style="color: …"` en línea es la paleta semántica vieja
+  y además la pisa. Lo que Streamlit dibuja por su cuenta y no acepta CSS —el
+  punto del radio, los anillos de foco— sale de `primaryColor` en
+  `.streamlit/config.toml`, que es verde.
+- **Las diferencias contra el promedio son contra el NACIONAL**, no contra la
+  predicción del perfil: son tasas observadas sin ajustar, y restarlas contra una
+  predicción que controla por todo lo demás mezcla dos cosas distintas.
 
 > El widget de **seguridad** no comparte el modelo estadístico que se documenta
 > abajo: es otra encuesta, otros predictores y **cuatro modelos**, uno por
@@ -165,6 +191,15 @@ Sin dependencia de sklearn en runtime.
 
 ## Modelo secundario: probabilidad de neutralidad
 
+> **NO SE MUESTRA DESDE EL 19/9/2026.** Tomer pidió adelgazar la tarjeta de
+> resultado y el "Además, X% de personas con tu perfil no toma posición clara"
+> salió de pantalla; `predict_probability_neutral()` **ya no tiene llamadores en
+> la app**. Se sigue entrenando y viajando en el JSON —las cuatro claves
+> `*_neutral` y `prob_neutral_nacional`— para no perder la serie y poder
+> reponerlo sumando de nuevo la llamada. Lo que sigue describe cómo se entrena,
+> no algo que el lector vea. Esta sección decía que la UI lo mostraba y quedó
+> falsa con ese cambio; lo marcó Codex.
+
 Junto al modelo principal de apoyo se entrena un **logit auxiliar** que predice
 P(NS-NC) sobre los mismos 19 predictores y la misma penalización Ridge (C=0.5,
 sample_weight=w_norm). La variable dependiente es:
@@ -174,10 +209,15 @@ sample_weight=w_norm). La variable dependiente es:
 
 Se exporta en `model_coefficients.json` bajo claves separadas:
 `coefficients_neutral`, `odds_ratios_neutral`, `model_info_neutral`,
-`prob_neutral_nacional`. La UI lo muestra como dato secundario discreto bajo
-el resultado principal: *"X% de personas con tu perfil no toma posición clara
-sobre el tema."* Hace explícito que el % de IVE es **condicional a tener
-postura definida**, no marginal sobre la población total.
+`prob_neutral_nacional`. **La UI ya no lo muestra** (ver el aviso de arriba):
+lo hacía como dato secundario bajo el resultado principal —*"X% de personas con
+tu perfil no toma posición clara sobre el tema"*—, y servía para hacer explícito
+que el % de IVE es **condicional a tener postura definida**, no marginal sobre
+la población total.
+
+Esa condicionalidad sigue dicha en otros dos lugares, que es lo que importa: el
+desplegable del modelo en la versión completa, y el pie de la versión de caja
+—que no tiene desplegable— con "Entre quienes tienen postura definida".
 
 Métricas: pseudo-R² ≈ 0.10 (esperable: la neutralidad es más ruidosa),
 tasa nacional ponderada ≈ 19%.

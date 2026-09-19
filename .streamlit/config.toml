@@ -23,12 +23,18 @@ gatherUsageStats = false
 # para un lector en modo claro no cambia nada; el que cambia es el que tenía el
 # sistema en oscuro.
 #
-# El verde de seguridad NO va acá: es de un solo widget y lo pone su hoja de
-# estilos. `primaryColor` sigue siendo el azul del IVE, que es quien lo usa.
+# `primaryColor` PASÓ AL VERDE DEL FIGMA. Decía que seguía siendo el azul del
+# IVE "que es quien lo usa", y eso valía mientras el IVE tenía su propia hoja;
+# desde que también usa `get_observador_css()` no queda nadie usando el azul y
+# lo que hacía era ensuciar las dos apps con un color que no está en el diseño.
+# Es el ÚNICO lugar desde donde se puede pintar lo que Streamlit dibuja por su
+# cuenta y no acepta CSS: el punto del radio del selector de preguntas de
+# seguridad —ver la nota en `shared/styles.py`, que lo daba por perdido en azul—
+# y los anillos de foco nativos.
 [theme]
 font = "sans serif"
 base = "light"
-primaryColor = "#2E45B8"
+primaryColor = "#006B36"
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#F2F2F2"
 textColor = "#121212"
