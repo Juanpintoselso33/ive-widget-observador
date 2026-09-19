@@ -31,13 +31,20 @@
 
 <!-- ============================================================
      1) VERSIÓN COMPLETA — para la nota
-     ============================================================ -->
+     ============================================================
+     UNA ALTURA FIJA TIENE QUE CUBRIR EL CASO PEOR, que es el MÓVIL: la versión
+     completa mide 1721px a 400 y 1638 a 700, así que va 1750 y no 1660. Con el
+     número de escritorio, un lector en celular perdía los últimos ~60px —el
+     pie— y `scrolling="no"` no le dejaba ni bajar a verlos. Lo marcó el bot de
+     Codex en el PR.
+     Si sobra blanco abajo en escritorio y molesta, usá el snippet (3), que
+     ajusta por ancho. -->
 <div style="width:100%;max-width:700px;margin:0 auto;">
   <iframe
     src="https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/?embed=true"
     title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
     width="100%"
-    height="1660"
+    height="1750"
     frameborder="0"
     scrolling="no"
     style="display:block;border:none;"
@@ -47,7 +54,12 @@
 
 <!-- ============================================================
      2) VERSIÓN CAJA — formulario y resultado
-     ============================================================ -->
+     ============================================================
+     Misma regla: 1150 cubre el caso peor de esta versión, que acá es el de
+     ESCRITORIO (1123 a 700 contra 1086 a 400). La caja y la completa crecen en
+     sentidos opuestos, así que no se puede copiar el criterio de una a la
+     otra. -->
+
 <div style="width:100%;max-width:700px;margin:0 auto;">
   <iframe
     src="https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/?resumen=1&amp;embed=true"
