@@ -12,15 +12,26 @@
   se ve como un error, y el menú deja al lector reiniciar la app. Con
   `embed=true` queda sólo el contenido.
 
-  ⚠️ PROBABLEMENTE ESTE EMBED ESTÉ CORTADO Y NADIE LO HAYA MIRADO. El 19/9/2026,
-  probando el del IVE dentro de un iframe de verdad, apareció esto: pedida a
+  ⚠️ ESTE EMBED PUEDE ESTAR CORTADO — NO SE VERIFICÓ. El 19/9/2026, probando el
+  del IVE dentro de un iframe de verdad, apareció esto: pedida a
   secas, Streamlit Cloud no devuelve la app sino un envoltorio que la carga en
   OTRO iframe adentro. Ese iframe anidado sólo se redimensiona cuando la página
   está arriba de todo; dentro del iframe de una nota se queda en ~150px y el
   widget se ve **cortado a la altura del título**, con el resto en blanco y una
   barra "Built with Streamlit / Fullscreen" al pie. La solución es apuntar a
   `/~/+/`, que es la ruta del iframe interno: entra entero y sin la barra.
-  En el IVE está medido y corregido — ver `ive-widget-embed.html`.
+  En el IVE está medido y corregido — ver `ive-widget-embed.html`. Acá es una
+  HIPÓTESIS POR ANALOGÍA: misma plataforma y mismo tipo de URL, pero nadie lo
+  vio pasar en esta app.
+
+  Y HAY UN DATO QUE JUEGA EN CONTRA DE LA HIPÓTESIS, así que conviene mirar
+  antes de tocar: la tabla de alturas de acá abajo dice haberse medido "cargando
+  el widget dentro de un iframe de cada ancho", y da valores de 2000 a 3000px
+  perfectamente coherentes. Si el envoltorio hubiera dejado el contenido en
+  150px, esas mediciones no habrían salido así. Dos explicaciones posibles, y no
+  sé cuál es: que en esta app el embebido funcione bien, o que se haya medido el
+  documento interno en vez del render real dentro del iframe anidado — que es
+  exactamente el error que cometí yo la primera vez con el IVE.
 
   ACÁ NO SE CAMBIÓ porque no se pudo comprobar: la app de seguridad estaba
   dormida y no responde hasta que alguien la despierte, y cambiar la URL de un

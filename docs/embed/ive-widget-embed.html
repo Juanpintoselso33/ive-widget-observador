@@ -1,7 +1,10 @@
 <!--
   Código de embed para el widget IVE — El Observador
 
-  La URL ya está puesta: https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/
+  Para ABRIR el widget en el navegador:
+  https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/
+
+  La de los iframes de abajo es otra —lleva `/~/+/`— y el motivo está acá:
 
 
   LA URL DEL EMBED LLEVA `/~/+/` Y NO ES UN CAPRICHO. Pedida a secas, Streamlit
@@ -46,9 +49,11 @@
   de 1750 recortaba 78px de verdad, con `scrolling="no"` y sin forma de bajar.
   Si se cambia un texto, volver a medir ASÍ: un iframe corto no avisa, recorta.
 
-  La completa CRECE en móvil —el titular y los textos ocupan más líneas— y la
-  caja crece apenas. Ojo con la caja: pasa con 8px de sobra, es la más
-  ajustada de las dos.
+  LAS DOS CRECEN en la columna angosta —el titular y los textos ocupan más
+  líneas—, la completa mucho (190px) y la caja apenas (19px). Una versión
+  anterior de esta nota decía que se comportaban "al revés" y que la caja se
+  achicaba: salía de medirlas sin iframe, con el widget usando el viewport
+  entero.
 -->
 
 <!-- ============================================================
@@ -56,10 +61,8 @@
      ============================================================
      UNA ALTURA FIJA TIENE QUE CUBRIR EL CASO PEOR, que es el MÓVIL: la versión
      completa mide 1828px embebida en una columna de celular y 1638 a 700, así
-     que va 1860. Con el
-     número de escritorio, un lector en celular perdía los últimos ~60px —el
-     pie— y `scrolling="no"` no le dejaba ni bajar a verlos. Lo marcó el bot de
-     Codex en el PR.
+     que va 1860. Con el número de escritorio, un lector en celular perdía el
+     pie y `scrolling="no"` no le dejaba ni bajar a verlo.
      Si sobra blanco abajo en escritorio y molesta, usá el snippet (3), que
      ajusta por ancho. -->
 <div style="width:100%;max-width:700px;margin:0 auto;">
@@ -79,8 +82,8 @@
      2) VERSIÓN CAJA — formulario y resultado
      ============================================================
      Misma regla, y acá el caso peor también es el móvil: 1142 contra 1123. Va
-     1180 en vez de los 1150 que tenía, que pasaban por 8px — demasiado poco
-     para una pieza a la que todavía le pueden tocar un texto. -->
+     1180, que deja 38px de sobra. Tenía 1150, que pasaba por 8px: demasiado
+     poco para una pieza a la que todavía le pueden tocar un texto. -->
 
 <div style="width:100%;max-width:700px;margin:0 auto;">
   <iframe
@@ -98,9 +101,8 @@
 <!-- ============================================================
      3) ALTURA SEGÚN EL ANCHO — si el CMS permite JavaScript
      ============================================================
-     Las dos versiones se comportan al revés entre sí, así que el salto va en
-     el sentido que corresponda a cada una. Los números salen de la tabla de
-     arriba, con un margen de ~25px.
+     Las dos crecen en la columna angosta, así que las dos suben ahí. Los
+     números salen de la tabla de arriba más un margen de entre 30 y 40px.
 
      LA VARIANTE SE DEDUCE DE LA URL, no de un atributo aparte. Antes había un
      `data-version="completa"` al lado de la URL completa, y era una trampa:
@@ -108,8 +110,11 @@
      (mucho blanco abajo) y cambiar sólo el atributo recortaba la versión
      completa. Con un solo dato no se pueden contradecir.
 
-     Sirve para las dos: pegá el bloque y, si querés la caja, agregale
-     `?resumen=1&` a la URL. Para dos widgets en la misma nota, cambiá el id.
+     Sirve para las dos: pegá el bloque y, si querés la caja, cambiá en la URL
+     `?embed=true` por `?resumen=1&amp;embed=true`. (Decía "agregale
+     `?resumen=1&`", que valía cuando la URL no llevaba `/~/+/` y por lo tanto
+     empezaba el query string ahí; ahora el `?` ya está puesto y agregarle otro
+     daría una URL rota.) Para dos widgets en la misma nota, cambiá el id.
 -->
 <div style="width:100%;max-width:700px;margin:0 auto;">
   <iframe
@@ -117,20 +122,23 @@
     src="https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/~/+/?embed=true"
     title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
     width="100%"
-    height="1660"
+    height="1860"
     frameborder="0"
     scrolling="no"
     style="display:block;border:none;"
     loading="lazy"
   ></iframe>
 </div>
+<!-- El height de arriba es el CASO PEOR a propósito, no el de escritorio: si el
+     CMS conserva el iframe pero se come el script, o tarda en ejecutarlo, un
+     valor corto recorta y uno largo sólo deja blanco. El JS lo baja enseguida
+     en pantallas anchas. -->
 <script>
   (function () {
     var iframe = document.getElementById('ive-widget');
     if (!iframe) return;
-    // alto = [angosto (<480px), ancho]. La caja se ACHICA en pantalla angosta
-    // y la completa CRECE: el titular ocupa más líneas y ella no lo compensa
-    // sacando bloques.
+    // alto = [angosto (<480px), ancho]. Las dos crecen al angostarse: la
+    // completa 190px y la caja 19.
     var ALTURAS = { completa: [1860, 1670], caja: [1180, 1160] };
     var esCaja = /[?&]resumen=(1|true|si|s%C3%AD)(&|$)/i.test(iframe.src);
     function ajustar() {
