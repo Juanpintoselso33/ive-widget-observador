@@ -191,6 +191,15 @@ Sin dependencia de sklearn en runtime.
 
 ## Modelo secundario: probabilidad de neutralidad
 
+> **NO SE MUESTRA DESDE EL 19/9/2026.** Tomer pidió adelgazar la tarjeta de
+> resultado y el "Además, X% de personas con tu perfil no toma posición clara"
+> salió de pantalla; `predict_probability_neutral()` **ya no tiene llamadores en
+> la app**. Se sigue entrenando y viajando en el JSON —las cuatro claves
+> `*_neutral` y `prob_neutral_nacional`— para no perder la serie y poder
+> reponerlo sumando de nuevo la llamada. Lo que sigue describe cómo se entrena,
+> no algo que el lector vea. Esta sección decía que la UI lo mostraba y quedó
+> falsa con ese cambio; lo marcó Codex.
+
 Junto al modelo principal de apoyo se entrena un **logit auxiliar** que predice
 P(NS-NC) sobre los mismos 19 predictores y la misma penalización Ridge (C=0.5,
 sample_weight=w_norm). La variable dependiente es:
@@ -200,10 +209,15 @@ sample_weight=w_norm). La variable dependiente es:
 
 Se exporta en `model_coefficients.json` bajo claves separadas:
 `coefficients_neutral`, `odds_ratios_neutral`, `model_info_neutral`,
-`prob_neutral_nacional`. La UI lo muestra como dato secundario discreto bajo
-el resultado principal: *"X% de personas con tu perfil no toma posición clara
-sobre el tema."* Hace explícito que el % de IVE es **condicional a tener
-postura definida**, no marginal sobre la población total.
+`prob_neutral_nacional`. **La UI ya no lo muestra** (ver el aviso de arriba):
+lo hacía como dato secundario bajo el resultado principal —*"X% de personas con
+tu perfil no toma posición clara sobre el tema"*—, y servía para hacer explícito
+que el % de IVE es **condicional a tener postura definida**, no marginal sobre
+la población total.
+
+Esa condicionalidad sigue dicha en otros dos lugares, que es lo que importa: el
+desplegable del modelo en la versión completa, y el pie de la versión de caja
+—que no tiene desplegable— con "Entre quienes tienen postura definida".
 
 Métricas: pseudo-R² ≈ 0.10 (esperable: la neutralidad es más ruidosa),
 tasa nacional ponderada ≈ 19%.

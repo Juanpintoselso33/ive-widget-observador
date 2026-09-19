@@ -8,16 +8,21 @@
     · COMPLETA — formulario, resultado, comparación por grupos y el desplegable
       del modelo. Es la de la nota.
     · CAJA (`?resumen=1`) — formulario y resultado, nada más. Es la que pidió
-      Tomer el 18/9/2026 para que entre en una caja; no muestra la comparación
-      ni la metodología, así que **conviene que la caja linkee a la completa**,
-      que es donde está el promedio nacional y la ficha del modelo.
+      Tomer el 18/9/2026 para que entre en una caja. No muestra la comparación
+      ni la metodología, así que **su pie lleva el enlace a la versión completa**
+      —que es donde están el promedio nacional y la ficha del modelo—, además
+      del aviso de que el cálculo es entre quienes tienen postura definida y de
+      los créditos de la UMAD y Juan Pablo Ferreira. Ese pie no es decorativo:
+      es lo único que acompaña al número en la caja.
 
   LAS ALTURAS ESTÁN MEDIDAS, no estimadas (19/9/2026, Chrome, con las fuentes
-  ya cargadas y habiendo scrolleado hasta el fondo):
+  ya cargadas y habiendo scrolleado hasta el fondo). Se re-midieron después de
+  sumarle al pie de la caja el aviso, los créditos y el enlace: esa línea de más
+  la hizo crecer unos 25px a 700 y 50 a 400.
 
       versión    ancho 700px   ancho 400px
       completa      1638           1721
-      caja          1098           1035
+      caja          1123           1086
 
   La completa CRECE en móvil —el titular y los textos ocupan más líneas— y la
   caja se achica. Si se cambia un texto, volver a medir: un iframe corto no
@@ -48,7 +53,7 @@
     src="https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/?resumen=1&amp;embed=true"
     title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
     width="100%"
-    height="1120"
+    height="1150"
     frameborder="0"
     scrolling="no"
     style="display:block;border:none;"
@@ -62,12 +67,20 @@
      Las dos versiones se comportan al revés entre sí, así que el salto va en
      el sentido que corresponda a cada una. Los números salen de la tabla de
      arriba, con un margen de ~25px.
+
+     LA VARIANTE SE DEDUCE DE LA URL, no de un atributo aparte. Antes había un
+     `data-version="completa"` al lado de la URL completa, y era una trampa:
+     cambiar sólo la URL a `?resumen=1` dejaba las alturas de la versión larga
+     (mucho blanco abajo) y cambiar sólo el atributo recortaba la versión
+     completa. Con un solo dato no se pueden contradecir.
+
+     Sirve para las dos: pegá el bloque y, si querés la caja, agregale
+     `?resumen=1&` a la URL. Para dos widgets en la misma nota, cambiá el id.
 -->
 <div style="width:100%;max-width:700px;margin:0 auto;">
   <iframe
     id="ive-widget"
     src="https://juanpintoselso33-ive-widget-observador-app-poekzu.streamlit.app/?embed=true"
-    data-version="completa"
     title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
     width="100%"
     height="1660"
@@ -81,10 +94,13 @@
   (function () {
     var iframe = document.getElementById('ive-widget');
     if (!iframe) return;
-    // alto = [angosto (<480px), ancho]
-    var ALTURAS = { completa: [1750, 1660], caja: [1060, 1120] };
+    // alto = [angosto (<480px), ancho]. La caja se ACHICA en pantalla angosta
+    // y la completa CRECE: el titular ocupa más líneas y ella no lo compensa
+    // sacando bloques.
+    var ALTURAS = { completa: [1750, 1660], caja: [1110, 1150] };
+    var esCaja = /[?&]resumen=(1|true|si|s%C3%AD)(&|$)/i.test(iframe.src);
     function ajustar() {
-      var alturas = ALTURAS[iframe.dataset.version] || ALTURAS.completa;
+      var alturas = esCaja ? ALTURAS.caja : ALTURAS.completa;
       iframe.height = iframe.offsetWidth < 480 ? alturas[0] : alturas[1];
     }
     ajustar();

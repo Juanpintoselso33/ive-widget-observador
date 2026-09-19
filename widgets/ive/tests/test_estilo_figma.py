@@ -224,6 +224,28 @@ def test_el_entry_carga_la_hoja_del_figma_y_arma_la_banda():
     assert "banda_resultado" in claves
 
 
+class _QueryParams:
+    """
+    Doble de `st.query_params` con SU semántica, no con una inventada.
+
+    Importa que sea fiel en un punto: con el parámetro repetido, `get()`
+    devuelve el ÚLTIMO valor y `get_all()` la lista completa. El test anterior
+    le pasaba un `dict` con una lista adentro —algo que el proxy real nunca
+    produce— y así verificaba la regla contraria a la que rige en producción.
+    Lo marcó Codex.
+    """
+
+    def __init__(self, pares=()):
+        self._pares = [(k, str(v)) for k, v in pares]
+
+    def get(self, clave, default=None):
+        valores = self.get_all(clave)
+        return valores[-1] if valores else default
+
+    def get_all(self, clave):
+        return [v for k, v in self._pares if k == clave]
+
+
 @pytest.mark.parametrize("valor, esperado", [
     ("1", True), ("true", True), ("si", True), ("sí", True), ("SÍ", True),
     ("0", False), ("false", False), ("", False), (None, False),
@@ -237,17 +259,42 @@ def test_el_modo_caja_se_pide_por_query_param(monkeypatch, valor, esperado):
     """
     from widgets.ive import app as entry
 
-    params = {} if valor is None else {entry.PARAM_RESUMEN: valor}
-    monkeypatch.setattr(entry.st, "query_params", params)
+    pares = () if valor is None else ((entry.PARAM_RESUMEN, valor),)
+    monkeypatch.setattr(entry.st, "query_params", _QueryParams(pares))
 
     assert entry.modo_resumen() is esperado
 
 
-def test_el_modo_caja_tolera_el_parametro_repetido(monkeypatch):
-    """`?resumen=1&resumen=0` llega como lista; no puede explotar."""
+@pytest.mark.parametrize("repetidos, esperado", [
+    (("1", "0"), False),
+    (("0", "1"), True),
+])
+def test_con_el_parametro_repetido_gana_el_ultimo(monkeypatch, repetidos, esperado):
+    """
+    La regla es la de Streamlit: el último valor manda. Se prueban los dos
+    órdenes porque una implementación que se quedara con el PRIMERO —que es lo
+    que hacía antes— pasaría cualquiera de los dos casos por separado.
+    """
     from widgets.ive import app as entry
 
-    monkeypatch.setattr(entry.st, "query_params", {entry.PARAM_RESUMEN: ["1", "0"]})
+    pares = tuple((entry.PARAM_RESUMEN, v) for v in repetidos)
+    monkeypatch.setattr(entry.st, "query_params", _QueryParams(pares))
+
+    assert entry.modo_resumen() is esperado
+
+
+def test_el_modo_caja_funciona_sin_get_all(monkeypatch):
+    """
+    Con una versión de Streamlit sin `get_all`, se cae a `get()` — que ya
+    devuelve el último valor. La rama existe, así que tiene que probarse.
+    """
+    from widgets.ive import app as entry
+
+    class _Viejo:
+        def get(self, clave, default=None):
+            return "1" if clave == entry.PARAM_RESUMEN else default
+
+    monkeypatch.setattr(entry.st, "query_params", _Viejo())
     assert entry.modo_resumen() is True
 
 
@@ -276,21 +323,44 @@ def _correr_entry(monkeypatch, synthetic_model, query_params):
     monkeypatch.setattr(entry, "predict_probability", lambda *a, **k: 75.0)
     monkeypatch.setattr(entry, "render_inputs", lambda m: (2, 0, 2, 2, 0, 0, 2, "otros"))
 
+    # LOS DOBLES RESPETAN LA FIRMA REAL. Eran `lambda *a, **k`, que se tragan
+    # cualquier cosa: el test seguía pasando si el entry llamaba a
+    # `render_footer` sin `resumido=True` —o con un keyword mal escrito— y la
+    # caja publicaba el pie completo. Lo marcó Codex. `functools.wraps` no
+    # alcanza: hay que copiar la firma para que Python valide la llamada.
+    import functools
+    import inspect
+
+    llamadas = {}
+
+    def doblar(nombre):
+        original = getattr(components, nombre)
+
+        @functools.wraps(original)
+        def doble(*a, **k):
+            atado = inspect.signature(original).bind(*a, **k)
+            atado.apply_defaults()
+            llamadas[nombre] = atado.arguments
+            dibujadas.append(nombre)
+
+        monkeypatch.setattr(entry, nombre, doble)
+
     for nombre in ("render_header", "render_probability_bar", "render_result_card",
                    "render_comparisons", "render_methodology", "render_footer"):
-        monkeypatch.setattr(entry, nombre,
-                            lambda *a, _n=nombre, **k: dibujadas.append(_n))
+        doblar(nombre)
 
     entry.main()
-    return dibujadas
+    return dibujadas, llamadas
 
 
 def test_la_caja_saca_la_comparacion_y_la_metodologia(monkeypatch, synthetic_model):
     """Lo que define la versión de caja es qué NO dibuja."""
     from widgets.ive import app as entry
 
-    dibujadas = _correr_entry(monkeypatch, synthetic_model,
-                              {entry.PARAM_RESUMEN: "1"})
+    dibujadas, llamadas = _correr_entry(
+        monkeypatch, synthetic_model,
+        _QueryParams(((entry.PARAM_RESUMEN, "1"),)),
+    )
 
     assert "render_comparisons" not in dibujadas
     assert "render_methodology" not in dibujadas
@@ -300,14 +370,48 @@ def test_la_caja_saca_la_comparacion_y_la_metodologia(monkeypatch, synthetic_mod
     assert "render_header" in dibujadas
     assert "render_footer" in dibujadas
 
+    # El pie tiene que recibir el aviso: si se llamara sin esto, la caja
+    # publicaría el pie largo y ningún assert de los de arriba lo notaría.
+    assert llamadas["render_footer"].get("resumido") is True
+
 
 def test_la_version_completa_dibuja_todo(monkeypatch, synthetic_model):
     """El otro lado del control: sin el parámetro no se saca nada."""
-    dibujadas = _correr_entry(monkeypatch, synthetic_model, {})
+    dibujadas, llamadas = _correr_entry(monkeypatch, synthetic_model, _QueryParams())
 
     assert "render_comparisons" in dibujadas
     assert "render_methodology" in dibujadas
     assert "render_result_card" in dibujadas
+    assert llamadas["render_footer"].get("resumido") is False
+
+
+def test_el_pie_de_la_caja_carga_lo_que_la_caja_no_muestra(render, synthetic_model):
+    """
+    La caja no dibuja la comparación ni el desplegable del modelo, así que el
+    pie corto es el ÚNICO lugar donde pueden estar el aviso de que el cálculo
+    es entre quienes tienen postura definida, los créditos que pidió Tomer y la
+    salida al widget completo.
+
+    El código y el archivo de embed decían que "la caja linkea a la completa" y
+    no había ningún enlace. Lo marcó Codex.
+    """
+    components.render_footer(synthetic_model, resumido=True)
+    html = render.html
+
+    assert "postura definida" in html
+    for credito in ("El Observador", "UMAD", "Juan Pablo Ferreira"):
+        assert credito in html, f"la caja se publica sin el crédito: {credito}"
+    assert 'href="?"' in html and 'target="_blank"' in html, (
+        "la caja no tiene salida al widget completo"
+    )
+
+
+def test_el_pie_largo_no_es_el_de_la_caja(render, synthetic_model):
+    """Control negativo del anterior: el pie completo no lleva el enlace."""
+    components.render_footer(synthetic_model, resumido=False)
+
+    assert "respuestas ponderadas" in render.html
+    assert 'href="?"' not in render.html
 
 
 def test_el_entry_del_deploy_no_duplica_el_widget():

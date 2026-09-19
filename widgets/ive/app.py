@@ -48,13 +48,25 @@ def modo_resumen():
     """
     Si el embebido pidió la versión de caja.
 
-    Tolera que el parámetro venga repetido (`?resumen=1&resumen=0`): Streamlit
-    devuelve una lista y quedarse con la primera es lo mismo que hace él para
-    el valor escalar.
+    CON EL PARÁMETRO REPETIDO GANA EL ÚLTIMO, que es lo que hace `st.query_params`
+    y por eso no se reimplementa: `?resumen=0&resumen=1` es caja y
+    `?resumen=1&resumen=0` no lo es. La versión anterior se quedaba con el
+    PRIMERO y decía en el docstring que eso era lo que hacía Streamlit — era
+    falso, y como el test le pasaba un diccionario con una lista en vez del
+    proxy real, verificaba justamente la semántica equivocada. Lo marcó Codex.
+
+    `get_all()` es la API para ver todos los valores; se usa sólo para quedarse
+    con el último de forma explícita, y si no existe —versiones viejas— se cae
+    a `get()`, que ya devuelve ese mismo último valor.
     """
-    valor = st.query_params.get(PARAM_RESUMEN)
-    if isinstance(valor, (list, tuple)):
-        valor = valor[0] if valor else None
+    params = st.query_params
+    obtener_todos = getattr(params, "get_all", None)
+    if callable(obtener_todos):
+        valores = obtener_todos(PARAM_RESUMEN)
+        valor = valores[-1] if valores else None
+    else:
+        valor = params.get(PARAM_RESUMEN)
+
     return str(valor).strip().lower() in _VERDADEROS
 
 

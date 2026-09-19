@@ -353,14 +353,30 @@ def render_footer(model, resumido=False):
     """
     El pie de página.
 
-    En la versión de caja va la línea de crédito y nada más: el resto de la
-    ficha técnica vive en el desplegable del modelo, que en esa versión no se
-    muestra, pero la caja siempre linkea al widget completo.
+    EN LA VERSIÓN DE CAJA EL PIE CARGA LO QUE LA CAJA NO MUESTRA, y por eso no
+    es sólo un pie más corto. La caja no dibuja la comparación ni el desplegable
+    del modelo, así que sin esto se publicaría:
+
+    - un porcentaje condicional a tener postura definida, sin decirlo en ningún
+      lado — la única mención vivía en el desplegable;
+    - sin los créditos de la UMAD y de Juan Pablo Ferreira, que Tomer pidió
+      expresamente y que también viven ahí;
+    - y sin salida al widget completo, aunque el código y el archivo de embed
+      dijeran que la caja "linkea a la completa". Lo decían y no era cierto: no
+      había ningún enlace. Lo marcó Codex.
+
+    El enlace va a `?` —la misma app sin parámetros— para no cablear el dominio,
+    y con `target="_blank"` porque la caja vive dentro de un iframe: sin eso, la
+    versión completa se abriría dentro de la cajita.
     """
     if resumido:
         st.markdown(
-            '<div class="footer-text"><strong>El Observador</strong> | '
-            'Encuesta realizada en Uruguay 2025/2026</div>',
+            '<div class="footer-text">'
+            'Entre quienes tienen postura definida. '
+            '<strong>El Observador</strong>, la UMAD y Juan Pablo Ferreira | '
+            'Encuesta realizada en Uruguay 2025/2026 · '
+            '<a href="?" target="_blank" rel="noopener">Ver el widget completo</a>'
+            '</div>',
             unsafe_allow_html=True,
         )
         return
