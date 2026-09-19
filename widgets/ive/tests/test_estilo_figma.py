@@ -14,6 +14,8 @@ función que se verifica ni de la hoja: si el esperado lo generara el código ba
 prueba, el test pasaría igual con el widget roto.
 """
 
+import ast
+import json
 import re
 import sys
 from pathlib import Path
@@ -153,7 +155,14 @@ def test_toda_clase_propia_que_emite_existe_en_la_hoja(render, synthetic_model):
     # bucle de abajo no probaría nada y el test pasaría igual.
     assert len(propias) >= len(CLASES_FIGMA)
 
-    huerfanas = [c for c in propias if f".{c}" not in hoja]
+    # CON LÍMITE, no por subcadena: `.grupo-celda-delta--sub` es prefijo de
+    # `.grupo-celda-delta--sube`, así que un typo que corta la clase por la
+    # mitad se daba por estilado. Detrás del nombre tiene que venir algo que
+    # CIERRE el selector, no otro carácter de clase. Lo marcó Codex.
+    def estilada(clase):
+        return re.search(rf"\.{re.escape(clase)}(?![-\w])", hoja) is not None
+
+    huerfanas = [c for c in propias if not estilada(c)]
     assert not huerfanas, (
         f"el widget emite clases que la hoja no estila: {sorted(huerfanas)}"
     )
@@ -162,6 +171,23 @@ def test_toda_clase_propia_que_emite_existe_en_la_hoja(render, synthetic_model):
 # ----------------------------------------------------------------------
 # Los entry points
 # ----------------------------------------------------------------------
+
+def _arbol(path):
+    return ast.parse(path.read_text(encoding="utf-8"))
+
+
+def _llamadas(arbol):
+    """Los nombres de función efectivamente LLAMADOS en el archivo."""
+    nombres = set()
+    for nodo in ast.walk(arbol):
+        if isinstance(nodo, ast.Call):
+            f = nodo.func
+            if isinstance(f, ast.Name):
+                nombres.add(f.id)
+            elif isinstance(f, ast.Attribute):
+                nombres.add(f.attr)
+    return nombres
+
 
 def test_el_entry_carga_la_hoja_del_figma_y_arma_la_banda():
     """
@@ -173,12 +199,26 @@ def test_el_entry_carga_la_hoja_del_figma_y_arma_la_banda():
     `.st-key-banda_resultado`, que sólo existe si el entry envuelve esa parte en
     `st.container(key="banda_resultado")`. Sin el contenedor la hoja entra igual
     y la zona del resultado queda blanca, que es un defecto mudo.
-    """
-    entry = (Path(__file__).parent.parent / "app.py").read_text(encoding="utf-8")
 
-    assert "get_observador_css" in entry
-    assert "get_custom_css" not in entry
-    assert 'st.container(key="banda_resultado")' in entry
+    Va por AST y no por substring: buscar el texto `get_observador_css` daba por
+    buena una importación sin uso —o una mención en un comentario— con la hoja
+    vieja cargándose por otra vía. Lo marcó Codex.
+    """
+    arbol = _arbol(Path(__file__).parent.parent / "app.py")
+    llamadas = _llamadas(arbol)
+
+    assert "get_observador_css" in llamadas, "la hoja del Figma no se LLAMA"
+    assert "get_custom_css" not in llamadas
+
+    # El contenedor con la clave exacta, como llamada con su keyword.
+    claves = [
+        kw.value.value
+        for nodo in ast.walk(arbol) if isinstance(nodo, ast.Call)
+        for kw in nodo.keywords
+        if isinstance(nodo.func, ast.Attribute) and nodo.func.attr == "container"
+        and kw.arg == "key" and isinstance(kw.value, ast.Constant)
+    ]
+    assert "banda_resultado" in claves
 
 
 def test_el_entry_del_deploy_no_duplica_el_widget():
@@ -186,13 +226,26 @@ def test_el_entry_del_deploy_no_duplica_el_widget():
     `app.py` de la raíz era una copia casi literal del entry del IVE, y esa
     copia es la razón de que el estilo viviera en dos lados y sólo uno se
     actualizara. Tiene que delegar, no repetir.
-    """
-    raiz = (Path(__file__).parent.parent.parent.parent / "app.py").read_text(encoding="utf-8")
 
-    assert "widgets" in raiz and "ive" in raiz and "app.py" in raiz
-    # Si vuelve a renderizar por su cuenta, volvió la duplicación.
-    assert "render_result_card" not in raiz
-    assert "get_custom_css" not in raiz
+    Por AST, otra vez: la versión anterior buscaba las palabras "widgets", "ive"
+    y "app.py" en el archivo, y las tres estaban en el docstring — así que el
+    test pasaba igual con el cuerpo entero borrado. Lo marcó Codex.
+    """
+    arbol = _arbol(Path(__file__).parent.parent.parent.parent / "app.py")
+
+    # Importa el entry real y lo ejecuta.
+    importa_el_entry = any(
+        isinstance(n, ast.ImportFrom) and n.module == "widgets.ive.app"
+        and any(a.name == "main" for a in n.names)
+        for n in ast.walk(arbol)
+    )
+    assert importa_el_entry, "la raíz no importa el entry del IVE"
+    assert "main" in _llamadas(arbol), "lo importa pero no lo llama"
+
+    # Y no renderiza por su cuenta: si vuelve a hacerlo, volvió la duplicación.
+    llamadas = _llamadas(arbol)
+    assert not llamadas & {"render_result_card", "render_comparisons",
+                           "render_header", "get_custom_css"}
 
 
 # ----------------------------------------------------------------------
@@ -209,6 +262,39 @@ def test_el_delta_por_grupo_es_contra_el_promedio_nacional(render, synthetic_mod
     assert "+13pp" in render.html
 
 
+def test_el_delta_sigue_a_la_base_nacional_que_se_le_pasa(monkeypatch, synthetic_model):
+    """
+    Control de que la base se USA y no está cableada: con el test anterior solo,
+    una implementación con `nacional_r = 80` adentro pasaba igual, porque 80 es
+    el único valor que se probaba. Acá se renderiza dos veces con bases
+    distintas y se exige que cada delta se mueva EXACTAMENTE lo que se movió la
+    base. Lo marcó Codex.
+    """
+    def render_con(nacional):
+        trozos = []
+        monkeypatch.setattr(components.st, "markdown",
+                            lambda html, **k: trozos.append(str(html)))
+        monkeypatch.setattr(components.st, "tabs",
+                            lambda titulos: [_Solapa() for _ in titulos])
+        components.render_comparisons(synthetic_model, nacional)
+        return "\n".join(trozos)
+
+    def deltas(html):
+        # El signo del widget es el menos tipográfico (−), no el guion.
+        return [int(v.replace("−", "-").replace("+", ""))
+                for v in re.findall(r'grupo-celda-delta--\w+">([+−]\d+)pp', html)]
+
+    con_80 = deltas(render_con(80.0))
+    con_70 = deltas(render_con(70.0))
+
+    assert con_80, "no se emitió ningún delta: el render falló"
+    assert len(con_80) == len(con_70)
+    # Bajar la base diez puntos tiene que subir cada delta diez puntos.
+    assert all(b - a == 10 for a, b in zip(con_80, con_70)), (
+        f"los deltas no siguen a la base: {con_80} contra {con_70}"
+    )
+
+
 def test_el_delta_no_depende_del_perfil_del_lector(render, synthetic_model):
     """
     Control negativo del cambio de significado: antes el delta se calculaba
@@ -219,6 +305,34 @@ def test_el_delta_no_depende_del_perfil_del_lector(render, synthetic_model):
 
     firma = inspect.signature(components.render_comparisons)
     assert list(firma.parameters) == ["model", "prob_nacional"]
+
+
+def test_toda_clave_del_modelo_esta_publicada_o_declarada_afuera():
+    """
+    Contrato contra el artefacto REAL, no contra el sintético.
+
+    `render_comparisons` omite en silencio cualquier clave que no reconozca, así
+    que una dimensión nueva entrenada en el modelo quedaría invisible sin que
+    nada fallara — y una dejada afuera a propósito (hogar) no se distingue de un
+    olvido. Este test obliga a decidir: se publica o se declara.
+    """
+    modelo = json.loads(
+        (Path(__file__).parent.parent / "model_coefficients.json").read_text(encoding="utf-8")
+    )
+    del_modelo = set(modelo["stats_by_group"])
+    publicadas = {k for _, claves in components.GRUPOS_ORDEN for k in claves}
+
+    assert del_modelo, "el artefacto no trae stats_by_group"
+    sin_decidir = del_modelo - publicadas - components.GRUPOS_NO_PUBLICADOS
+    assert not sin_decidir, (
+        f"claves del modelo que no se publican ni están declaradas afuera: "
+        f"{sorted(sin_decidir)}"
+    )
+
+    # Y al revés: una etiqueta que apunte a una clave que el modelo ya no trae
+    # deja una celda muda en la grilla.
+    fantasma = publicadas - del_modelo
+    assert not fantasma, f"la grilla pide claves que el modelo no trae: {sorted(fantasma)}"
 
 
 def test_una_dimension_sin_datos_no_genera_solapa(render, synthetic_model):

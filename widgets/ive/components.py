@@ -237,6 +237,19 @@ GRUPOS_ORDEN = [
                   "edad_45-54", "edad_55+"]),
 ]
 
+# Claves que el modelo trae y la grilla NO publica, con el motivo. Va explícito
+# —y con un test que exige que toda clave del artefacto esté acá o en
+# GRUPOS_ORDEN— porque `stats.get(k)` omite en silencio lo que no reconoce: sin
+# esta lista, una dimensión nueva entrenada en el modelo quedaría invisible sin
+# que nada lo notara, y una que se dejó afuera a propósito no se distingue de un
+# olvido. Lo marcó Codex.
+GRUPOS_NO_PUBLICADOS = {
+    # Tamaño del hogar: es predictor del modelo, pero nunca fue una dimensión de
+    # comparación publicada —ni antes de la migración al Figma, ni en el frame
+    # de la diseñadora, que muestra cuatro—. Sumarla es decisión editorial.
+    "hogar_1_2", "hogar_3_4", "hogar_5_plus",
+}
+
 GRUPOS_LABEL = {
     "religiosidad_nada": "Nada religioso",
     "religiosidad_poco": "Poco religioso",

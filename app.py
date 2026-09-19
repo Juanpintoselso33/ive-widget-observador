@@ -12,15 +12,22 @@ hoja del Figma hubo que acordarse de tocar dos entry points para una sola app, y
 un cambio aplicado en uno solo no se nota hasta que alguien abre el otro.
 
 Streamlit Cloud apunta su *Main file path* a este archivo, así que tiene que
-seguir existiendo; lo que no tiene que hacer es repetir el widget. Ejecuta el
-entry real con `run_name="__main__"` para que corra igual que si Streamlit lo
-hubiera lanzado directamente.
+seguir existiendo; lo que no tiene que hacer es repetir el widget.
+
+Va por IMPORT y no por `runpy.run_path()`: las dos formas ejecutan el widget,
+pero runpy lo corre en un `__main__` temporal que después sale de `sys.modules`,
+y el watcher de Streamlit arma la lista de archivos a vigilar recorriendo
+`sys.modules` — así que editar `widgets/ive/app.py` no recargaba la app. Con el
+import queda registrado y se recarga como cualquier otro módulo.
 """
 
-import runpy
+import sys
 from pathlib import Path
 
-runpy.run_path(
-    str(Path(__file__).parent / "widgets" / "ive" / "app.py"),
-    run_name="__main__",
-)
+_ROOT = Path(__file__).parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from widgets.ive.app import main  # noqa: E402
+
+main()
