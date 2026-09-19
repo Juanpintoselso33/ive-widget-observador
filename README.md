@@ -79,14 +79,28 @@ https://tu-usuario-ive-widget.streamlit.app
 ```
 
 ### Paso 4: Embeber en El Observador
-Usar iframe en el artículo:
+
+**No armes el iframe a mano: copiá el de `docs/embed/ive-widget-embed.html`.**
+Ahí están la URL correcta, las dos versiones —completa y caja— y las alturas
+medidas dentro de un iframe real.
+
+Dos cosas que ese archivo explica y que este README recomendaba mal:
+
+- La URL del embed lleva **`/~/+/`**. Pedida a secas, Streamlit Cloud devuelve un
+  envoltorio que carga la app en otro iframe adentro, y ese iframe anidado no se
+  redimensiona dentro del iframe de una nota: el widget queda cortado a la altura
+  del título.
+- El alto **no es 800**: la versión completa necesita 1860 y la de caja 1180. Un
+  iframe corto con `scrolling="no"` recorta sin avisar.
+
 ```html
-<iframe 
-  src="https://tu-usuario-ive-widget.streamlit.app?embed=true" 
-  width="100%" 
-  height="800" 
+<iframe
+  src="https://TU-APP.streamlit.app/~/+/?embed=true"
+  width="100%"
+  height="1860"
   frameborder="0"
-  style="border: none; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+  scrolling="no"
+  style="border: none;">
 </iframe>
 ```
 
