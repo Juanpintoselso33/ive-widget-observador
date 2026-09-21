@@ -162,3 +162,18 @@ def test_avisa_la_altura_nueva_al_cruzar_el_corte(navegador, url):
 
     # En dos columnas mide ~600px; como caja, más de 1000.
     assert ancho_alto < 800 < angosto_alto
+
+
+@pytest.mark.parametrize("version", ["", "?resumen=1"])
+@pytest.mark.parametrize("ancho", [320, 360, 390, 480, 540, 600])
+def test_en_celular_no_se_corta_ninguna_opcion(navegador, url, version, ancho):
+    """Con dos columnas parejas, abajo de 600px se cortaban las opciones largas."""
+    pagina = navegador.new_page(viewport={"width": ancho, "height": 900})
+    pagina.goto(url + version)
+    pagina.locator(".result-number").wait_for()
+    pagina.evaluate("document.fonts.ready")
+    recortados = pagina.evaluate(ESTADO.replace(
+        "const fila = w.querySelector('.fila-apaisada');",
+        "const fila = w.querySelector('.fila-apaisada') || campos;"))["recortados"]
+    pagina.close()
+    assert recortados == []
