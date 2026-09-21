@@ -296,6 +296,36 @@
     window.addEventListener("resize", aplicar);
   }
 
+  /**
+   * En celular, "Personas en el hogar" pasa ANTES que "Balotaje 2024".
+   *
+   * Abajo de 600px educación y balotaje ocupan la fila entera (sus opciones
+   * no entran en media columna), y con el orden de siempre "¿Tienes hijos?"
+   * quedaba sola en su fila. Se sube "hogar" a su lado MOVIENDO EL NODO, no con
+   * `grid-auto-flow: dense` ni `order`: esos cambian sólo lo que se ve, y el
+   * tabulador y el lector de pantalla seguían el orden viejo, bajando a
+   * balotaje y volviendo a subir. Lo marcó Codex. Arriba de 600px vuelve a su
+   * lugar, así que el escritorio queda como estaba.
+   */
+  function ordenarCamposEnCelular() {
+    var hogar = document.getElementById("campo-hogar").parentNode;
+    var balotaje = document.getElementById("campo-balotaje").parentNode;
+    var angosto = window.matchMedia("(max-width: 599px)");
+    function aplicar() {
+      var conFoco = document.activeElement;
+      if (angosto.matches) {
+        if (hogar.nextSibling !== balotaje) balotaje.parentNode.insertBefore(hogar, balotaje);
+      } else if (balotaje.nextSibling !== hogar) {
+        balotaje.parentNode.insertBefore(hogar, balotaje.nextSibling);
+      }
+      if (conFoco && conFoco !== document.activeElement && hogar.contains(conFoco)) {
+        conFoco.focus({ preventScroll: true });
+      }
+    }
+    aplicar();
+    angosto.addEventListener("change", aplicar);
+  }
+
   function iniciar(modelo) {
     var v = versionPedida();
     var resumen = v.resumen;
@@ -327,6 +357,7 @@
     }
 
     construirCampos(campos, modelo.variable_ranges, actualizar);
+    ordenarCamposEnCelular();
     actualizar();
 
     if (!resumen) {

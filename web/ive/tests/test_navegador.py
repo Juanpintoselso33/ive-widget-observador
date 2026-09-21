@@ -177,3 +177,30 @@ def test_en_celular_no_se_corta_ninguna_opcion(navegador, url, version, ancho):
         "const fila = w.querySelector('.fila-apaisada') || campos;"))["recortados"]
     pagina.close()
     assert recortados == []
+
+
+@pytest.mark.parametrize("version", ["", "?resumen=1"])
+@pytest.mark.parametrize("ancho", [360, 540, 640, 1280])
+def test_el_orden_de_lectura_es_el_que_se_ve(navegador, url, version, ancho):
+    """El tabulador recorre los campos en el mismo orden en que se ven."""
+    pagina = navegador.new_page(viewport={"width": ancho, "height": 900})
+    pagina.goto(url + version)
+    pagina.locator(".result-number").wait_for()
+    en_dom, en_pantalla = pagina.evaluate("""() => {
+      const s = [...document.querySelectorAll('#campos select')];
+      const pos = s.map(e => [e.id, Math.round(e.getBoundingClientRect().top), e.getBoundingClientRect().left]);
+      const vis = [...pos].sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(p => p[0]);
+      return [s.map(e => e.id), vis];
+    }""")
+    pagina.close()
+    assert en_dom == en_pantalla
+
+
+def test_en_celular_hogar_va_al_lado_de_hijos_y_vuelve(navegador, url):
+    pagina = _abrir(navegador, url, 360)
+    orden = "() => [...document.querySelectorAll('#campos select')].map(e => e.id)"
+    assert pagina.evaluate(orden)[-2:] == ["campo-hogar", "campo-balotaje"]
+    pagina.set_viewport_size({"width": 700, "height": 900})
+    pagina.wait_for_function("document.querySelectorAll('#campos select')[7].id === 'campo-hogar'")
+    assert pagina.evaluate(orden)[-2:] == ["campo-balotaje", "campo-hogar"]
+    pagina.close()
