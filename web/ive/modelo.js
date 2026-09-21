@@ -88,8 +88,13 @@
    */
   function redondear(x) {
     var piso = Math.floor(x);
-    var resto = x - piso;
-    if (Math.abs(resto - 0.5) > 1e-9) return Math.round(x);
+    // EL EMPATE SE DETECTA EXACTO, sin tolerancia. Con un margen de 1e-9,
+    // 76.5000000001 se trataba como empate y daba 76 mientras Python daba 77,
+    // y 77.4999999999 daba 78 contra 77. El modelo de hoy no cae ahí —su valor
+    // más cercano a un medio es 78.50000524— pero un reentrenamiento sí
+    // podría. La resta es exacta en coma flotante, así que la comparación
+    // directa es la que replica a Python. Lo marcó Codex.
+    if (x - piso !== 0.5) return Math.round(x);
     return piso % 2 === 0 ? piso : piso + 1;
   }
 
@@ -100,7 +105,62 @@
     return UMBRALES[UMBRALES.length - 1][1];
   }
 
+  // Mapeo UI → código del modelo, igual que widgets/ive/config.py.
+  var BALOTAJE_UI_A_CODIGO = {
+    "No votó/Blanco": "otros",
+    "Orsi (FA)": "martinez",
+    "Delgado (Coalición)": "lacalle"
+  };
+
+  /**
+   * Convierte los ÍNDICES de los ocho desplegables en el perfil que come el
+   * modelo.
+   *
+   * Vive acá, pura y aparte del DOM, porque es donde estaba el agujero: la
+   * grilla de 5.760 perfiles del test comparaba Python contra JS usando
+   * perfiles YA codificados, así que cambiar un `idx + 1` por `idx`, dar vuelta
+   * sexo y región o alterar el orden de las opciones dejaba el test en verde
+   * mientras todos los lectores recibían otro perfil. Lo marcó Codex.
+   *
+   * Los códigos numéricos arrancan en 1, como en el Python; los binarios son
+   * el índice tal cual; el balotaje es una cadena.
+   */
+  function perfilDesdeIndices(rangos, i) {
+    return {
+      tramoEdad: i.tramoEdad + 1,
+      esMujer: i.esMujer,
+      nivelEduc: i.nivelEduc + 1,
+      religiosidad: i.religiosidad + 1,
+      esMontevideo: i.esMontevideo,
+      tieneHijos: i.tieneHijos,
+      hogar: i.hogar + 1,
+      balotaje: BALOTAJE_UI_A_CODIGO[rangos.balotaje.labels[i.balotaje]]
+    };
+  }
+
+  /**
+   * El índice que arranca seleccionado en cada desplegable.
+   *
+   * `variable_ranges` no es homogéneo: en los campos numéricos `default` es el
+   * CÓDIGO (base 1), en los binarios es el índice y en balotaje es la cadena
+   * del código. Acá se normaliza a índice, que es lo que entiende un <select>.
+   */
+  function indicePorDefecto(rango) {
+    if (rango.labels && rango.labels.length && BALOTAJE_UI_A_CODIGO[rango.labels[0]] !== undefined) {
+      for (var j = 0; j < rango.labels.length; j++) {
+        if (BALOTAJE_UI_A_CODIGO[rango.labels[j]] === rango.default) return j;
+      }
+      return 0;
+    }
+    if (rango.default === undefined) return 0;
+    var k = rango.options.indexOf(rango.default);
+    return k < 0 ? 0 : k;
+  }
+
   raiz.ModeloIVE = {
+    perfilDesdeIndices: perfilDesdeIndices,
+    indicePorDefecto: indicePorDefecto,
+    BALOTAJE_UI_A_CODIGO: BALOTAJE_UI_A_CODIGO,
     calcularZ: calcularZ,
     predecir: predecir,
     redondear: redondear,

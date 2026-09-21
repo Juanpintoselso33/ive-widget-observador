@@ -18,14 +18,6 @@
   // compara contra model.py. Acá sólo se usa.
   var M = window.ModeloIVE;
 
-  // Mapeos UI → código del modelo. Son los mismos que en widgets/ive/config.py
-  // y components.py; los índices arrancan en 1 como en el Python.
-  var BALOTAJE_UI_A_CODIGO = {
-    "No votó/Blanco": "otros",
-    "Orsi (FA)": "martinez",
-    "Delgado (Coalición)": "lacalle"
-  };
-
   // Las dimensiones del bloque comparativo y la etiqueta de cada grupo.
   var GRUPOS_ORDEN = [
     ["Por religiosidad", ["religiosidad_nada", "religiosidad_poco", "religiosidad_bastante", "religiosidad_mucho"]],
@@ -117,19 +109,7 @@
         sel.appendChild(opt);
       });
 
-      // El valor por defecto: en las variables numéricas `default` es el
-      // código (base 1) y en las binarias es el índice; en balotaje es la
-      // cadena del código. Se normaliza al índice de la lista.
-      var indice = 0;
-      if (campo[2] === "balotaje") {
-        rango.labels.forEach(function (texto, i) {
-          if (BALOTAJE_UI_A_CODIGO[texto] === rango.default) indice = i;
-        });
-      } else if (rango.default !== undefined) {
-        indice = rango.options.indexOf(rango.default);
-        if (indice < 0) indice = 0;
-      }
-      sel.value = String(indice);
+      sel.value = String(M.indicePorDefecto(rango));
 
       sel.addEventListener("change", alCambiar);
       div.appendChild(lab);
@@ -142,17 +122,13 @@
     function idx(clave) {
       return parseInt(contenedor.querySelector('[data-clave="' + clave + '"]').value, 10);
     }
-    return {
-      // Los códigos numéricos arrancan en 1, como en el Python.
-      tramoEdad: idx("tramoEdad") + 1,
-      esMujer: idx("esMujer"),
-      nivelEduc: idx("nivelEduc") + 1,
-      religiosidad: idx("religiosidad") + 1,
-      esMontevideo: idx("esMontevideo"),
-      tieneHijos: idx("tieneHijos"),
-      hogar: idx("hogar") + 1,
-      balotaje: BALOTAJE_UI_A_CODIGO[rangos.balotaje.labels[idx("balotaje")]]
-    };
+    // La conversión en sí vive en modelo.js, pura, para que el test la ejerza.
+    return M.perfilDesdeIndices(rangos, {
+      tramoEdad: idx("tramoEdad"), esMujer: idx("esMujer"),
+      nivelEduc: idx("nivelEduc"), religiosidad: idx("religiosidad"),
+      esMontevideo: idx("esMontevideo"), tieneHijos: idx("tieneHijos"),
+      hogar: idx("hogar"), balotaje: idx("balotaje")
+    });
   }
 
   function pintarResultado(nodos, prob) {
@@ -181,16 +157,36 @@
 
     var solapas = crear("div", "solapas");
     solapas.setAttribute("role", "tablist");
+    solapas.setAttribute("aria-label", "Dimensiones de comparación");
     var paneles = [];
+    var botones = [];
+
+    function activar(indice) {
+      botones.forEach(function (b, j) {
+        b.setAttribute("aria-selected", j === indice ? "true" : "false");
+        b.tabIndex = j === indice ? 0 : -1;
+      });
+      paneles.forEach(function (p, j) { p.hidden = j !== indice; });
+    }
 
     dimensiones.forEach(function (dim, i) {
       var boton = crear("button", "solapa", dim[0]);
       boton.type = "button";
       boton.setAttribute("role", "tab");
       boton.setAttribute("aria-selected", i === 0 ? "true" : "false");
+      // Un solo tab en el orden de foco, y las flechas mueven entre ellas: es
+      // lo que espera quien navega por teclado cuando encuentra `role="tab"`.
+      // Estaban las tres cosas a medias —todas enfocables, sin flechas y sin
+      // relación con su panel—, que es peor que no declarar el rol. Lo marcó
+      // Codex.
+      boton.tabIndex = i === 0 ? 0 : -1;
+      boton.id = "solapa-" + i;
+      boton.setAttribute("aria-controls", "panel-" + i);
 
       var panel = crear("div", "grupo-cifras");
       panel.setAttribute("role", "tabpanel");
+      panel.id = "panel-" + i;
+      panel.setAttribute("aria-labelledby", "solapa-" + i);
       if (i !== 0) panel.hidden = true;
 
       dim[1].forEach(function (par) {
@@ -214,16 +210,21 @@
         panel.appendChild(celda);
       });
 
-      boton.addEventListener("click", function () {
-        solapas.querySelectorAll(".solapa").forEach(function (b) {
-          b.setAttribute("aria-selected", "false");
-        });
-        paneles.forEach(function (p) { p.hidden = true; });
-        boton.setAttribute("aria-selected", "true");
-        panel.hidden = false;
+      boton.addEventListener("click", function () { activar(i); });
+      boton.addEventListener("keydown", function (e) {
+        var salto = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+        var destino = null;
+        if (salto) destino = (i + salto + dimensiones.length) % dimensiones.length;
+        else if (e.key === "Home") destino = 0;
+        else if (e.key === "End") destino = dimensiones.length - 1;
+        if (destino === null) return;
+        e.preventDefault();
+        activar(destino);
+        botones[destino].focus();
       });
 
       solapas.appendChild(boton);
+      botones.push(boton);
       paneles.push(panel);
     });
 
@@ -284,23 +285,53 @@
         (modelo.model_info.pseudo_r2 * 100).toFixed(1).replace(".", ",") + "%";
     }
 
-    avisarAltura();
-    window.addEventListener("resize", avisarAltura);
-    // El alto cambia al abrir la metodología o cambiar de solapa.
-    document.addEventListener("click", function () { setTimeout(avisarAltura, 60); });
+    vigilarAltura();
   }
 
   /**
    * Le dice al que nos embebe cuánto medimos, para que ajuste el iframe.
    *
    * Es lo que hace que el embebido NO necesite una altura cableada: el script
-   * de la nota escucha este mensaje. Es el mismo mecanismo que usan Flourish y
-   * Datawrapper, y es la razón por la que ellos no te piden un `height`.
+   * de la nota escucha este mensaje. Mismo mecanismo que usan Flourish y
+   * Datawrapper, y la razón por la que ellos no te piden un `height`.
+   *
+   * SE MIDE EL CONTENIDO, NO EL DOCUMENTO, y la diferencia importa: dentro de
+   * un iframe el `html` y el `body` se estiran hasta el alto del iframe, así
+   * que medirlos devuelve el alto que el iframe YA tiene. Eso arma un bucle:
+   * el widget avisa el alto que le dieron, el padre se lo confirma, y el
+   * iframe se queda clavado en su altura inicial — medido, los dos widgets de
+   * la prueba quedaban en los 1860px de arranque.
+   *
+   * El borde inferior de `#widget` sí es el final del contenido. Se le suma el
+   * margen negativo con el que la banda sangra hasta el borde del marco.
    */
   function avisarAltura() {
     if (window.parent === window) return;
-    var alto = Math.ceil(document.documentElement.getBoundingClientRect().height);
+    var raiz = document.getElementById("widget");
+    if (!raiz) return;
+    var rect = raiz.getBoundingClientRect();
+    var alto = Math.ceil(rect.bottom + window.scrollY);
     window.parent.postMessage({ tipo: "ive-widget:alto", alto: alto, id: window.name || null }, "*");
+  }
+
+  /**
+   * Avisa la altura cada vez que cambia de verdad, no sólo al arrancar.
+   *
+   * Hacía falta: el primer aviso salía ANTES de que terminaran de bajar las
+   * fuentes de Google, y con la tipografía definitiva el texto ocupa más
+   * líneas — medido, el iframe quedaba entre 5 y 18px corto y recortaba el
+   * pie. Un `ResizeObserver` cubre eso y también lo que cambia después: abrir
+   * la metodología, cambiar de solapa o girar el teléfono.
+   */
+  function vigilarAltura() {
+    avisarAltura();
+    if (typeof ResizeObserver === "function") {
+      new ResizeObserver(avisarAltura).observe(document.documentElement);
+    }
+    window.addEventListener("resize", avisarAltura);
+    // Cinturón y tirantes para los navegadores sin ResizeObserver.
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(avisarAltura);
+    [120, 400, 1200].forEach(function (ms) { setTimeout(avisarAltura, ms); });
   }
 
   fetch("modelo.json")

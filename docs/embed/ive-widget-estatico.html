@@ -1,0 +1,84 @@
+<!--
+  ============================================================
+  CÓDIGO DE EMBED — Widget IVE (versión estática)
+  ============================================================
+
+  Reemplaza al embed de Streamlit (`ive-widget-embed.html`), que tenía dos
+  problemas de fondo para publicar en una nota: la app dormía a las 12 h sin
+  visitas —el lector se encontraba una pantalla de "despertando"— y abría un
+  proceso por lector, así que el tráfico del diario la tumbaba.
+
+  Esta versión es HTML y JavaScript: la cuenta corre en el navegador de quien
+  lee. No hay servidor que se duerma ni que se sature, y carga al instante.
+
+  Se aloja en GitHub Pages:
+    https://juanpintoselso33.github.io/ive-widget-observador/ive/
+
+  ============================================================
+  CÓMO SE USA
+  ============================================================
+  Un div y el script al lado, como los embeds de Flourish. NO LLEVA ALTURA: el
+  widget avisa cuánto mide y el script ajusta el iframe solo, así que si mañana
+  se cambia un texto no hay que volver a medir nada.
+
+  El `<noscript>` no es decorativo: el iframe lo crea el script, así que sin
+  JavaScript el lector vería un espacio en blanco. Con él ve el widget igual,
+  sólo que con una altura fija.
+-->
+
+
+<!-- ============================================================
+     1) PARA LA NOTA — versión completa
+     ============================================================ -->
+<div class="ive-embed"
+     data-src="https://juanpintoselso33.github.io/ive-widget-observador/ive/"></div>
+<noscript>
+  <iframe src="https://juanpintoselso33.github.io/ive-widget-observador/ive/"
+          title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
+          width="100%" height="1890" frameborder="0" scrolling="no"
+          style="display:block;border:none;"></iframe>
+</noscript>
+<script src="https://juanpintoselso33.github.io/ive-widget-observador/ive/embed.js"></script>
+
+
+<!-- ============================================================
+     2) PARA LA HOME — versión de caja
+     ============================================================
+     Formulario y resultado, sin la comparación por grupos ni el desplegable
+     del modelo. Su pie lleva el aviso de que el cálculo es entre quienes
+     tienen postura definida, los créditos y el enlace a la versión completa:
+     es lo único que acompaña al número en esta versión, así que no conviene
+     recortarlo. -->
+<div class="ive-embed"
+     data-src="https://juanpintoselso33.github.io/ive-widget-observador/ive/?resumen=1"></div>
+<noscript>
+  <iframe src="https://juanpintoselso33.github.io/ive-widget-observador/ive/?resumen=1"
+          title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
+          width="100%" height="1210" frameborder="0" scrolling="no"
+          style="display:block;border:none;"></iframe>
+</noscript>
+<script src="https://juanpintoselso33.github.io/ive-widget-observador/ive/embed.js"></script>
+
+
+<!--
+  ============================================================
+  NOTAS
+  ============================================================
+
+  · CON LOS DOS EN LA MISMA PÁGINA alcanza con incluir el `<script>` una sola
+    vez: monta todos los `div.ive-embed` que encuentre.
+
+  · EL ANCHO lo decide el contenedor de la nota. El widget se topa solo en
+    698px —el ancho del frame de escritorio del Figma— y centra; abajo de eso
+    se adapta, y mantiene sus dos columnas de campos hasta 400px, como el frame
+    móvil.
+
+  · LAS ALTURAS DEL `<noscript>` están medidas, y sólo se usan si el lector no
+    tiene JavaScript: 1888px la completa y 1199 la caja, en una columna de
+    celular, que es el caso peor. Con JavaScript, la altura se ajusta sola y
+    estos números no intervienen.
+
+  · SI EL WIDGET APARECE CORTADO, es que el script no se está cargando: revisar
+    que la etiqueta `<script>` no la haya filtrado el CMS. Sin el script sólo
+    corre el `<noscript>`, que no se ajusta.
+-->

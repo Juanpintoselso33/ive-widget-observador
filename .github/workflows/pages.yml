@@ -9,6 +9,12 @@ on:
     branches: [master]
     paths:
       - 'web/**'
+      # El artefacto entrenado también dispara: si se reentrena el modelo y
+      # nadie regenera `web/ive/modelo.json`, sin esto Pages seguiría sirviendo
+      # los coeficientes viejos y el chequeo de sincronía de abajo ni siquiera
+      # llegaría a correr. Con esto, el despliegue falla hasta regenerar la
+      # copia. Lo marcó Codex.
+      - 'widgets/ive/model_coefficients.json'
       - '.github/workflows/pages.yml'
   # Para poder republicar a mano sin tener que tocar un archivo.
   workflow_dispatch:
@@ -57,6 +63,20 @@ jobs:
               )
           print('modelo del widget sincronizado')
           PY
+
+      # LOS TESTS CORREN ANTES DE PUBLICAR, y no es ceremonia: la paridad entre
+      # el JS y el Python es lo único que garantiza que el widget publicado dé
+      # los mismos números que el modelo entrenado, y sin este paso el workflow
+      # subía a producción sin ejecutarla nunca. Lo marcó Codex.
+      - name: Instalar Python y dependencias de test
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Paridad del widget contra el modelo de producción
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest web/ive/tests/ -q
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

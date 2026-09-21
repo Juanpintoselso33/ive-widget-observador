@@ -15,9 +15,11 @@
    un blanco enorme. Acá el widget avisa cuánto mide con `postMessage` y este
    script ajusta el iframe. Es lo mismo que hacen Flourish y Datawrapper.
 
-   Sin JavaScript en la página que embebe, el iframe igual se dibuja con una
-   altura de arranque que cubre el caso peor: se ve todo, sólo que con blanco
-   abajo en pantallas anchas.
+   SIN JAVASCRIPT EN LA PÁGINA QUE EMBEBE NO SE VE NADA, porque el iframe lo
+   crea este script. Por eso el snippet para el diario trae además un
+   `<noscript>` con un iframe de altura fija. Este comentario decía lo
+   contrario —que el iframe se dibujaba igual—, que era falso: el lector sin JS
+   veía un div vacío. Lo marcó Codex.
    =========================================================================== */
 
 (function () {
@@ -68,20 +70,31 @@
   window.addEventListener("message", function (e) {
     var d = e.data;
     if (!d || d.tipo !== "ive-widget:alto") return;
-    // El alto viene de un widget que NOSOTROS insertamos; se ignora cualquier
-    // otro mensaje, y el valor se acota para que un mensaje raro no estire la
-    // página a lo loco.
+
+    // EL REMITENTE SE IDENTIFICA POR LA VENTANA, NO POR EL ID QUE DICE SER.
+    // Antes, un mensaje con un `id` conocido se aplicaba sin mirar de dónde
+    // venía, y los ids son adivinables ("ive-1", "ive-2"): cualquier otro
+    // iframe de la nota podía encoger el widget a un pixel o estirarlo hasta
+    // el tope. Ahora se busca el iframe cuya ventana efectivamente envió el
+    // mensaje, y el id sólo sirve para desempatar. Lo marcó Codex.
+    var iframe = null;
+    for (var k in pendientes) {
+      if (pendientes[k].contentWindow === e.source) { iframe = pendientes[k]; break; }
+    }
+    if (!iframe) return;
+
+    // Y el origen tiene que ser el del propio iframe.
+    var origenEsperado;
+    try {
+      origenEsperado = new URL(iframe.src, window.location.href).origin;
+    } catch (err) {
+      return;
+    }
+    if (e.origin !== origenEsperado) return;
+
     var alto = parseInt(d.alto, 10);
     if (!(alto > 0) || alto > 20000) return;
-
-    var iframe = d.id && pendientes[d.id];
-    if (!iframe) {
-      // Sin id —o con uno desconocido— se busca por la ventana que envió.
-      for (var k in pendientes) {
-        if (pendientes[k].contentWindow === e.source) { iframe = pendientes[k]; break; }
-      }
-    }
-    if (iframe) iframe.height = String(alto);
+    iframe.height = String(alto);
   });
 
   if (document.readyState === "loading") {

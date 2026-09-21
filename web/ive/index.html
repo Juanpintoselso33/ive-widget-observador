@@ -40,7 +40,12 @@
       </div>
     </div>
 
-    <div class="result-card">
+    <!-- `aria-live` con `aria-atomic`: el resultado cambia con cada selección
+         y el foco se queda en el desplegable, así que sin esto un lector de
+         pantalla no anuncia nunca el porcentaje nuevo — la persona cambia
+         "religiosidad" y no se entera de que el número se movió. Atómico para
+         que lea el bloque entero y no sólo el trozo que cambió. -->
+    <div class="result-card" role="status" aria-live="polite" aria-atomic="true">
       <div class="result-number">—</div>
       <div class="result-text"></div>
     </div>
