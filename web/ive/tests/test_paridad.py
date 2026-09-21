@@ -296,3 +296,55 @@ def test_el_widget_arranca_en_el_mismo_perfil_que_la_version_publicada(modelo_we
         capture_output=True, text=True, check=True,
     ).stdout
     assert json.loads(salida) == esperado
+
+
+# ----------------------------------------------------------------------
+# Qué versión se dibuja y cómo se acomoda
+# ----------------------------------------------------------------------
+
+def _node(expr, *args):
+    return json.loads(subprocess.run(
+        ["node", "-e",
+         "const M=require(process.argv[1]+'/modelo.js').ModeloIVE;"
+         f"process.stdout.write(JSON.stringify({expr}))",
+         str(_WEB), *args],
+        capture_output=True, text=True, check=True,
+    ).stdout)
+
+
+@necesita_node
+@pytest.mark.parametrize("resumen, apaisado, esperado", [
+    ([], [], False),            # la nota
+    (["1"], [], True),          # la home
+    # `?apaisado=1` quedó como sinónimo: existió un rato como versión aparte y
+    # un código ya pegado con ese parámetro tiene que seguir andando.
+    ([], ["1"], True),
+    (["0"], ["1"], True),
+    # Repetido, gana el último — la misma regla que la versión Streamlit.
+    (["1", "0"], [], False),
+    (["0", "1"], [], True),
+    # Valores que NO activan: sin este control, un `parametroActivo` que
+    # devolviera siempre True pasaría casi todos los casos de arriba.
+    (["cualquiera"], ["no"], False),
+    ([""], [""], False),
+])
+def test_la_version_segun_la_url(resumen, apaisado, esperado):
+    r = _node("M.version(JSON.parse(process.argv[2]),JSON.parse(process.argv[3]))",
+              json.dumps(resumen), json.dumps(apaisado))
+    assert r == {"resumen": esperado}
+
+
+@necesita_node
+@pytest.mark.parametrize("ancho, esperado", [
+    (320, "caja"), (400, "caja"), (700, "caja"), (900, "caja"),
+    (1099, "caja"),      # el borde, de los dos lados
+    (1100, "columnas"),
+    (1280, "columnas"), (1440, "columnas"),
+])
+def test_la_disposicion_la_decide_el_ancho(ancho, esperado):
+    """
+    La versión resumida se acomoda por el ANCHO DISPONIBLE, no por la URL: así
+    la home usa un solo embed para escritorio y móvil. Se prueban los dos lados
+    del corte porque un `>` en vez de `>=` corre el borde un pixel y no se ve.
+    """
+    assert _node(f"M.disposicion({ancho})") == esperado

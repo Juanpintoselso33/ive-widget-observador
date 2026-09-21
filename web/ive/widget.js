@@ -238,16 +238,67 @@
   // Arranque
   // ---------------------------------------------------------------------
 
-  function esResumen() {
-    var v = new URLSearchParams(window.location.search).getAll("resumen");
-    // Con el parámetro repetido gana el ÚLTIMO, igual que en la versión
-    // Streamlit (que sigue la semántica de st.query_params).
-    var ultimo = v.length ? v[v.length - 1] : null;
-    return ["1", "true", "si", "sí"].indexOf(String(ultimo).trim().toLowerCase()) !== -1;
+  function versionPedida() {
+    var q = new URLSearchParams(window.location.search);
+    return M.version(q.getAll("resumen"), q.getAll("apaisado"));
+  }
+
+  /**
+   * La versión resumida se acomoda sola según el ancho: en dos columnas en
+   * escritorio y en caja vertical en móvil. Un solo embed para toda la home.
+   *
+   * En el HTML la tarjeta vive dentro de la banda gris, debajo de la barra: es
+   * el orden de la caja. En dos columnas se la saca de la banda y se la pone al
+   * lado del formulario; al volver a caja, se la devuelve EXACTAMENTE a su
+   * lugar —después de la barra—, así que la caja en móvil queda idéntica a la
+   * de siempre, no parecida. Se reordena el DOM en vez de usar sólo CSS porque
+   * la tarjeta y los campos no son hermanos, y `display: contents` sobre la
+   * banda le borraba el fondo gris.
+   *
+   * Reacciona a cambios de ancho —girar el teléfono, achicar la ventana— y no
+   * sólo al arrancar.
+   */
+  function acomodarResumen() {
+    var raiz = document.getElementById("widget");
+    var campos = document.getElementById("campos");
+    var tarjeta = raiz.querySelector(".result-card");
+    var barra = raiz.querySelector(".prob-bar-wrapper");
+
+    // La fila se crea una sola vez, vacía; los nodos entran y salen de ella.
+    var fila = document.createElement("div");
+    fila.className = "fila-apaisada";
+    campos.parentNode.insertBefore(fila, campos);
+
+    var actual = null;
+    function aplicar() {
+      var modo = M.disposicion(raiz.parentNode.getBoundingClientRect().width);
+      if (modo === actual) return;
+      actual = modo;
+      // Mover un nodo en el DOM le saca el foco a lo que tenga adentro: quien
+      // estaba en un desplegable cuando el iframe cruzó el corte —al rotar la
+      // tablet, al achicar la ventana— quedaba sin foco. Se guarda y se
+      // devuelve. Lo marcó Codex.
+      var conFoco = document.activeElement;
+      if (modo === "columnas") {
+        raiz.classList.add("apaisado");
+        fila.appendChild(campos);
+        fila.appendChild(tarjeta);
+      } else {
+        raiz.classList.remove("apaisado");
+        fila.parentNode.insertBefore(campos, fila);
+        barra.parentNode.insertBefore(tarjeta, barra.nextSibling);
+      }
+      if (conFoco && conFoco !== document.activeElement && raiz.contains(conFoco)) {
+        conFoco.focus({ preventScroll: true });
+      }
+    }
+    aplicar();
+    window.addEventListener("resize", aplicar);
   }
 
   function iniciar(modelo) {
-    var resumen = esResumen();
+    var v = versionPedida();
+    var resumen = v.resumen;
     // POR ID, no por clase: el aviso de error y el bloque de <noscript>
     // también son ".marco", y `querySelector` devolvía el primero — o sea
     // que se le sacaba el `hidden` al div de error, vacío, y el widget real
@@ -261,6 +312,7 @@
     } else {
       document.getElementById("pie-caja").remove();
     }
+    if (resumen) acomodarResumen();
 
     var campos = document.getElementById("campos");
     var nodos = {

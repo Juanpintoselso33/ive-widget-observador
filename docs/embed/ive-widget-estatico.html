@@ -22,8 +22,9 @@
   se cambia un texto no hay que volver a medir nada.
 
   El `<noscript>` no es decorativo: el iframe lo crea el script, así que sin
-  JavaScript el lector vería un espacio en blanco. Con él ve el widget igual,
-  sólo que con una altura fija.
+  JavaScript el lector vería un espacio en blanco. Con él ve el título y un
+  aviso de que el widget necesita JavaScript —el cálculo corre en el
+  navegador, así que sin JavaScript no hay número que mostrar—.
 -->
 
 
@@ -35,17 +36,22 @@
 <noscript>
   <iframe src="https://juanpintoselso33.github.io/ive-widget-observador/ive/"
           title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
-          width="100%" height="1890" frameborder="0" scrolling="no"
+          width="100%" height="330" frameborder="0" scrolling="no"
           style="display:block;border:none;"></iframe>
 </noscript>
 <script src="https://juanpintoselso33.github.io/ive-widget-observador/ive/embed.js"></script>
 
 
 <!-- ============================================================
-     2) PARA LA HOME — versión de caja
+     2) PARA LA HOME — escritorio Y móvil, el mismo código
      ============================================================
      Formulario y resultado, sin la comparación por grupos ni el desplegable
-     del modelo. Su pie lleva el aviso de que el cálculo es entre quienes
+     del modelo. SE ACOMODA SOLO AL ANCHO del lugar donde lo pongan: desde
+     1100px en adelante va en dos columnas —los campos a la izquierda, el
+     resultado a la derecha y la barra abajo—, "menos largo y más ancho" como
+     pidió Tomer para la home vista desde una computadora (~590px de alto);
+     por debajo de 1100px es la caja vertical (~1.100px). No hace falta un embed
+     distinto para escritorio y para móvil. Su pie lleva el aviso de que el cálculo es entre quienes
      tienen postura definida, los créditos y el enlace a la versión completa:
      es lo único que acompaña al número en esta versión, así que no conviene
      recortarlo. -->
@@ -54,7 +60,7 @@
 <noscript>
   <iframe src="https://juanpintoselso33.github.io/ive-widget-observador/ive/?resumen=1"
           title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
-          width="100%" height="1210" frameborder="0" scrolling="no"
+          width="100%" height="330" frameborder="0" scrolling="no"
           style="display:block;border:none;"></iframe>
 </noscript>
 <script src="https://juanpintoselso33.github.io/ive-widget-observador/ive/embed.js"></script>
@@ -68,15 +74,16 @@
   · CON LOS DOS EN LA MISMA PÁGINA alcanza con incluir el `<script>` una sola
     vez: monta todos los `div.ive-embed` que encuentre.
 
-  · EL ANCHO lo decide el contenedor de la nota. El widget se topa solo en
-    698px —el ancho del frame de escritorio del Figma— y centra; abajo de eso
-    se adapta, y mantiene sus dos columnas de campos hasta 400px, como el frame
-    móvil.
+  · EL ANCHO lo decide el contenedor. La versión completa y la caja se topan
+    solas en 698px —el ancho del frame de escritorio del Figma— y centran;
+    abajo de eso se adaptan, y mantienen sus dos columnas de campos hasta
+    400px, como el frame móvil. La versión de la home en dos columnas se topa
+    en 1140px.
 
-  · LAS ALTURAS DEL `<noscript>` están medidas, y sólo se usan si el lector no
-    tiene JavaScript: 1888px la completa y 1199 la caja, en una columna de
-    celular, que es el caso peor. Con JavaScript, la altura se ajusta sola y
-    estos números no intervienen.
+  · LA ALTURA DEL `<noscript>` es la del aviso, no la del widget: sin
+    JavaScript el iframe sólo muestra el título y "Este widget necesita
+    JavaScript", que en un celular de 320px mide 317px. Con JavaScript la
+    altura se ajusta sola y este número no interviene.
 
   · SI EL WIDGET APARECE CORTADO, es que el script no se está cargando: revisar
     que la etiqueta `<script>` no la haya filtrado el CMS. Sin el script sólo

@@ -409,3 +409,89 @@ body {
   cursor: help;
   vertical-align: middle;
 }
+
+/* ===========================================================================
+   LA VERSIÓN RESUMIDA EN ESCRITORIO — dos columnas
+   ===========================================================================
+   Pedido de Tomer el 21/9/2026: en la home del diario, vista desde una
+   computadora, el widget va "menos largo y más ancho". No es otra URL: la
+   versión resumida (`?resumen=1`) se acomoda así sola cuando tiene 1100px o
+   más, y vuelve a ser la caja vertical cuando no. Es la caja —sin
+   comparación ni metodología— reacomodada en dos columnas: los ocho campos en
+   una grilla de 4×2 a la izquierda, el resultado a la derecha, y la banda gris
+   abajo con la barra a todo el ancho y el pie.
+
+   NO HAY FRAME DE ESTO EN EL FIGMA: se buscó en el archivo "Producto UY", en el
+   chat y en el correo, y sólo existen la versión de escritorio y la móvil para
+   nota. Por eso no se inventa estilo: son los mismos colores, tipografías y
+   componentes, reacomodados. Si la diseñadora manda un frame, manda el frame.
+
+   La tarjeta sale de la banda gris (la mueve widget.js), así que pierde la
+   sombra —sobre blanco no la necesita para separarse— y toma el gris de la
+   banda como fondo: sigue leyéndose como "esto es el resultado". */
+#widget.apaisado { max-width: 1140px; }
+
+.apaisado .main-title { padding: 6px 0 10px 0; }
+
+.apaisado .fila-apaisada {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 24px;
+  align-items: stretch;
+  margin-bottom: 19px;
+}
+
+/* Las columnas NO son parejas: cada una tiene de mínimo lo que pide el texto
+   más largo que puede mostrar —"Terciaria completa o más" 232px, "Delgado
+   (Coalición)" 196px, "Personas en el hogar" con su signo de ayuda 172px—, y
+   el sobrante se reparte. Con cuatro iguales esas dos opciones se cortaban
+   hasta en 1280px (lo marcó Codex). La suma de los mínimos es la que fija el
+   corte de 1100px de `ANCHO_COLUMNAS` en modelo.js: si se tocan, se re-mide. El
+   orden de los campos es fijo —edad, religiosidad, sexo, región arriba;
+   educación, hijos, balotaje, hogar abajo—, así que la primera columna es la
+   de educación y la tercera la de balotaje. Si cambia el orden de los
+   campos, estas proporciones cambian con él. */
+.apaisado .campos {
+  grid-template-columns: minmax(232px, 1.25fr) minmax(122px, 0.7fr) minmax(196px, 1fr) minmax(172px, 1fr);
+  gap: 1.1rem 0.8rem;
+  margin-bottom: 0;
+}
+
+/* Un punto menos que en la caja: a 17px las etiquetas y las opciones largas
+   piden columnas más anchas y el corte subía de 1100px. */
+.apaisado .campo label { font-size: 16px; }
+
+.apaisado .result-card {
+  margin: 0;
+  background: var(--banda);
+  box-shadow: none;
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.apaisado .result-number { font-size: 46px; }
+.apaisado .result-text { font-size: 17px; line-height: 1.5; }
+
+/* La banda queda sólo con la barra y el pie: no necesita el aire de arriba
+   que tenía para separarse del formulario, porque ahora la separa la fila. */
+.apaisado .banda { padding-top: 12px; }
+
+/* SIN REPLIEGUE POR CSS: la clase `.apaisado` la pone y la saca widget.js
+   según el ancho disponible, y en angosto la tarjeta vuelve a su lugar dentro
+   de la banda. Así la versión resumida en móvil es la caja de siempre, no una
+   parecida — el repliegue que había acá dejaba la tarjeta arriba de la barra
+   y con otro fondo. */
+
+/* Ajustes finos del apaisado, vistos en la captura a 1280:
+
+   · Si una etiqueta llega a partir en dos renglones bajaba su desplegable,
+     que quedaba desalineado de los otros tres de la fila. Alineados al pie,
+     los cuatro desplegables de una fila quedan a la misma altura igual.
+   · La barra y el pie tenían entre sí los 71px que les corresponden en la
+     nota, donde hay mucho más contenido alrededor; acá sobraban. */
+.apaisado .campos { align-items: end; }
+.apaisado .campo select { font-size: 16px; }
+.apaisado .prob-bar-wrapper { margin-bottom: 8px; }
+.apaisado .footer-text { margin-top: 18px; }
