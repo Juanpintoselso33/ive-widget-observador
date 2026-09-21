@@ -342,7 +342,11 @@
     } else {
       document.getElementById("pie-caja").remove();
     }
-    if (resumen) acomodarResumen();
+    if (resumen) {
+      // La clase engancha el bloque "más compacta" del CSS.
+      document.getElementById("widget").classList.add("resumen");
+      acomodarResumen();
+    }
 
     var campos = document.getElementById("campos");
     var nodos = {

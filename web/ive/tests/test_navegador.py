@@ -160,8 +160,10 @@ def test_avisa_la_altura_nueva_al_cruzar_el_corte(navegador, url):
     angosto_alto = pagina.evaluate("window.altos[window.altos.length-1]")
     pagina.close()
 
-    # En dos columnas mide ~600px; como caja, más de 1000.
-    assert ancho_alto < 800 < angosto_alto
+    # En dos columnas mide ~545px; como caja a 600px de ancho, ~780. Se compara
+    # una contra otra y no contra un número fijo, que se rompía con cada ajuste
+    # de espacios.
+    assert ancho_alto + 150 < angosto_alto
 
 
 @pytest.mark.parametrize("version", ["", "?resumen=1"])
