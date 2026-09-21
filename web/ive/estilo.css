@@ -391,26 +391,17 @@ body {
 }
 
 /* ---------- Desplegables en celular ----------
-   Con dos columnas parejas, abajo de 600px "Terciaria completa o más" no
-   entraba en su desplegable, abajo de 480 tampoco "Delgado (Coalición)", y a
-   320 se cortaban hasta "35-44 años" y "3-4 personas": el lector veía la
-   opción elegida mocha. Medido en Chrome, 21/9/2026.
-
-   Educación y balotaje —las dos de opciones largas— pasan a ocupar la fila
-   entera, y widget.js sube "Personas en el hogar" al lado de "¿Tienes
-   hijos?" moviendo el nodo (no con `dense`, que desordenaba el tabulador).
-   El corte de 599px está repetido allá: si se cambia, cambian los dos.
-   Alineados al pie, los desplegables de una fila
-   quedan parejos aunque una etiqueta parta en dos renglones. */
+   Abajo de 400px la flecha se achica y cede relleno —lo justo para que
+   "Terciaria completa o más" entre a 360px con la letra en 11px— y la letra base baja a 16px.
+   Si aun así la opción elegida no entra, widget.js le achica la letra a ese
+   desplegable (`ajustarLetraDesplegables`). Alineados al pie, los
+   desplegables de una fila quedan parejos aunque una etiqueta parta en dos
+   renglones. */
 @media (max-width: 599px) {
   .campos { align-items: end; }
-  .campo:has(#campo-nivelEduc), .campo:has(#campo-balotaje) { grid-column: 1 / -1; }
 }
-/* En los celulares más angostos, además, la letra baja un punto y la flecha
-   cede algo de relleno: a 320px la columna mide 139px. */
 @media (max-width: 400px) {
-  .campo select { font-size: 16px; padding: 0 1.75rem 0 0.6rem; background-position: right 0.5rem center; }
-  .campo label { font-size: 17px; }
+  .campo select { font-size: 16px; padding: 0 1.4rem 0 0.5rem; background-position: right 0.45rem center; background-size: 13px; }
 }
 
 /* El signo de ayuda al lado de cada etiqueta: es el `help=` de los selectbox
@@ -434,6 +425,25 @@ body {
 }
 
 /* ===========================================================================
+   LA VERSIÓN RESUMIDA, MÁS COMPACTA
+   ===========================================================================
+   Pedido de Tomer el 21/9/2026: la versión de la home "te ocupa una banda" —va
+   a todo el ancho— y pidió dejar menos espacio entre las partes. Sólo la
+   resumida: la nota larga quedó bien y no se toca. Los espacios de arriba
+   estaban igualados a los que agregaba Streamlit; acá se achican. Va ANTES
+   del bloque de dos columnas, que pisa lo que necesita. */
+#widget.resumen { padding-top: 0.75rem; }
+.resumen .main-title { padding: 6px 0 10px 0; }
+.resumen .subtitle { margin-bottom: 0.7rem; }
+.resumen .campos { gap: 0.95rem 1rem; margin-bottom: 14px; }
+.resumen .campo label { margin-bottom: 0.3rem; }
+.resumen .banda { padding-top: 14px; padding-bottom: 12px; }
+.resumen .prob-bar-wrapper { margin: 0 0 14px 0; }
+.resumen .result-card { padding: 1rem 1.2rem 1.1rem 1.2rem; margin-bottom: 0.5rem; }
+.resumen .result-text { line-height: 1.45; }
+.resumen .footer-text { margin-top: 14px; padding-top: 0.6rem; line-height: 1.45; }
+
+/* ===========================================================================
    LA VERSIÓN RESUMIDA EN ESCRITORIO — dos columnas
    ===========================================================================
    Pedido de Tomer el 21/9/2026: en la home del diario, vista desde una
@@ -452,15 +462,19 @@ body {
    La tarjeta sale de la banda gris (la mueve widget.js), así que pierde la
    sombra —sobre blanco no la necesita para separarse— y toma el gris de la
    banda como fondo: sigue leyéndose como "esto es el resultado". */
-#widget.apaisado { max-width: 1140px; }
+#widget.apaisado { max-width: 1240px; }
 
 .apaisado .main-title { padding: 6px 0 10px 0; }
 
 .apaisado .fila-apaisada {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 290px;
+  /* Los campos toman lo justo (la suma de los mínimos de sus columnas) y la
+     tarjeta se queda con el resto: cuanto más ancha, menos renglones tiene su
+     texto y menos alta queda la fila. Con la tarjeta fija en 290px era ella
+     la que estiraba la fila y abría un hueco entre las dos filas de campos. */
+  grid-template-columns: auto minmax(290px, 1fr);
   gap: 24px;
-  align-items: stretch;
+  align-items: center;
   margin-bottom: 19px;
 }
 
@@ -476,7 +490,7 @@ body {
    campos, estas proporciones cambian con él. */
 .apaisado .campos {
   grid-template-columns: minmax(232px, 1.25fr) minmax(122px, 0.7fr) minmax(196px, 1fr) minmax(172px, 1fr);
-  gap: 1.1rem 0.8rem;
+  gap: 0.8rem 0.8rem;
   margin-bottom: 0;
 }
 
@@ -494,8 +508,9 @@ body {
   justify-content: center;
 }
 
-.apaisado .result-number { font-size: 46px; }
-.apaisado .result-text { font-size: 17px; line-height: 1.5; }
+.apaisado .result-card { align-self: stretch; }
+.apaisado .result-number { font-size: 42px; }
+.apaisado .result-text { font-size: 16px; line-height: 1.4; }
 
 /* La banda queda sólo con la barra y el pie: no necesita el aire de arriba
    que tenía para separarse del formulario, porque ahora la separa la fila. */
@@ -516,5 +531,5 @@ body {
      nota, donde hay mucho más contenido alrededor; acá sobraban. */
 .apaisado .campos { align-items: end; }
 .apaisado .campo select { font-size: 16px; }
-.apaisado .prob-bar-wrapper { margin-bottom: 8px; }
-.apaisado .footer-text { margin-top: 18px; }
+.apaisado .prob-bar-wrapper { margin-bottom: 6px; }
+.apaisado .footer-text { margin-top: 12px; }
