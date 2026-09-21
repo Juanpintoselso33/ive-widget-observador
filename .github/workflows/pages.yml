@@ -1,0 +1,86 @@
+# Publica el widget estático en GitHub Pages.
+#
+# Sube SÓLO `web/`, no el repo entero: lo que se publica es el widget y sus
+# datos, no el código de entrenamiento ni los CSV de la encuesta.
+name: Publicar widget en Pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'web/**'
+      # El artefacto entrenado también dispara: si se reentrena el modelo y
+      # nadie regenera `web/ive/modelo.json`, sin esto Pages seguiría sirviendo
+      # los coeficientes viejos y el chequeo de sincronía de abajo ni siquiera
+      # llegaría a correr. Con esto, el despliegue falla hasta regenerar la
+      # copia. Lo marcó Codex.
+      - 'widgets/ive/model_coefficients.json'
+      - '.github/workflows/pages.yml'
+  # Para poder republicar a mano sin tener que tocar un archivo.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Una publicación por vez, y si entra una nueva mientras hay otra en curso,
+# gana la nueva. No se cancela la que ya está corriendo para no dejar Pages a
+# medio publicar.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # El JSON del widget es una copia recortada del artefacto entrenado, y
+      # dos copias se separan solas. Esto corta la publicación si alguien
+      # reentrena el modelo y se olvida de regenerar `web/ive/modelo.json`:
+      # sin el chequeo, Pages quedaría sirviendo coeficientes viejos sin que
+      # nada fallara.
+      - name: Verificar que el modelo del widget no esté desactualizado
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          web = json.load(open('web/ive/modelo.json'))
+          prod = json.load(open('widgets/ive/model_coefficients.json'))
+          problemas = [
+              clave for clave in ('coefficients', 'prob_nacional', 'stats_by_group',
+                                  'variable_ranges')
+              if web[clave] != prod[clave]
+          ]
+          if problemas:
+              sys.exit(
+                  'web/ive/modelo.json quedó viejo respecto de '
+                  'widgets/ive/model_coefficients.json en: ' + ', '.join(problemas)
+              )
+          print('modelo del widget sincronizado')
+          PY
+
+      # LOS TESTS CORREN ANTES DE PUBLICAR, y no es ceremonia: la paridad entre
+      # el JS y el Python es lo único que garantiza que el widget publicado dé
+      # los mismos números que el modelo entrenado, y sin este paso el workflow
+      # subía a producción sin ejecutarla nunca. Lo marcó Codex.
+      - name: Instalar Python y dependencias de test
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Paridad del widget contra el modelo de producción
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest web/ive/tests/ -q
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

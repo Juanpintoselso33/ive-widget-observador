@@ -1,0 +1,105 @@
+/* ===========================================================================
+   Script de embebido del widget IVE — El Observador.
+
+   Se usa igual que el de Flourish: un div con un atributo y este script al
+   lado. No hay que poner altura.
+
+     <div class="ive-embed" data-src="https://…/ive/"></div>
+     <script src="https://…/ive/embed.js"></script>
+
+   Para la versión de caja, agregarle `?resumen=1` al data-src.
+
+   QUÉ RESUELVE. Un iframe de otro dominio no deja que la página que lo
+   contiene mida su contenido, así que el alto hay que fijarlo a mano — y un
+   alto fijo o recorta (si el texto ocupa más líneas de las previstas) o deja
+   un blanco enorme. Acá el widget avisa cuánto mide con `postMessage` y este
+   script ajusta el iframe. Es lo mismo que hacen Flourish y Datawrapper.
+
+   SIN JAVASCRIPT EN LA PÁGINA QUE EMBEBE NO SE VE NADA, porque el iframe lo
+   crea este script. Por eso el snippet para el diario trae además un
+   `<noscript>` con un iframe de altura fija. Este comentario decía lo
+   contrario —que el iframe se dibujaba igual—, que era falso: el lector sin JS
+   veía un div vacío. Lo marcó Codex.
+   =========================================================================== */
+
+(function () {
+  "use strict";
+
+  // Alto de arranque, antes del primer aviso del widget. Cubre el caso peor
+  // MEDIDO —la versión completa en una columna de celular—, no el de
+  // escritorio: de más sólo sobra blanco un instante; de menos, recorta.
+  var ALTO_INICIAL = 1860;
+
+  // De dónde salió este script, para resolver rutas relativas del data-src.
+  var actual = document.currentScript;
+  var base = actual ? actual.src.replace(/embed\.js(\?.*)?$/, "") : "";
+
+  var pendientes = {};
+  var contador = 0;
+
+  function montar(div) {
+    if (div.dataset.iveMontado === "1") return;
+    div.dataset.iveMontado = "1";
+
+    var src = div.getAttribute("data-src") || base;
+    var id = "ive-" + (++contador);
+
+    var iframe = document.createElement("iframe");
+    iframe.src = src;
+    // El `name` viaja al widget y vuelve en el mensaje: con dos widgets en la
+    // misma nota, es lo que dice cuál avisó.
+    iframe.name = id;
+    iframe.title = div.getAttribute("data-title") ||
+      "¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador";
+    iframe.width = "100%";
+    iframe.height = String(ALTO_INICIAL);
+    iframe.setAttribute("frameborder", "0");
+    iframe.setAttribute("scrolling", "no");
+    iframe.setAttribute("loading", "lazy");
+    iframe.style.cssText = "display:block;border:none;width:100%;";
+
+    div.appendChild(iframe);
+    pendientes[id] = iframe;
+  }
+
+  function montarTodos() {
+    var divs = document.querySelectorAll(".ive-embed, [data-ive-embed]");
+    for (var i = 0; i < divs.length; i++) montar(divs[i]);
+  }
+
+  window.addEventListener("message", function (e) {
+    var d = e.data;
+    if (!d || d.tipo !== "ive-widget:alto") return;
+
+    // EL REMITENTE SE IDENTIFICA POR LA VENTANA, NO POR EL ID QUE DICE SER.
+    // Antes, un mensaje con un `id` conocido se aplicaba sin mirar de dónde
+    // venía, y los ids son adivinables ("ive-1", "ive-2"): cualquier otro
+    // iframe de la nota podía encoger el widget a un pixel o estirarlo hasta
+    // el tope. Ahora se busca el iframe cuya ventana efectivamente envió el
+    // mensaje, y el id sólo sirve para desempatar. Lo marcó Codex.
+    var iframe = null;
+    for (var k in pendientes) {
+      if (pendientes[k].contentWindow === e.source) { iframe = pendientes[k]; break; }
+    }
+    if (!iframe) return;
+
+    // Y el origen tiene que ser el del propio iframe.
+    var origenEsperado;
+    try {
+      origenEsperado = new URL(iframe.src, window.location.href).origin;
+    } catch (err) {
+      return;
+    }
+    if (e.origin !== origenEsperado) return;
+
+    var alto = parseInt(d.alto, 10);
+    if (!(alto > 0) || alto > 20000) return;
+    iframe.height = String(alto);
+  });
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", montarTodos);
+  } else {
+    montarTodos();
+  }
+})();

@@ -1,0 +1,400 @@
+/* ===========================================================================
+   Widget IVE — El Observador. Versión estática.
+
+   Los valores salen del Figma "Producto UY", página Widget IVE, y son LOS
+   MISMOS que usa `shared/styles.py::get_observador_css()` en la versión
+   Streamlit: este archivo es esa hoja sin los selectores del framework.
+   La referencia con el detalle de cada número está en
+   `docs/diseno/figma-producto-uy.md`.
+
+   Si hay que cambiar un color o un tamaño, cambiarlo EN LOS DOS LADOS o las
+   dos versiones se separan.
+   =========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=Libre+Baskerville:wght@400;700&display=swap');
+
+:root {
+  /* SON DOS VERDES, no uno: el del titular y el de las superficies sólidas. */
+  --primary: #006B36;
+  --solid: #0D443B;
+  /* Naranja y azul: los mismos del gradiente y de las diferencias. */
+  --accent: #F57F00;
+  --azul: #93B6EE;
+  --background: #FFFFFF;
+  --banda: #EDEDED;
+  --text: #1B1B19;
+  --text-muted: #999998;
+  --border: #D0CFCF;
+  --card-bg: #FFFFFF;
+  --card-shadow: rgba(0, 0, 0, 0.15);
+  --input-bg: #F2F2F2;
+  --input-text: #515151;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* CUALQUIER regla de autor que declare `display` pisa el `[hidden]` del
+   navegador, que es sólo `display: none` del user-agent. Sin esto, los paneles
+   de comparación —que son `display: grid`— se mostraban los CUATRO a la vez,
+   apilados, aunque el JS los marcara ocultos. Las solapas funcionaban y no se
+   notaba que estaban de más hasta comparar el alto contra la versión
+   Streamlit. */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 19px;
+  color: var(--text);
+  background: var(--background);
+}
+
+/* El marco: 698px, filete superior de 2px y sombra. */
+.marco {
+  max-width: 698px;
+  margin: 0 auto;
+  border-top: 2px solid var(--primary);
+  box-shadow: 0 5px 6px var(--card-shadow);
+  padding: 1.5rem 0.8rem 2rem 0.8rem;
+}
+
+/* ---------- Titulares ---------- */
+.main-title {
+  font-family: 'Libre Baskerville', Georgia, serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 42px;
+  letter-spacing: 0;
+  /* El texto mide 126px (tres líneas de 42, que es lo que dice el Figma); el
+     relleno lleva el bloque a los 169 que ocupa en la versión publicada. Ese
+     aire extra no sale del Figma: se lo agrega Streamlit a los `h1`, y se
+     replica acá para que las dos versiones se vean iguales puestas al lado. */
+  margin: 0;
+  padding: 21px 0 22px 0;
+}
+
+/* La bajada usa la variante CONDENSED, que en Instrument Sans sale del eje de
+   ancho: `font-stretch: 75%`. No es otra familia. */
+.subtitle {
+  font-size: 23px;
+  font-stretch: 75%;
+  color: var(--text);
+  line-height: 23px;
+  margin: 0 0 1rem 0;
+}
+
+.section-header {
+  font-family: 'Libre Baskerville', Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0;
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--text);
+}
+
+/* ---------- Formulario ---------- */
+/* Dos columnas, y se MANTIENEN en móvil: el frame de 331px del Figma las
+   conserva. */
+.campos {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  /* El espaciado está igualado al de la versión publicada, no elegido: con el
+     gap original el formulario medía 311px contra los 346 de Streamlit y el
+     widget quedaba notoriamente más apretado. */
+  gap: 1.6rem 1rem;
+}
+
+.campo { display: flex; flex-direction: column; }
+
+/* La etiqueta y el signo de ayuda en los extremos: en la versión publicada el
+   signo va pegado al borde derecho del campo, no al final del texto. */
+.campo label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 19px;
+  font-weight: 400;
+  color: var(--text);
+  margin-bottom: 0.45rem;
+}
+
+/* El control del Figma: relleno gris, borde de 1px, radio 9 y alto 37. El
+   `appearance: none` es lo que permite fijar el alto: con el select nativo, el
+   alto lo decide el sistema operativo y cada navegador lo dibuja distinto. */
+.campo select {
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  font-size: 19px;
+  color: var(--input-text);
+  background-color: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  height: 37px;
+  padding: 0 2rem 0 0.75rem;
+  width: 100%;
+  cursor: pointer;
+  /* La flecha, dibujada como SVG en el fondo para no depender de una fuente
+     de íconos ni de un elemento extra. */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23515151' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 16px;
+}
+
+.campo select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  border-color: var(--primary);
+}
+
+/* ---------- La banda gris ---------- */
+/* LOS ESPACIOS ENTRE BLOQUES DE ACÁ ABAJO ESTÁN IGUALADOS a la versión
+   publicada, no elegidos a ojo: Streamlit inserta un hueco propio entre cada
+   bloque vertical, y sin replicarlo el widget entero quedaba 172px más corto
+   y visiblemente más apretado. Se midió la distancia entre el tope de cada
+   sección y el de la siguiente en las dos versiones. */
+/* Del gradiente al pie el diseño va sobre #EDEDED: es un tercio del área. Los
+   márgenes negativos la sacan a sangre hasta los bordes del marco. */
+.banda {
+  background: var(--banda);
+  margin: 0 -0.8rem -2rem -0.8rem;
+  padding: 3.6rem 0.8rem 2rem 0.8rem;
+}
+
+/* ---------- Barra de probabilidad ---------- */
+.prob-bar-wrapper { margin: 0.5rem 0 1.25rem 0; }
+
+.prob-endpoints {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.prob-endpoint { font-size: 19px; font-weight: 400; color: var(--text); }
+
+/* Gradiente de DOS paradas, naranja a azul. */
+.prob-container {
+  background: linear-gradient(90deg, var(--accent) 0%, var(--azul) 100%);
+  border-radius: 6px;
+  height: 31px;
+  position: relative;
+  margin-top: 2.2rem;
+}
+
+.prob-indicator {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  background: var(--text);
+  transform: translateX(-1px);
+  transition: left 0.25s ease;
+}
+
+/* La pastilla va ARRIBA de la barra, como en los dos frames del Figma. */
+.prob-label {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  background: var(--text);
+  color: #FFFFFF;
+  font-size: 19px;
+  font-weight: 400;
+  padding: 3px 10px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+
+/* ---------- Tarjeta de resultado ---------- */
+/* Sin borde: en el Figma se separa sólo por la sombra. */
+.result-card {
+  background: var(--card-bg);
+  border: none;
+  border-radius: 10px;
+  /* El relleno inferior está igualado al de la versión publicada (la tarjeta
+     mide 200px ahí y medía 191 acá), no elegido a ojo. */
+  padding: 1.5rem 1.5rem 1.8rem 1.5rem;
+  box-shadow: 0 5px 6px var(--card-shadow);
+  margin-bottom: 1rem;
+}
+
+/* El número grande NO va en el verde del titular: va en el sólido. */
+.result-number {
+  font-size: 50px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--solid);
+  margin-bottom: 0.35rem;
+}
+
+.result-text { font-size: 19px; color: var(--text); line-height: 1.6; }
+.result-text strong { color: var(--solid); }
+
+/* ---------- Comparación por grupos ---------- */
+.solapas {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 2.5rem;
+  padding: 0;
+}
+
+.solapa {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 9px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.solapa[aria-selected="true"] {
+  background: var(--solid);
+  border-color: var(--solid);
+  color: #FFFFFF;
+}
+
+.solapa:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+/* Grid y no flex: con flex, los grupos que pasan a una segunda fila se estiran
+   para llenarla y quedan desalineados respecto de la primera. Cuatro columnas
+   FIJAS, que además es lo único que permite sacarle el borde izquierdo a la
+   primera celda DE CADA FILA. */
+.grupo-cifras {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem 0;
+}
+
+.grupo-celda {
+  padding: 0.25rem 0.75rem;
+  border-left: 1px solid var(--border);
+  text-align: left;
+}
+
+.grupo-celda:nth-child(4n + 1) { border-left: none; padding-left: 0; }
+
+.grupo-celda-label {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+  line-height: 1.35;
+  min-height: 2.7em;
+  /* Sin esto, "Terciaria incompleta" se corta por la mitad. */
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
+}
+
+.grupo-celda-valor { font-size: 25px; font-weight: 500; color: var(--text); line-height: 1; }
+
+.grupo-celda-delta { font-size: 17px; font-weight: 700; margin-top: 0.2rem; }
+.grupo-celda-delta--sube { color: var(--azul); }
+.grupo-celda-delta--baja { color: var(--accent); }
+
+.grupo-nota-ref { margin-top: 1rem; font-size: 16px; color: var(--text-muted); }
+
+/* ---------- Varios ---------- */
+.editorial-divider { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+
+/* El desplegable de metodología, con <details> nativo. */
+.metodologia {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  margin-top: 1rem;
+  padding: 0 0.9rem;
+}
+
+.metodologia > summary {
+  cursor: pointer;
+  padding: 0.7rem 0;
+  font-size: 17px;
+  color: var(--text-muted);
+  list-style: none;
+}
+
+.metodologia > summary::-webkit-details-marker { display: none; }
+
+.metodologia > summary::before {
+  content: "›";
+  display: inline-block;
+  margin-right: 0.5rem;
+  transition: transform 0.15s ease;
+}
+
+.metodologia[open] > summary::before { transform: rotate(90deg); }
+
+.metodologia .cuerpo { font-size: 17px; line-height: 1.6; padding-bottom: 0.8rem; }
+.metodologia .cuerpo ol { padding-left: 1.2rem; }
+
+.footer-text {
+  font-size: 16px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-top: 3.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.footer-text strong { color: var(--text-muted); }
+.footer-text a { color: var(--primary); }
+
+/* ---------- Móvil ---------- */
+/* EL MÓVIL DEL FIGMA MANTIENE DOS COLUMNAS DE CAMPOS: el frame de 331px las
+   conserva, así que acá no se apila nada. */
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .campo label { font-size: 16px; }
+  .main-title { font-size: 24px; line-height: 32px; }
+  .subtitle { font-size: 19px; line-height: 20px; }
+  .result-number { font-size: 40px; }
+  /* En el frame de 331px la barra mide 18px, no 31. */
+  .prob-container { height: 18px; }
+  .prob-endpoint, .prob-label { font-size: 16px; }
+  /* Dos columnas, como el frame de 331px. El borde separador se saca entero:
+     a ese ancho no hay lugar para el padding que pide. */
+  .grupo-cifras { grid-template-columns: repeat(2, 1fr); gap: 0.75rem 1rem; }
+  .grupo-celda, .grupo-celda:nth-child(4n + 1) { border-left: none; padding: 0 0 0.25rem 0; }
+  .grupo-celda-label { min-height: 0; }
+}
+
+/* El signo de ayuda al lado de cada etiqueta: es el `help=` de los selectbox
+   de la versión Streamlit, que ahí se dibuja como un signo de pregunta en un
+   círculo. */
+.ayuda {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05em;
+  height: 1.05em;
+  margin-left: 0;
+  flex: 0 0 auto;
+  border: 1px solid var(--text-muted);
+  border-radius: 50%;
+  font-size: 0.72em;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: help;
+  vertical-align: middle;
+}
