@@ -297,34 +297,30 @@
   }
 
   /**
-   * En celular, las opciones largas se abrevian.
+   * En celular, "Personas en el hogar" pasa ANTES que "Balotaje 2024".
    *
-   * Abajo de 600px los campos van de a dos y cada desplegable mide la mitad
-   * del ancho: "Terciaria completa o más" y "Delgado (Coalición)" no entraban
-   * y el lector veía la opción elegida mocha. Ponerlos en una fila entera
-   * alargaba demasiado la caja de la home (Tomer, 21/9/2026), así que se
-   * acorta el TEXTO y no se toca la grilla. Sólo el texto visible: el valor de
-   * cada opción es su índice, y el modelo lee la etiqueta completa de
-   * `variable_ranges`, así que el cálculo no se entera. Medido en Chrome:
-   * desde 360px entran todas.
+   * Abajo de 600px educación y balotaje ocupan la fila entera (sus opciones
+   * no entran en media columna), y con el orden de siempre "¿Tienes hijos?"
+   * quedaba sola en su fila. Se sube "hogar" a su lado MOVIENDO EL NODO, no con
+   * `grid-auto-flow: dense` ni `order`: esos cambian sólo lo que se ve, y el
+   * tabulador y el lector de pantalla seguían el orden viejo, bajando a
+   * balotaje y volviendo a subir. Lo marcó Codex. Arriba de 600px vuelve a su
+   * lugar, así que el escritorio queda como estaba.
    */
-  var ABREVIADAS = {
-    "Primaria o menos": "Hasta primaria",
-    "Terciaria incompleta": "Terciaria inc.",
-    "Terciaria completa o más": "Terc. completa+",
-    "Delgado (Coalición)": "Delgado (Coal.)"
-  };
-  function abreviarEnCelular() {
-    var opciones = [].filter.call(document.querySelectorAll("#campos option"), function (o) {
-      return ABREVIADAS[o.textContent] !== undefined;
-    });
-    opciones.forEach(function (o) { o.dataset.completa = o.textContent; });
+  function ordenarCamposEnCelular() {
+    var hogar = document.getElementById("campo-hogar").parentNode;
+    var balotaje = document.getElementById("campo-balotaje").parentNode;
     var angosto = window.matchMedia("(max-width: 599px)");
     function aplicar() {
-      opciones.forEach(function (o) {
-        var completa = o.dataset.completa;
-        o.textContent = angosto.matches ? ABREVIADAS[completa] : completa;
-      });
+      var conFoco = document.activeElement;
+      if (angosto.matches) {
+        if (hogar.nextSibling !== balotaje) balotaje.parentNode.insertBefore(hogar, balotaje);
+      } else if (balotaje.nextSibling !== hogar) {
+        balotaje.parentNode.insertBefore(hogar, balotaje.nextSibling);
+      }
+      if (conFoco && conFoco !== document.activeElement && hogar.contains(conFoco)) {
+        conFoco.focus({ preventScroll: true });
+      }
     }
     aplicar();
     angosto.addEventListener("change", aplicar);
@@ -365,7 +361,7 @@
     }
 
     construirCampos(campos, modelo.variable_ranges, actualizar);
-    abreviarEnCelular();
+    ordenarCamposEnCelular();
     actualizar();
 
     if (!resumen) {
