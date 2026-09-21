@@ -409,3 +409,87 @@ body {
   cursor: help;
   vertical-align: middle;
 }
+
+/* ===========================================================================
+   HOME DE ESCRITORIO — `?apaisado=1`
+   ===========================================================================
+   Pedido de Tomer el 21/9/2026: en la home del diario, vista desde una
+   computadora, el widget va "menos largo y más ancho". Es la caja —sin
+   comparación ni metodología— reacomodada en dos columnas: los ocho campos en
+   una grilla de 4×2 a la izquierda, el resultado a la derecha, y la banda gris
+   abajo con la barra a todo el ancho y el pie.
+
+   NO HAY FRAME DE ESTO EN EL FIGMA: se buscó en el archivo "Producto UY", en el
+   chat y en el correo, y sólo existen la versión de escritorio y la móvil para
+   nota. Por eso no se inventa estilo: son los mismos colores, tipografías y
+   componentes, reacomodados. Si la diseñadora manda un frame, manda el frame.
+
+   La tarjeta sale de la banda gris (la mueve widget.js), así que pierde la
+   sombra —sobre blanco no la necesita para separarse— y toma el gris de la
+   banda como fondo: sigue leyéndose como "esto es el resultado". */
+#widget.apaisado { max-width: 1100px; }
+
+.apaisado .main-title { padding: 6px 0 10px 0; }
+
+.apaisado .fila-apaisada {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 28px;
+  align-items: stretch;
+  margin-bottom: 19px;
+}
+
+.apaisado .campos {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.1rem 0.9rem;
+  margin-bottom: 0;
+}
+
+/* En cuatro columnas cada campo mide ~170px: el signo de ayuda no entra al
+   lado de "Personas en el hogar" sin partir la etiqueta. */
+.apaisado .campo label { font-size: 17px; }
+
+.apaisado .result-card {
+  margin: 0;
+  background: var(--banda);
+  box-shadow: none;
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.apaisado .result-number { font-size: 46px; }
+.apaisado .result-text { font-size: 17px; line-height: 1.5; }
+
+/* La banda queda sólo con la barra y el pie: no necesita el aire de arriba
+   que tenía para separarse del formulario, porque ahora la separa la fila. */
+.apaisado .banda { padding-top: 12px; }
+
+/* REPLIEGUE: si igual lo embeben en un contenedor angosto —en móvil, o en una
+   columna de la home que no era la prevista— vuelve a ser la caja vertical en
+   vez de apretar cuatro desplegables en 300px. El orden queda formulario,
+   resultado, barra y pie, que se lee bien. */
+@media (max-width: 899px) {
+  #widget.apaisado { max-width: 698px; }
+  .apaisado .fila-apaisada { display: block; }
+  .apaisado .campos { grid-template-columns: repeat(2, 1fr); gap: 1.6rem 1rem; margin-bottom: 19px; }
+  .apaisado .campo label { font-size: inherit; }
+  .apaisado .result-card { margin-bottom: 19px; }
+}
+
+/* Ajustes finos del apaisado, vistos en la captura a 1280:
+
+   · Cada campo mide ~170px y "Personas en el hogar" no entra en una línea:
+     parte en dos y bajaba su desplegable, que quedaba desalineado de los
+     otros tres de la fila. Alineados al pie, los cuatro desplegables de una
+     fila quedan a la misma altura aunque una etiqueta ocupe dos renglones.
+   · A 19px "No votó/Blanco" no entraba en el desplegable y se cortaba.
+   · La barra y el pie tenían entre sí los 71px que les corresponden en la
+     nota, donde hay mucho más contenido alrededor; acá sobraban. */
+@media (min-width: 900px) {
+  .apaisado .campos { align-items: end; }
+  .apaisado .campo select { font-size: 17px; }
+  .apaisado .prob-bar-wrapper { margin-bottom: 8px; }
+  .apaisado .footer-text { margin-top: 18px; }
+}

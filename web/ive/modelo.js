@@ -157,7 +157,37 @@
     return k < 0 ? 0 : k;
   }
 
+  /**
+   * Si un parámetro de la URL está activo, dados TODOS sus valores.
+   *
+   * Con el parámetro repetido gana el ÚLTIMO, que es la semántica de
+   * `st.query_params` en la versión Streamlit. Pura y aparte del DOM para que
+   * el test la ejerza: la leen `?resumen=1` (la caja) y `?apaisado=1` (la
+   * home de escritorio).
+   */
+  var VERDADEROS = ["1", "true", "si", "sí"];
+  function parametroActivo(valores) {
+    if (!valores || !valores.length) return false;
+    var ultimo = valores[valores.length - 1];
+    return VERDADEROS.indexOf(String(ultimo).trim().toLowerCase()) !== -1;
+  }
+
+  /**
+   * Qué versión del widget se dibuja, a partir de los parámetros de la URL.
+   *
+   * `apaisado` IMPLICA `resumen`: la home de escritorio es la caja reacomodada
+   * en dos columnas, no una versión con más contenido. Sin esto, alguien que
+   * pidiera sólo `?apaisado=1` vería la comparación y la metodología metidas
+   * en un formato pensado para no tenerlas.
+   */
+  function version(valoresResumen, valoresApaisado) {
+    var apaisado = parametroActivo(valoresApaisado);
+    return { resumen: apaisado || parametroActivo(valoresResumen), apaisado: apaisado };
+  }
+
   raiz.ModeloIVE = {
+    parametroActivo: parametroActivo,
+    version: version,
     perfilDesdeIndices: perfilDesdeIndices,
     indicePorDefecto: indicePorDefecto,
     BALOTAJE_UI_A_CODIGO: BALOTAJE_UI_A_CODIGO,

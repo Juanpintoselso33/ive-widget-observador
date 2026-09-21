@@ -238,16 +238,37 @@
   // Arranque
   // ---------------------------------------------------------------------
 
-  function esResumen() {
-    var v = new URLSearchParams(window.location.search).getAll("resumen");
-    // Con el parámetro repetido gana el ÚLTIMO, igual que en la versión
-    // Streamlit (que sigue la semántica de st.query_params).
-    var ultimo = v.length ? v[v.length - 1] : null;
-    return ["1", "true", "si", "sí"].indexOf(String(ultimo).trim().toLowerCase()) !== -1;
+  function versionPedida() {
+    var q = new URLSearchParams(window.location.search);
+    return M.version(q.getAll("resumen"), q.getAll("apaisado"));
+  }
+
+  /**
+   * La home de escritorio: los campos y el resultado lado a lado.
+   *
+   * En el HTML la tarjeta vive dentro de la banda gris, debajo de la barra,
+   * que es el orden de la nota y de la caja. Acá se la saca de la banda y se la
+   * pone al lado del formulario, en una fila propia; la banda queda sólo con la
+   * barra y el pie. Se reordena el DOM en vez de hacerlo con CSS porque la
+   * tarjeta y los campos no son hermanos, y `display: contents` sobre la banda
+   * le borraba el fondo gris.
+   */
+  function armarApaisado() {
+    var raiz = document.getElementById("widget");
+    var campos = document.getElementById("campos");
+    var tarjeta = raiz.querySelector(".result-card");
+    raiz.classList.add("apaisado");
+
+    var fila = document.createElement("div");
+    fila.className = "fila-apaisada";
+    campos.parentNode.insertBefore(fila, campos);
+    fila.appendChild(campos);
+    fila.appendChild(tarjeta);
   }
 
   function iniciar(modelo) {
-    var resumen = esResumen();
+    var v = versionPedida();
+    var resumen = v.resumen;
     // POR ID, no por clase: el aviso de error y el bloque de <noscript>
     // también son ".marco", y `querySelector` devolvía el primero — o sea
     // que se le sacaba el `hidden` al div de error, vacío, y el widget real
@@ -261,6 +282,7 @@
     } else {
       document.getElementById("pie-caja").remove();
     }
+    if (v.apaisado) armarApaisado();
 
     var campos = document.getElementById("campos");
     var nodos = {

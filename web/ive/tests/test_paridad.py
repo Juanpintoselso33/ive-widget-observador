@@ -296,3 +296,35 @@ def test_el_widget_arranca_en_el_mismo_perfil_que_la_version_publicada(modelo_we
         capture_output=True, text=True, check=True,
     ).stdout
     assert json.loads(salida) == esperado
+
+
+# ----------------------------------------------------------------------
+# Qué versión se dibuja según la URL
+# ----------------------------------------------------------------------
+
+@necesita_node
+@pytest.mark.parametrize("resumen, apaisado, esperado", [
+    ([], [], {"resumen": False, "apaisado": False}),        # la nota
+    (["1"], [], {"resumen": True, "apaisado": False}),      # home móvil
+    ([], ["1"], {"resumen": True, "apaisado": True}),       # home escritorio
+    # `apaisado` IMPLICA resumen aunque se pida explícitamente lo contrario:
+    # es la caja reacomodada, no una versión con más contenido.
+    (["0"], ["1"], {"resumen": True, "apaisado": True}),
+    (["1"], ["0"], {"resumen": True, "apaisado": False}),
+    # Repetido, gana el último — la misma regla que la versión Streamlit.
+    ([], ["1", "0"], {"resumen": False, "apaisado": False}),
+    ([], ["0", "1"], {"resumen": True, "apaisado": True}),
+    # Valores que NO activan: sin este control, un `parametroActivo` que
+    # devolviera siempre True pasaría todos los casos de arriba menos uno.
+    (["cualquiera"], ["no"], {"resumen": False, "apaisado": False}),
+    ([""], [""], {"resumen": False, "apaisado": False}),
+])
+def test_la_version_segun_la_url(resumen, apaisado, esperado):
+    salida = subprocess.run(
+        ["node", "-e",
+         "const M=require(process.argv[1]+'/modelo.js').ModeloIVE;"
+         "process.stdout.write(JSON.stringify(M.version(JSON.parse(process.argv[2]),JSON.parse(process.argv[3]))))",
+         str(_WEB), json.dumps(resumen), json.dumps(apaisado)],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    assert json.loads(salida) == esperado
