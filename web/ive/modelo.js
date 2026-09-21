@@ -175,19 +175,38 @@
   /**
    * Qué versión del widget se dibuja, a partir de los parámetros de la URL.
    *
-   * `apaisado` IMPLICA `resumen`: la home de escritorio es la caja reacomodada
-   * en dos columnas, no una versión con más contenido. Sin esto, alguien que
-   * pidiera sólo `?apaisado=1` vería la comparación y la metodología metidas
-   * en un formato pensado para no tenerlas.
+   * Hay DOS versiones de contenido: la completa (la nota) y la resumida (la
+   * home). CÓMO se acomoda la resumida —en dos columnas o en caja vertical— ya
+   * no lo decide la URL sino el ancho disponible: ver `disposicion()`. Así la
+   * home usa un solo embed para escritorio y para móvil.
+   *
+   * `?apaisado=1` queda como sinónimo de `?resumen=1`: existió un rato como
+   * versión aparte, y si alguien llegó a pegar ese código tiene que seguir
+   * andando.
    */
   function version(valoresResumen, valoresApaisado) {
-    var apaisado = parametroActivo(valoresApaisado);
-    return { resumen: apaisado || parametroActivo(valoresResumen), apaisado: apaisado };
+    return { resumen: parametroActivo(valoresResumen) || parametroActivo(valoresApaisado) };
+  }
+
+  /**
+   * Cómo se acomoda la versión resumida según el ancho que tiene el widget.
+   *
+   * Lo que cuenta es el ancho del IFRAME, no el de la pantalla: si en la home
+   * de escritorio lo ponen en una columna angosta, tiene que verse como caja,
+   * y un criterio por dispositivo lo pondría en dos columnas apretadas. El
+   * corte está en 900px porque es lo mínimo en que entran los ocho campos en
+   * cuatro columnas y la tarjeta al lado sin partir etiquetas de más.
+   */
+  var ANCHO_COLUMNAS = 900;
+  function disposicion(ancho) {
+    return ancho >= ANCHO_COLUMNAS ? "columnas" : "caja";
   }
 
   raiz.ModeloIVE = {
     parametroActivo: parametroActivo,
     version: version,
+    disposicion: disposicion,
+    ANCHO_COLUMNAS: ANCHO_COLUMNAS,
     perfilDesdeIndices: perfilDesdeIndices,
     indicePorDefecto: indicePorDefecto,
     BALOTAJE_UI_A_CODIGO: BALOTAJE_UI_A_CODIGO,

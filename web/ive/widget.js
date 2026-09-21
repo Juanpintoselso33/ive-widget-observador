@@ -244,26 +244,48 @@
   }
 
   /**
-   * La home de escritorio: los campos y el resultado lado a lado.
+   * La versión resumida se acomoda sola según el ancho: en dos columnas en
+   * escritorio y en caja vertical en móvil. Un solo embed para toda la home.
    *
-   * En el HTML la tarjeta vive dentro de la banda gris, debajo de la barra,
-   * que es el orden de la nota y de la caja. Acá se la saca de la banda y se la
-   * pone al lado del formulario, en una fila propia; la banda queda sólo con la
-   * barra y el pie. Se reordena el DOM en vez de hacerlo con CSS porque la
-   * tarjeta y los campos no son hermanos, y `display: contents` sobre la banda
-   * le borraba el fondo gris.
+   * En el HTML la tarjeta vive dentro de la banda gris, debajo de la barra: es
+   * el orden de la caja. En dos columnas se la saca de la banda y se la pone al
+   * lado del formulario; al volver a caja, se la devuelve EXACTAMENTE a su
+   * lugar —después de la barra—, así que la caja en móvil queda idéntica a la
+   * de siempre, no parecida. Se reordena el DOM en vez de usar sólo CSS porque
+   * la tarjeta y los campos no son hermanos, y `display: contents` sobre la
+   * banda le borraba el fondo gris.
+   *
+   * Reacciona a cambios de ancho —girar el teléfono, achicar la ventana— y no
+   * sólo al arrancar.
    */
-  function armarApaisado() {
+  function acomodarResumen() {
     var raiz = document.getElementById("widget");
     var campos = document.getElementById("campos");
     var tarjeta = raiz.querySelector(".result-card");
-    raiz.classList.add("apaisado");
+    var barra = raiz.querySelector(".prob-bar-wrapper");
 
+    // La fila se crea una sola vez, vacía; los nodos entran y salen de ella.
     var fila = document.createElement("div");
     fila.className = "fila-apaisada";
     campos.parentNode.insertBefore(fila, campos);
-    fila.appendChild(campos);
-    fila.appendChild(tarjeta);
+
+    var actual = null;
+    function aplicar() {
+      var modo = M.disposicion(raiz.parentNode.getBoundingClientRect().width);
+      if (modo === actual) return;
+      actual = modo;
+      if (modo === "columnas") {
+        raiz.classList.add("apaisado");
+        fila.appendChild(campos);
+        fila.appendChild(tarjeta);
+      } else {
+        raiz.classList.remove("apaisado");
+        fila.parentNode.insertBefore(campos, fila);
+        barra.parentNode.insertBefore(tarjeta, barra.nextSibling);
+      }
+    }
+    aplicar();
+    window.addEventListener("resize", aplicar);
   }
 
   function iniciar(modelo) {
@@ -282,7 +304,7 @@
     } else {
       document.getElementById("pie-caja").remove();
     }
-    if (v.apaisado) armarApaisado();
+    if (resumen) acomodarResumen();
 
     var campos = document.getElementById("campos");
     var nodos = {

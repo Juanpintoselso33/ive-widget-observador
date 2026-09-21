@@ -411,10 +411,12 @@ body {
 }
 
 /* ===========================================================================
-   HOME DE ESCRITORIO — `?apaisado=1`
+   LA VERSIÓN RESUMIDA EN ESCRITORIO — dos columnas
    ===========================================================================
    Pedido de Tomer el 21/9/2026: en la home del diario, vista desde una
-   computadora, el widget va "menos largo y más ancho". Es la caja —sin
+   computadora, el widget va "menos largo y más ancho". No es otra URL: la
+   versión resumida (`?resumen=1`) se acomoda así sola cuando tiene 900px o
+   más, y vuelve a ser la caja vertical cuando no. Es la caja —sin
    comparación ni metodología— reacomodada en dos columnas: los ocho campos en
    una grilla de 4×2 a la izquierda, el resultado a la derecha, y la banda gris
    abajo con la barra a todo el ancho y el pie.
@@ -466,17 +468,11 @@ body {
    que tenía para separarse del formulario, porque ahora la separa la fila. */
 .apaisado .banda { padding-top: 12px; }
 
-/* REPLIEGUE: si igual lo embeben en un contenedor angosto —en móvil, o en una
-   columna de la home que no era la prevista— vuelve a ser la caja vertical en
-   vez de apretar cuatro desplegables en 300px. El orden queda formulario,
-   resultado, barra y pie, que se lee bien. */
-@media (max-width: 899px) {
-  #widget.apaisado { max-width: 698px; }
-  .apaisado .fila-apaisada { display: block; }
-  .apaisado .campos { grid-template-columns: repeat(2, 1fr); gap: 1.6rem 1rem; margin-bottom: 19px; }
-  .apaisado .campo label { font-size: inherit; }
-  .apaisado .result-card { margin-bottom: 19px; }
-}
+/* SIN REPLIEGUE POR CSS: la clase `.apaisado` la pone y la saca widget.js
+   según el ancho disponible, y en angosto la tarjeta vuelve a su lugar dentro
+   de la banda. Así la versión resumida en móvil es la caja de siempre, no una
+   parecida — el repliegue que había acá dejaba la tarjeta arriba de la barra
+   y con otro fondo. */
 
 /* Ajustes finos del apaisado, vistos en la captura a 1280:
 
@@ -487,9 +483,7 @@ body {
    · A 19px "No votó/Blanco" no entraba en el desplegable y se cortaba.
    · La barra y el pie tenían entre sí los 71px que les corresponden en la
      nota, donde hay mucho más contenido alrededor; acá sobraban. */
-@media (min-width: 900px) {
-  .apaisado .campos { align-items: end; }
-  .apaisado .campo select { font-size: 17px; }
-  .apaisado .prob-bar-wrapper { margin-bottom: 8px; }
-  .apaisado .footer-text { margin-top: 18px; }
-}
+.apaisado .campos { align-items: end; }
+.apaisado .campo select { font-size: 17px; }
+.apaisado .prob-bar-wrapper { margin-bottom: 8px; }
+.apaisado .footer-text { margin-top: 18px; }
