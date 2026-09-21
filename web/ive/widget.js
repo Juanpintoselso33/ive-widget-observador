@@ -297,44 +297,49 @@
   }
 
   /**
-   * Si la opción elegida no entra en su desplegable, se le achica la letra.
+   * Si alguna opción elegida no entra en su desplegable, se achica la letra
+   * de TODOS los desplegables, parejo.
    *
    * En celular los campos van de a dos y cada desplegable mide media columna:
    * "Terciaria completa o más" o "Delgado (Coalición)" no entraban y el
    * lector veía la opción elegida cortada. Ponerlos en una fila entera
    * alargaba la caja de la home (Tomer, 21/9/2026) y abreviarlos quedaba feo.
-   * Así el texto va completo y en su lugar: sólo ESE desplegable, y sólo
-   * mientras esa opción esté elegida, baja la letra lo justo para entrar.
-   * Donde entra —escritorio, dos columnas— no cambia nada.
+   * Achicar sólo el desplegable que no entraba dejaba letras de tamaños
+   * distintos lado a lado; por prolijidad bajan todos al mismo tamaño: el que
+   * necesita la opción elegida más larga. Donde todo entra —escritorio, dos
+   * columnas— no cambia nada.
    *
-   * Hay un piso de 11px: más chico no se lee. A 360px "Terciaria completa o
-   * más" queda en ~11px; a 320 puede quedar algo cortada igual.
+   * Hay un piso de 11px: más chico no se lee. A 360px, con "Terciaria completa
+   * o más" elegida, quedan en ~11px; a 320 puede quedar algo cortada igual.
    */
   var LETRA_MINIMA = 11;
   function ajustarLetraDesplegables() {
     var lienzo = document.createElement("canvas").getContext("2d");
     var selects = [].slice.call(document.querySelectorAll("#campos select"));
-    function ajustar(sel) {
-      sel.style.fontSize = "";
-      var cs = getComputedStyle(sel);
-      var base = parseFloat(cs.fontSize);
-      var util = sel.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      lienzo.font = cs.fontWeight + " " + base + "px " + cs.fontFamily;
-      var texto = sel.options[sel.selectedIndex].text;
-      var ancho = lienzo.measureText(texto).width;
-      if (ancho > util && util > 0) {
-        sel.style.fontSize = Math.max(LETRA_MINIMA, Math.floor(base * util / ancho * 10) / 10) + "px";
+    function ajustar() {
+      selects.forEach(function (sel) { sel.style.fontSize = ""; });
+      var letra = Infinity;
+      selects.forEach(function (sel) {
+        var cs = getComputedStyle(sel);
+        var base = parseFloat(cs.fontSize);
+        var util = sel.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        lienzo.font = cs.fontWeight + " " + base + "px " + cs.fontFamily;
+        var ancho = lienzo.measureText(sel.options[sel.selectedIndex].text).width;
+        var entra = ancho > util && util > 0 ? Math.floor(base * util / ancho * 10) / 10 : base;
+        letra = Math.min(letra, entra);
+      });
+      var base = parseFloat(getComputedStyle(selects[0]).fontSize);
+      if (letra < base) {
+        letra = Math.max(LETRA_MINIMA, letra) + "px";
+        selects.forEach(function (sel) { sel.style.fontSize = letra; });
       }
     }
-    function todos() { selects.forEach(ajustar); }
-    selects.forEach(function (sel) {
-      sel.addEventListener("change", function () { ajustar(sel); });
-    });
-    todos();
-    window.addEventListener("resize", todos);
+    selects.forEach(function (sel) { sel.addEventListener("change", ajustar); });
+    ajustar();
+    window.addEventListener("resize", ajustar);
     // La medida depende de la fuente: si todavía no cargó, se mide con la de
     // reemplazo y hay que volver a medir cuando llega.
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(todos);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(ajustar);
   }
 
   function iniciar(modelo) {

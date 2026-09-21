@@ -203,16 +203,19 @@ def test_en_celular_no_se_corta_la_opcion_mas_larga(navegador, url, version, anc
     pagina.close()
     assert e["recortados"] == []
     assert min(letras) >= 11
+    assert len(set(letras)) == 1  # todas parejas, por prolijidad
 
 
-def test_la_letra_vuelve_al_elegir_una_opcion_corta(navegador, url):
+def test_la_letra_baja_pareja_y_vuelve_al_elegir_una_opcion_corta(navegador, url):
     pagina = _abrir(navegador, url, 360)
-    letra = "() => parseFloat(getComputedStyle(document.getElementById('campo-nivelEduc')).fontSize)"
-    normal = pagina.evaluate(letra)
+    letras = ("() => [...document.querySelectorAll('#campos select')]"
+              ".map(s => parseFloat(getComputedStyle(s).fontSize))")
+    normal = pagina.evaluate(letras)
     pagina.select_option("#campo-nivelEduc", "3")  # Terciaria completa o más
-    assert pagina.evaluate(letra) < normal
+    achicadas = pagina.evaluate(letras)
+    assert len(set(achicadas)) == 1 and achicadas[0] < normal[0]
     pagina.select_option("#campo-nivelEduc", "1")  # Secundaria
-    assert pagina.evaluate(letra) == normal
+    assert pagina.evaluate(letras) == normal
     pagina.close()
 
 
