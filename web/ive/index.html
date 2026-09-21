@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>¿Apoyás el IVE? | El Observador</title>
+<meta name="description" content="Estimá tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo, según la encuesta de El Observador, la UMAD y Juan Pablo Ferreira.">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+
+<!-- El marco arranca oculto y lo muestra el JS al terminar de armar todo: así
+     el lector no ve medio widget dibujándose, ni el formulario sin el
+     resultado. Si el JS falla, en vez del marco queda el aviso de abajo. -->
+<noscript>
+  <div class="marco">
+    <h1 class="main-title">¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo?</h1>
+    <p class="subtitle">Este widget necesita JavaScript para calcular el resultado.</p>
+  </div>
+</noscript>
+
+<div id="error" class="marco" hidden></div>
+
+<div class="marco" id="widget" hidden>
+  <h1 class="main-title">¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo?</h1>
+  <p class="subtitle">Seleccioná tus características:</p>
+
+  <div class="campos" id="campos"></div>
+
+  <div class="banda">
+    <div class="prob-bar-wrapper">
+      <div class="prob-endpoints">
+        <span class="prob-endpoint prob-endpoint--contra">En contra</span>
+        <span class="prob-endpoint prob-endpoint--favor">A favor</span>
+      </div>
+      <div class="prob-container">
+        <div class="prob-indicator" style="left: 0%;">
+          <div class="prob-label">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-card">
+      <div class="result-number">—</div>
+      <div class="result-text"></div>
+    </div>
+
+    <div id="bloque-comparacion">
+      <hr class="editorial-divider">
+      <div class="section-header">Comparación con otros grupos</div>
+      <p class="subtitle">A continuación puedes compararte con otras características de la población:</p>
+      <div id="comparacion"></div>
+    </div>
+
+    <details class="metodologia" id="bloque-metodologia">
+      <summary>¿Cómo funciona este modelo?</summary>
+      <div class="cuerpo">
+        <p>Este widget utiliza un <strong>modelo de regresión logística</strong>
+        entrenado con datos de la encuesta realizada en Uruguay por El Observador,
+        la UMAD y Juan Pablo Ferreira. Y contó con la colaboración en la
+        programación de Juan Ignacio Pintos.</p>
+
+        <p><strong>Variables más influyentes:</strong></p>
+        <ol>
+          <li><strong>Religiosidad</strong>: es el factor más importante. Las
+          personas más religiosas tienen significativamente menor probabilidad
+          de apoyar el IVE.</li>
+          <li><strong>Voto político</strong>: votantes de Orsi (FA) en el
+          balotaje 2024 tienen mayor probabilidad de apoyo que votantes de
+          Delgado (Coalición).</li>
+          <li><strong>Sexo</strong>: las mujeres tienden a apoyar más el IVE que
+          los hombres.</li>
+          <li><strong>Educación</strong>: mayor nivel educativo se asocia con
+          mayor apoyo al derecho a decidir.</li>
+          <li><strong>Región</strong>: pueden existir diferencias entre
+          Montevideo y el interior.</li>
+        </ol>
+
+        <p><strong>Nota metodológica:</strong></p>
+        <ul>
+          <li>El modelo excluye a quienes respondieron "ni de acuerdo ni en
+          desacuerdo", así que el porcentaje es entre quienes tienen postura
+          definida.</li>
+          <li>Los resultados son probabilidades basadas en correlaciones
+          estadísticas, no predicciones individuales.</li>
+          <li>Pseudo R² del modelo: <span id="pseudo-r2">—</span></li>
+        </ul>
+      </div>
+    </details>
+
+    <div class="footer-text" id="pie-completo">
+      <strong>El Observador</strong> | Encuesta realizada en Uruguay 2025/2026<br>
+      Basado en <span id="n-observaciones">—</span> respuestas ponderadas | Modelo de regresión logística<br>
+      <em>Las probabilidades son estimaciones estadísticas basadas en grupos,
+      no predicciones individuales</em>
+    </div>
+
+    <!-- El pie de la versión de caja carga lo que la caja no muestra: el aviso
+         de que el cálculo es entre quienes tienen postura definida, los
+         créditos y la salida al widget completo. Sin esto se publicaría un
+         porcentaje condicional sin decirlo en ningún lado. -->
+    <div class="footer-text" id="pie-caja">
+      Entre quienes tienen postura definida.
+      <strong>El Observador</strong>, la UMAD y Juan Pablo Ferreira |
+      Encuesta realizada en Uruguay 2025/2026 ·
+      <a href="?" target="_blank" rel="noopener">Ver el widget completo</a>
+    </div>
+  </div>
+</div>
+
+<script src="modelo.js"></script>
+<script src="widget.js"></script>
+</body>
+</html>
