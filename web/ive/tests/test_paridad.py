@@ -336,10 +336,10 @@ def test_la_version_segun_la_url(resumen, apaisado, esperado):
 
 @necesita_node
 @pytest.mark.parametrize("ancho, esperado", [
-    (320, "caja"), (400, "caja"), (700, "caja"),
-    (899, "caja"),       # el borde, de los dos lados
-    (900, "columnas"),
-    (1100, "columnas"), (1280, "columnas"),
+    (320, "caja"), (400, "caja"), (700, "caja"), (900, "caja"),
+    (1099, "caja"),      # el borde, de los dos lados
+    (1100, "columnas"),
+    (1280, "columnas"), (1440, "columnas"),
 ])
 def test_la_disposicion_la_decide_el_ancho(ancho, esperado):
     """

@@ -274,6 +274,11 @@
       var modo = M.disposicion(raiz.parentNode.getBoundingClientRect().width);
       if (modo === actual) return;
       actual = modo;
+      // Mover un nodo en el DOM le saca el foco a lo que tenga adentro: quien
+      // estaba en un desplegable cuando el iframe cruzó el corte —al rotar la
+      // tablet, al achicar la ventana— quedaba sin foco. Se guarda y se
+      // devuelve. Lo marcó Codex.
+      var conFoco = document.activeElement;
       if (modo === "columnas") {
         raiz.classList.add("apaisado");
         fila.appendChild(campos);
@@ -282,6 +287,9 @@
         raiz.classList.remove("apaisado");
         fila.parentNode.insertBefore(campos, fila);
         barra.parentNode.insertBefore(tarjeta, barra.nextSibling);
+      }
+      if (conFoco && conFoco !== document.activeElement && raiz.contains(conFoco)) {
+        conFoco.focus({ preventScroll: true });
       }
     }
     aplicar();

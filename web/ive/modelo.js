@@ -194,10 +194,13 @@
    * Lo que cuenta es el ancho del IFRAME, no el de la pantalla: si en la home
    * de escritorio lo ponen en una columna angosta, tiene que verse como caja,
    * y un criterio por dispositivo lo pondría en dos columnas apretadas. El
-   * corte está en 900px porque es lo mínimo en que entran los ocho campos en
-   * cuatro columnas y la tarjeta al lado sin partir etiquetas de más.
+   * corte está en 1100px porque es lo mínimo en que entran los ocho campos en
+   * cuatro columnas, con la tarjeta al lado, sin cortar ninguna opción: el
+   * texto más largo es "Terciaria completa o más" y necesita 232px de
+   * desplegable. Estaba en 900 y ahí cada desplegable medía 116px; medido en
+   * Chrome, abajo de 1100 la fila desborda.
    */
-  var ANCHO_COLUMNAS = 900;
+  var ANCHO_COLUMNAS = 1100;
   function disposicion(ancho) {
     return ancho >= ANCHO_COLUMNAS ? "columnas" : "caja";
   }
