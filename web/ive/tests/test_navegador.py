@@ -6,19 +6,26 @@ reacomodara nada, midiera el nodo equivocado, devolviera la tarjeta a otro
 lugar o dejara de avisar su altura. Lo marcó Codex. Éste abre la página en
 Chrome, la achica y la agranda, y mira el DOM.
 
-Necesita Playwright con Chrome instalado; si no está —la CI de Pages sólo
-instala pytest— se saltea. Se corre a mano antes de tocar `acomodarResumen()`
-o las columnas del `.apaisado`.
+Necesita Playwright con Chrome instalado. En la máquina de uno, si no está,
+se saltea; en la CI de Pages corre con `IVE_EXIGIR_NAVEGADOR=1`, y ahí no
+poder correr es un error, no un salteo — si no, el deploy queda verde sin
+haber probado nada (lo marcó Codex).
 """
 
 import functools
 import http.server
+import os
 import threading
 from pathlib import Path
 
 import pytest
 
-playwright_api = pytest.importorskip("playwright.sync_api")
+EXIGIR = bool(os.environ.get("IVE_EXIGIR_NAVEGADOR"))
+
+if EXIGIR:
+    import playwright.sync_api as playwright_api
+else:
+    playwright_api = pytest.importorskip("playwright.sync_api")
 
 WEB = Path(__file__).resolve().parents[2]
 
@@ -42,6 +49,8 @@ def navegador():
         try:
             b = p.chromium.launch(headless=True, channel="chrome")
         except Exception as e:  # sin Chrome instalado
+            if EXIGIR:
+                raise
             pytest.skip(f"no hay Chrome para Playwright: {e}")
         yield b
         b.close()

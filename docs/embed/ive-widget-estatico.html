@@ -36,7 +36,7 @@
 <noscript>
   <iframe src="https://juanpintoselso33.github.io/ive-widget-observador/ive/"
           title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
-          width="100%" height="1890" frameborder="0" scrolling="no"
+          width="100%" height="330" frameborder="0" scrolling="no"
           style="display:block;border:none;"></iframe>
 </noscript>
 <script src="https://juanpintoselso33.github.io/ive-widget-observador/ive/embed.js"></script>
@@ -60,7 +60,7 @@
 <noscript>
   <iframe src="https://juanpintoselso33.github.io/ive-widget-observador/ive/?resumen=1"
           title="¿Cuál es tu probabilidad de apoyar el derecho a la interrupción voluntaria del embarazo? — El Observador"
-          width="100%" height="1210" frameborder="0" scrolling="no"
+          width="100%" height="330" frameborder="0" scrolling="no"
           style="display:block;border:none;"></iframe>
 </noscript>
 <script src="https://juanpintoselso33.github.io/ive-widget-observador/ive/embed.js"></script>
@@ -80,10 +80,10 @@
     400px, como el frame móvil. La versión de la home en dos columnas se topa
     en 1140px.
 
-  · LAS ALTURAS DEL `<noscript>` están medidas, y sólo se usan si el lector no
-    tiene JavaScript: 1890px la completa y 1210 la caja, lo que miden en una
-    columna de celular —el caso peor— con un margen chico. Con JavaScript, la altura se ajusta sola y
-    estos números no intervienen.
+  · LA ALTURA DEL `<noscript>` es la del aviso, no la del widget: sin
+    JavaScript el iframe sólo muestra el título y "Este widget necesita
+    JavaScript", que en un celular de 320px mide 317px. Con JavaScript la
+    altura se ajusta sola y este número no interviene.
 
   · SI EL WIDGET APARECE CORTADO, es que el script no se está cargando: revisar
     que la etiqueta `<script>` no la haya filtrado el CMS. Sin el script sólo

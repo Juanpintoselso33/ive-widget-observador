@@ -75,8 +75,12 @@ jobs:
 
       - name: Paridad del widget contra el modelo de producción
         run: |
-          python -m pip install --quiet pytest
-          python -m pytest web/ive/tests/ -q
+          # Playwright usa el Chrome que ya trae el runner (channel="chrome"),
+          # así que no baja navegadores. IVE_EXIGIR_NAVEGADOR hace que la
+          # prueba en navegador FALLE si no puede correr, en vez de saltearse:
+          # sin eso el deploy quedaba verde sin probar nunca el layout.
+          python -m pip install --quiet pytest playwright
+          IVE_EXIGIR_NAVEGADOR=1 python -m pytest web/ive/tests/ -q
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
