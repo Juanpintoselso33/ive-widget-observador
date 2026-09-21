@@ -243,3 +243,25 @@ def test_el_orden_de_lectura_es_el_que_se_ve(navegador, url, version, ancho):
     }""")
     pagina.close()
     assert en_dom == en_pantalla
+
+
+def test_con_opcion_larga_cruzar_a_dos_columnas_y_volver(navegador, url):
+    """La letra se recalcula en cada resize, DESPUÉS de mover los nodos (lo marcó Codex)."""
+    pagina = _abrir(navegador, url, 360)
+    pagina.select_option("#campo-nivelEduc", "3")
+    letras = ("() => [...document.querySelectorAll('#campos select')]"
+              ".map(s => parseFloat(getComputedStyle(s).fontSize))")
+    chica = pagina.evaluate(letras)
+    assert len(set(chica)) == 1 and chica[0] < 16
+
+    pagina.set_viewport_size({"width": 1280, "height": 900})
+    pagina.wait_for_function("document.getElementById('widget').classList.contains('apaisado')")
+    grande = pagina.evaluate(letras)
+    assert len(set(grande)) == 1 and grande[0] > chica[0]
+    assert _estado(pagina)["recortados"] == []
+
+    pagina.set_viewport_size({"width": 360, "height": 900})
+    pagina.wait_for_function("!document.getElementById('widget').classList.contains('apaisado')")
+    assert pagina.evaluate(letras) == chica
+    assert _estado(pagina)["recortados"] == []
+    pagina.close()
