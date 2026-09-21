@@ -297,33 +297,44 @@
   }
 
   /**
-   * En celular, "Personas en el hogar" pasa ANTES que "Balotaje 2024".
+   * Si la opción elegida no entra en su desplegable, se le achica la letra.
    *
-   * Abajo de 600px educación y balotaje ocupan la fila entera (sus opciones
-   * no entran en media columna), y con el orden de siempre "¿Tienes hijos?"
-   * quedaba sola en su fila. Se sube "hogar" a su lado MOVIENDO EL NODO, no con
-   * `grid-auto-flow: dense` ni `order`: esos cambian sólo lo que se ve, y el
-   * tabulador y el lector de pantalla seguían el orden viejo, bajando a
-   * balotaje y volviendo a subir. Lo marcó Codex. Arriba de 600px vuelve a su
-   * lugar, así que el escritorio queda como estaba.
+   * En celular los campos van de a dos y cada desplegable mide media columna:
+   * "Terciaria completa o más" o "Delgado (Coalición)" no entraban y el
+   * lector veía la opción elegida cortada. Ponerlos en una fila entera
+   * alargaba la caja de la home (Tomer, 21/9/2026) y abreviarlos quedaba feo.
+   * Así el texto va completo y en su lugar: sólo ESE desplegable, y sólo
+   * mientras esa opción esté elegida, baja la letra lo justo para entrar.
+   * Donde entra —escritorio, dos columnas— no cambia nada.
+   *
+   * Hay un piso de 11px: más chico no se lee. A 360px "Terciaria completa o
+   * más" queda en ~11px; a 320 puede quedar algo cortada igual.
    */
-  function ordenarCamposEnCelular() {
-    var hogar = document.getElementById("campo-hogar").parentNode;
-    var balotaje = document.getElementById("campo-balotaje").parentNode;
-    var angosto = window.matchMedia("(max-width: 599px)");
-    function aplicar() {
-      var conFoco = document.activeElement;
-      if (angosto.matches) {
-        if (hogar.nextSibling !== balotaje) balotaje.parentNode.insertBefore(hogar, balotaje);
-      } else if (balotaje.nextSibling !== hogar) {
-        balotaje.parentNode.insertBefore(hogar, balotaje.nextSibling);
-      }
-      if (conFoco && conFoco !== document.activeElement && hogar.contains(conFoco)) {
-        conFoco.focus({ preventScroll: true });
+  var LETRA_MINIMA = 11;
+  function ajustarLetraDesplegables() {
+    var lienzo = document.createElement("canvas").getContext("2d");
+    var selects = [].slice.call(document.querySelectorAll("#campos select"));
+    function ajustar(sel) {
+      sel.style.fontSize = "";
+      var cs = getComputedStyle(sel);
+      var base = parseFloat(cs.fontSize);
+      var util = sel.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      lienzo.font = cs.fontWeight + " " + base + "px " + cs.fontFamily;
+      var texto = sel.options[sel.selectedIndex].text;
+      var ancho = lienzo.measureText(texto).width;
+      if (ancho > util && util > 0) {
+        sel.style.fontSize = Math.max(LETRA_MINIMA, Math.floor(base * util / ancho * 10) / 10) + "px";
       }
     }
-    aplicar();
-    angosto.addEventListener("change", aplicar);
+    function todos() { selects.forEach(ajustar); }
+    selects.forEach(function (sel) {
+      sel.addEventListener("change", function () { ajustar(sel); });
+    });
+    todos();
+    window.addEventListener("resize", todos);
+    // La medida depende de la fuente: si todavía no cargó, se mide con la de
+    // reemplazo y hay que volver a medir cuando llega.
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(todos);
   }
 
   function iniciar(modelo) {
@@ -361,7 +372,7 @@
     }
 
     construirCampos(campos, modelo.variable_ranges, actualizar);
-    ordenarCamposEnCelular();
+    ajustarLetraDesplegables();
     actualizar();
 
     if (!resumen) {

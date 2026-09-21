@@ -391,26 +391,17 @@ body {
 }
 
 /* ---------- Desplegables en celular ----------
-   Con dos columnas parejas, abajo de 600px "Terciaria completa o más" no
-   entraba en su desplegable, abajo de 480 tampoco "Delgado (Coalición)", y a
-   320 se cortaban hasta "35-44 años" y "3-4 personas": el lector veía la
-   opción elegida mocha. Medido en Chrome, 21/9/2026.
-
-   Educación y balotaje —las dos de opciones largas— pasan a ocupar la fila
-   entera, y widget.js sube "Personas en el hogar" al lado de "¿Tienes
-   hijos?" moviendo el nodo (no con `dense`, que desordenaba el tabulador).
-   El corte de 599px está repetido allá: si se cambia, cambian los dos.
-   Alineados al pie, los desplegables de una fila
-   quedan parejos aunque una etiqueta parta en dos renglones. */
+   Abajo de 400px la flecha se achica y cede relleno —lo justo para que
+   "Terciaria completa o más" entre a 360px con la letra en 11px— y la letra base baja a 16px.
+   Si aun así la opción elegida no entra, widget.js le achica la letra a ese
+   desplegable (`ajustarLetraDesplegables`). Alineados al pie, los
+   desplegables de una fila quedan parejos aunque una etiqueta parta en dos
+   renglones. */
 @media (max-width: 599px) {
   .campos { align-items: end; }
-  .campo:has(#campo-nivelEduc), .campo:has(#campo-balotaje) { grid-column: 1 / -1; }
 }
-/* En los celulares más angostos, además, la letra baja un punto y la flecha
-   cede algo de relleno: a 320px la columna mide 139px. */
 @media (max-width: 400px) {
-  .campo select { font-size: 16px; padding: 0 1.75rem 0 0.6rem; background-position: right 0.5rem center; }
-  .campo label { font-size: 17px; }
+  .campo select { font-size: 16px; padding: 0 1.4rem 0 0.5rem; background-position: right 0.45rem center; background-size: 13px; }
 }
 
 /* El signo de ayuda al lado de cada etiqueta: es el `help=` de los selectbox

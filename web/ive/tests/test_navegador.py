@@ -64,11 +64,13 @@ ESTADO = """() => {
   const fila = w.querySelector('.fila-apaisada');
   const selects = [...campos.querySelectorAll('select')];
   const c = document.createElement('canvas').getContext('2d');
+  // Lo que se ve con el desplegable cerrado es la opción ELEGIDA, con la
+  // letra que tenga en ese momento (widget.js la achica si no entra).
   const recortados = selects.filter(s => {
     const cs = getComputedStyle(s);
-    c.font = cs.fontSize + ' ' + cs.fontFamily;
-    const largo = Math.max(...[...s.options].map(o => c.measureText(o.text).width));
-    return largo > s.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    const largo = c.measureText(s.options[s.selectedIndex].text).width;
+    return largo > s.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + 0.5;
   }).map(s => s.id);
   return {
     apaisado: w.classList.contains('apaisado'),
@@ -150,35 +152,77 @@ def test_avisa_la_altura_nueva_al_cruzar_el_corte(navegador, url):
         "<script>window.altos=[];addEventListener('message',e=>{"
         "if(e.data&&e.data.tipo==='ive-widget:alto')altos.push(e.data.alto)});</script>"
     )
+    real = ("() => { const d = document.getElementById('f').contentDocument;"
+            " const r = d.getElementById('widget').getBoundingClientRect(); return Math.ceil(r.bottom); }")
     pagina.wait_for_function("window.altos.length > 0")
     pagina.wait_for_timeout(800)
     ancho_alto = pagina.evaluate("window.altos[window.altos.length-1]")
+    assert abs(ancho_alto - pagina.evaluate(real)) <= 2
 
     pagina.evaluate("window.altos=[]; document.getElementById('caja').style.width='600px'")
     pagina.wait_for_function("window.altos.length > 0")
     pagina.wait_for_timeout(800)
     angosto_alto = pagina.evaluate("window.altos[window.altos.length-1]")
+    assert abs(angosto_alto - pagina.evaluate(real)) <= 2
     pagina.close()
 
-    # En dos columnas mide ~545px; como caja a 600px de ancho, ~780. Se compara
-    # una contra otra y no contra un número fijo, que se rompía con cada ajuste
-    # de espacios.
+    # Cada aviso tiene que ser el alto REAL del widget (arriba; lo marcó
+    # Codex), y además el layout tiene que haber cambiado: dos columnas es
+    # mucho más bajo.
     assert ancho_alto + 150 < angosto_alto
 
 
+ELEGIR_LO_MAS_LARGO = """() => {
+  const c = document.createElement('canvas').getContext('2d');
+  c.font = '16px sans-serif';
+  document.querySelectorAll('#campos select').forEach(s => {
+    let mejor = 0;
+    [...s.options].forEach((o, i) => { if (c.measureText(o.text).width > c.measureText(s.options[mejor].text).width) mejor = i; });
+    s.selectedIndex = mejor;
+    s.dispatchEvent(new Event('change'));
+  });
+}"""
+
+
+# 320px queda afuera: ahí la media columna tiene 99px útiles y "Terciaria
+# completa o más" no entra ni con la letra en el piso de 11px.
 @pytest.mark.parametrize("version", ["", "?resumen=1"])
-@pytest.mark.parametrize("ancho", [320, 360, 390, 480, 540, 600])
-def test_en_celular_no_se_corta_ninguna_opcion(navegador, url, version, ancho):
-    """Con dos columnas parejas, abajo de 600px se cortaban las opciones largas."""
+@pytest.mark.parametrize("ancho", [360, 390, 414, 480, 540, 600])
+def test_en_celular_no_se_corta_la_opcion_mas_larga(navegador, url, version, ancho):
+    """Con la opción más larga elegida en cada campo, ninguna se ve cortada."""
     pagina = navegador.new_page(viewport={"width": ancho, "height": 900})
     pagina.goto(url + version)
     pagina.locator(".result-number").wait_for()
     pagina.evaluate("document.fonts.ready")
-    recortados = pagina.evaluate(ESTADO.replace(
+    pagina.evaluate(ELEGIR_LO_MAS_LARGO)
+    e = pagina.evaluate(ESTADO.replace(
         "const fila = w.querySelector('.fila-apaisada');",
-        "const fila = w.querySelector('.fila-apaisada') || campos;"))["recortados"]
+        "const fila = w.querySelector('.fila-apaisada') || campos;"))
+    letras = pagina.evaluate("() => [...document.querySelectorAll('#campos select')]"
+                             ".map(s => parseFloat(getComputedStyle(s).fontSize))")
     pagina.close()
-    assert recortados == []
+    assert e["recortados"] == []
+    assert min(letras) >= 11
+
+
+def test_la_letra_vuelve_al_elegir_una_opcion_corta(navegador, url):
+    pagina = _abrir(navegador, url, 360)
+    letra = "() => parseFloat(getComputedStyle(document.getElementById('campo-nivelEduc')).fontSize)"
+    normal = pagina.evaluate(letra)
+    pagina.select_option("#campo-nivelEduc", "3")  # Terciaria completa o más
+    assert pagina.evaluate(letra) < normal
+    pagina.select_option("#campo-nivelEduc", "1")  # Secundaria
+    assert pagina.evaluate(letra) == normal
+    pagina.close()
+
+
+def test_en_celular_educacion_y_balotaje_van_de_a_pares(navegador, url):
+    """Tomer: en filas enteras alargaban la caja de la home."""
+    pagina = _abrir(navegador, url, 360)
+    anchos = pagina.evaluate("() => ['campo-nivelEduc','campo-tieneHijos','campo-balotaje','campo-hogar']"
+                             ".map(i => Math.round(document.getElementById(i).getBoundingClientRect().width))")
+    pagina.close()
+    assert len(set(anchos)) == 1
 
 
 @pytest.mark.parametrize("version", ["", "?resumen=1"])
@@ -196,13 +240,3 @@ def test_el_orden_de_lectura_es_el_que_se_ve(navegador, url, version, ancho):
     }""")
     pagina.close()
     assert en_dom == en_pantalla
-
-
-def test_en_celular_hogar_va_al_lado_de_hijos_y_vuelve(navegador, url):
-    pagina = _abrir(navegador, url, 360)
-    orden = "() => [...document.querySelectorAll('#campos select')].map(e => e.id)"
-    assert pagina.evaluate(orden)[-2:] == ["campo-hogar", "campo-balotaje"]
-    pagina.set_viewport_size({"width": 700, "height": 900})
-    pagina.wait_for_function("document.querySelectorAll('#campos select')[7].id === 'campo-hogar'")
-    assert pagina.evaluate(orden)[-2:] == ["campo-balotaje", "campo-hogar"]
-    pagina.close()
