@@ -86,6 +86,12 @@ body {
   margin: 0 0 1rem 0;
 }
 
+/* La bajada del bloque de comparación lleva un poco más de aire abajo que la
+   del encabezado: son los 6px que faltaban para que las solapas cayeran donde
+   caen en la versión publicada. Va apuntada a ese bloque para no mover la
+   bajada principal, que ya coincidía. */
+#bloque-comparacion .subtitle { margin-bottom: 22px; }
+
 .section-header {
   font-family: 'Libre Baskerville', Georgia, serif;
   font-size: 18px;
@@ -108,6 +114,11 @@ body {
      gap original el formulario medía 311px contra los 346 de Streamlit y el
      widget quedaba notoriamente más apretado. */
   gap: 1.6rem 1rem;
+  /* El aire entre el último desplegable y el borde de la banda gris. Sin esto
+     el select quedaba PEGADO al gris: al igualar la distancia campos→barra se
+     le había cargado todo el espacio al relleno de la banda, y el reparto
+     quedaba de 0px arriba y 65 abajo contra los 19 y 33 del original. */
+  margin-bottom: 19px;
 }
 
 .campo { display: flex; flex-direction: column; }
@@ -166,11 +177,11 @@ body {
 .banda {
   background: var(--banda);
   margin: 0 -0.8rem -2rem -0.8rem;
-  padding: 3.6rem 0.8rem 2rem 0.8rem;
+  padding: 25px 0.8rem 19px 0.8rem;
 }
 
 /* ---------- Barra de probabilidad ---------- */
-.prob-bar-wrapper { margin: 0.5rem 0 1.25rem 0; }
+.prob-bar-wrapper { margin: 0.5rem 0 24px 0; }
 
 .prob-endpoints {
   display: flex;
@@ -312,17 +323,17 @@ body {
 .grupo-celda-delta--sube { color: var(--azul); }
 .grupo-celda-delta--baja { color: var(--accent); }
 
-.grupo-nota-ref { margin-top: 1rem; font-size: 16px; color: var(--text-muted); }
+.grupo-nota-ref { margin-top: 19px; font-size: 16px; color: var(--text-muted); }
 
 /* ---------- Varios ---------- */
-.editorial-divider { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+.editorial-divider { border: none; border-top: 1px solid var(--border); margin: 57px 0 38px 0; }
 
 /* El desplegable de metodología, con <details> nativo. */
 .metodologia {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: transparent;
-  margin-top: 1rem;
+  margin-top: 0;
   padding: 0 0.9rem;
 }
 
@@ -352,7 +363,7 @@ body {
   font-size: 16px;
   color: var(--text-muted);
   line-height: 1.6;
-  margin-top: 3.2rem;
+  margin-top: 47px;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
